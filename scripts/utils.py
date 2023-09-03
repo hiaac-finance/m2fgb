@@ -86,7 +86,7 @@ def plot_metric_lambda(results, metric, axs=None):
 
 
 def comparison_subgrous_metrics_lambda(results):
-    fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(12, 7), sharey="row")
+    fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(10, 10), sharey="row")
     plot_metric_lambda(results, "roc", axs[0])
     plot_metric_lambda(results, "tpr", axs[1])
     plot_metric_lambda(results, "fpr", axs[2])
