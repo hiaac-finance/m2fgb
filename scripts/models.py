@@ -25,7 +25,7 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
 
     def fit(self, X, y):
         X, y = check_X_y(X, y)
-
+        self.classes_ = np.unique(y)
         dtrain = xgb.DMatrix(X, label=y)
         params = {
             'objective': "binary:logistic",
