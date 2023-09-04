@@ -9,16 +9,16 @@ def get_best_threshold(y_ground, y_pred):
     return thresholds[np.argmax(tpr - fpr)]
 
 
-def fpr_score(y_ground, y_pred):
-    tn = ((y_pred == 0) & (y_ground == y_pred)).sum()
-    fp = ((y_pred == 1) & (y_ground != y_pred)).sum()
-    fpr = fp / (fp + tn)
-    return fpr
+def fnr_score(y_ground, y_pred):
+    fn = ((y_pred == 0) & (y_ground == 1)).sum()
+    tp = ((y_pred == 1) & (y_ground == 1)).sum()
+    fnr = fn / (fn + tp)
+    return fnr
 
 
 def tpr_score(y_ground, y_pred):
-    tp = ((y_pred == 1) & (y_ground == y_pred)).sum()
-    fn = ((y_pred == 0) & (y_ground != y_pred)).sum()
+    fn = ((y_pred == 0) & (y_ground == 1)).sum()
+    tp = ((y_pred == 1) & (y_ground == 1)).sum()
     tpr = tp / (tp + fn)
     return tpr
 
@@ -27,7 +27,7 @@ def eval_model_data(y_ground, y_pred, p=None, name=""):
     roc = roc_auc_score(y_ground, y_pred)
     if p is None:
         p = get_best_threshold(y_ground, y_pred)
-    fpr = fpr_score(y_ground, y_pred > p)
+    fnr = fnr_score(y_ground, y_pred > p)
     tpr = tpr_score(y_ground, y_pred > p)
     acc = accuracy_score(y_ground, y_pred > p)
     precision = precision_score(y_ground, y_pred > p)
@@ -35,7 +35,7 @@ def eval_model_data(y_ground, y_pred, p=None, name=""):
         {
             "roc": roc,
             "tpr": tpr,
-            "fpr": fpr,
+            "fnr": fnr,
             "threshold": p,
             "accuracy": acc,
             "precision": precision,
@@ -89,6 +89,6 @@ def comparison_subgrous_metrics_lambda(results):
     fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(10, 10), sharey="row")
     plot_metric_lambda(results, "roc", axs[0])
     plot_metric_lambda(results, "tpr", axs[1])
-    plot_metric_lambda(results, "fpr", axs[2])
+    plot_metric_lambda(results, "fnr", axs[2])
 
     plt.tight_layout()
