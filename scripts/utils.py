@@ -22,11 +22,15 @@ def tpr_score(y_ground, y_pred):
     tpr = tp / (tp + fn)
     return tpr
 
+def logloss_score(y_ground, y_pred):
+    return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
+
 
 def eval_model_data(y_ground, y_pred, p=None, name=""):
     roc = roc_auc_score(y_ground, y_pred)
     if p is None:
         p = get_best_threshold(y_ground, y_pred)
+    logloss = logloss_score(y_ground, y_pred)
     fnr = fnr_score(y_ground, y_pred > p)
     tpr = tpr_score(y_ground, y_pred > p)
     acc = accuracy_score(y_ground, y_pred > p)
@@ -36,6 +40,7 @@ def eval_model_data(y_ground, y_pred, p=None, name=""):
             "roc": roc,
             "tpr": tpr,
             "fnr": fnr,
+            "logloss": logloss,
             "threshold": p,
             "accuracy": acc,
             "precision": precision,
@@ -87,8 +92,9 @@ def plot_metric_lambda(results, metric, axs=None):
 
 def comparison_subgrous_metrics_lambda(results):
     fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(10, 10), sharey="row")
-    plot_metric_lambda(results, "roc", axs[0])
-    plot_metric_lambda(results, "tpr", axs[1])
-    plot_metric_lambda(results, "fnr", axs[2])
+    plot_metric_lambda(results, "logloss", axs[0])
+    plot_metric_lambda(results, "roc", axs[1])
+    plot_metric_lambda(results, "tpr", axs[2])
+    
 
     plt.tight_layout()
