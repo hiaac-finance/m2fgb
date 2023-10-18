@@ -9,11 +9,12 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
         self,
         n_estimators = 10,
         eta = 0.3,
-        colsample_bytree = 0.5,
-        max_depth = 5,
+        colsample_bytree = 1,
+        max_depth = 6,
         min_child_weight = 1,
         l2_weight = 1,
         objective = None,
+        seed = None,
     ):
         self.eta = eta
         self.n_estimators = n_estimators
@@ -22,26 +23,30 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
         self.min_child_weight = min_child_weight
         self.l2_weight = l2_weight
         self.objective = objective
+        self.seed = seed
 
     def fit(self, X, y):
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
         dtrain = xgb.DMatrix(X, label=y)
+
         params = {
+            "tree_method" : "hist",
             'objective': "binary:logistic",
             "max_depth" : self.max_depth,
             "colsample_bytree" : self.colsample_bytree,
             "min_child_weight" : self.min_child_weight,
             "eta" : self.eta,
             "lambda" : self.l2_weight,
-            "tree_method" : "hist",
-            "seed" : 0
         }
+        if self.seed is not None:
+            params["seed"] = self.seed
+        
         self.model_ = xgb.train(
             params,
             dtrain,
             num_boost_round = self.n_estimators,
-            obj = None if self.objective is None else self.objective
+            obj = self.objective
         )
         return self
 
@@ -50,7 +55,7 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
         X = check_array(X)
         dtest = xgb.DMatrix(X)
         preds = self.model_.predict(dtest)
-        return (preds > 0.5).astype(int)  # You can adjust the threshold
+        return (preds > 0.5).astype(int) 
 
     def predict_proba(self, X):
         check_is_fitted(self)
