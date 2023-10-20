@@ -81,7 +81,7 @@ def plot_metric_lambda(results, metric, axs=None):
         results_1 = results_[results_.name.str.contains("1")]
         axs[i].plot(results_0["lambda"], results_0[metric], label=f"{ds}_0")
         axs[i].plot(results_1["lambda"], results_1[metric], label=f"{ds}_1")
-        axs[i].set_xlabel("lambda")
+        axs[i].set_xlabel("Fairness weight")
         axs[i].set_ylabel(metric)
         axs[i].legend()
         axs[i].set_xscale("symlog", linthresh=0.01)
