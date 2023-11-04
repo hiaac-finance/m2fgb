@@ -106,7 +106,7 @@ def preprocess_taiwan():
 
     df=pd.get_dummies(df,columns=cat_cols,prefix=cat_cols)
 
-    df.to_csv("../data/taiwan_preprocessed.csv", index = False)
+    df.to_csv("data/taiwan_preprocessed.csv", index = False)
     
 
 if __name__ == "__main__":
