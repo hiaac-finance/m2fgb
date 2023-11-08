@@ -7,6 +7,11 @@ import cvxpy as cp
 
 
 class XGBoostWrapper(BaseEstimator, ClassifierMixin):
+    """_summary_
+
+    :param alpha: weight of the performance objective, must be in [0, 1], 1 - alpha is the weight of the fairness objective
+    :param ClassifierMixin: _description_
+    """
     def __init__(
         self,
         n_estimators=10,
@@ -17,6 +22,8 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
         max_leaves=0,
         l2_weight=1,
         objective=None,
+        alpha = 1,
+        sensitive_idx=None,
         seed=None,
     ):
         self.eta = eta
@@ -27,6 +34,8 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
         self.l2_weight = l2_weight
         self.max_leaves = max_leaves
         self.objective = objective
+        self.alpha = alpha
+        self.sensitive_idx = sensitive_idx
         self.seed = seed
 
     def fit(self, X, y):
@@ -69,14 +78,25 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
         preds[:, 0] -= preds_pos
         return preds
 
+    def fairness_score(self, X, y, preds):
+        A = X[:, self.sensitive_idx]
+        A = A.reshape(-1)
+        A = A.astype(int)
+        EOD = np.mean(preds[(A == 1) & (y == 1)]) - np.mean(preds[(A == 0) & (y == 1)])
+        return 1 - np.abs(EOD)
+     
+
     def score(self, X, y):
         check_is_fitted(self)
         X = check_array(X)
         dtest = xgb.DMatrix(X)
         preds = self.model_.predict(dtest)
-        return roc_auc_score(y, preds)
-        p = get_best_threshold(y, preds)
-        return accuracy_score(y, preds > p)
+        roc = roc_auc_score(y, preds)
+        if self.alpha == 1:
+            return roc
+        fair = self.fairness_score(X, y, preds)
+        return roc * self.alpha + (1 - self.alpha) * fair
+       
 
 
 def logloss_grad(predt, dtrain):
@@ -149,12 +169,14 @@ def penalize_max_loss_subgroups(subgroup_idx, fair_weight):
             # dual problem
             loss_group = logloss_group(predt, dtrain, subgroup)
             mu = cp.Variable(loss_group.shape[0])  # number of groups
-            z = cp.Variable(1)  # z is the min of mu * loss
-            constraints = [cp.sum(mu) == weight_2, mu >= 0] + [
-                z <= mu[i] * loss_group[i] for i in range(loss_group.shape[0])
-            ]
-
-            objective = cp.Maximize(z)
+            # z = cp.Variable(1)  # z is the min of mu * loss
+            #constraints = [cp.sum(mu) == weight_2, mu >= 0] + [
+            #    z <= mu[i] * loss_group[i] for i in range(loss_group.shape[0])
+            #]
+            #objective = cp.Maximize(z)
+            
+            constraints = [cp.sum(mu) == weight_2, mu >= 0]
+            objective = cp.Maximize(cp.sum([mu[i] * loss_group[i] for i in range(loss_group.shape[0])]))
             problem = cp.Problem(objective, constraints)
             problem.solve()
 
