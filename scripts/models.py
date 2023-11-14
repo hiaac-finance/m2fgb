@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, accuracy_score
 import xgboost as xgb
 import cvxpy as cp
 
@@ -197,3 +197,149 @@ def penalize_max_loss_subgroups(subgroup_idx, fair_weight):
         return grad, hess
 
     return custom_obj
+
+def dual_obj(subgroup, fair_weight):
+    weight_1 = 1
+    weight_2 = fair_weight
+    n = len(subgroup)
+    n_g = get_subgroup_indicator(subgroup)
+
+    def custom_obj(predt, dtrain):
+        if weight_2 > 0:
+            # dual problem solved analytically
+            loss_group = logloss_group(predt, dtrain, subgroup)
+            idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
+            # if is more than one, randomly choose one
+            idx_biggest_loss = np.random.choice(idx_biggest_loss)
+            mu_opt = np.zeros(loss_group.shape[0])
+            mu_opt[idx_biggest_loss] = weight_2
+            
+        else:
+            mu_opt = np.zeros(len(np.unique(subgroup)))
+        
+        grad = logloss_grad(predt, dtrain) * (1 / n + np.sum(n_g * mu_opt, axis=1))
+        hess = logloss_hessian(predt, dtrain) * (1 / n + np.sum(n_g * mu_opt, axis=1))
+        return grad, hess
+
+    return custom_obj
+
+class XtremeFair(BaseEstimator, ClassifierMixin):
+    """Gradient Boosting with min max fairness regularization.
+
+    :param n_estimators:
+    :param ClassifierMixin: _description_
+    """
+
+    def __init__(
+        self,
+        fairness_constraint = "equalized_loss",
+        fair_weight=1,
+        use_sensitive_attr = True,
+        n_estimators=10,
+        eta=0.3,
+        colsample_bytree=1,
+        max_depth=6,
+        min_child_weight=1,
+        max_leaves=0,
+        l2_weight=1,
+        alpha=1,
+        fairness_metric = "EOD",
+        seed=None,
+    ):  
+        if fairness_constraint != "equalized_loss":
+            raise NotImplementedError(f"Fairness constraint {fairness_constraint} not implemented.")
+        
+        if fairness_metric != "EOD":
+            raise NotImplementedError(f"Fairness score {fairness_metric} not implemented.")
+        
+        self.fairness_constraint = fairness_constraint
+        self.fair_weight = fair_weight
+        self.use_sensitive_attr = use_sensitive_attr
+        self.n_estimators = n_estimators
+        self.eta = eta
+        self.colsample_bytree = colsample_bytree
+        self.max_depth = max_depth
+        self.min_child_weight = min_child_weight
+        self.max_leaves = max_leaves
+        self.l2_weight = l2_weight
+        self.alpha = alpha
+        self.seed = seed
+        self.fairness_metric = fairness_metric
+
+    def fit(self, X, y):
+        """_summary_
+
+        :param X: array-like of shape (n_samples, n_features), sensitive attribute must be in the first column
+        :param y: labels array-like of shape (n_samples), must be (0 or 1)
+        :return: self
+        """
+        X, y = check_X_y(X, y)
+        A = X[:, 0].reshape(-1)
+        self.classes_ = np.unique(y)
+        if not self.use_sensitive_attr:
+            dtrain = xgb.DMatrix(X[:, 1:], label=y)
+        else:
+            dtrain = xgb.DMatrix(X, label=y)
+
+        params = {
+            "tree_method": "hist",
+            "objective": "binary:logistic",
+            "eta": self.eta,
+            "colsample_bytree": self.colsample_bytree,
+            "max_depth": self.max_depth,
+            "min_child_weight": self.min_child_weight,
+            "max_leaves": self.max_leaves,
+            "lambda": self.l2_weight,
+        }
+        if self.seed is not None:
+            params["seed"] = self.seed
+
+        self.model_ = xgb.train(
+            params, 
+            dtrain, 
+            num_boost_round=self.n_estimators, 
+            obj=dual_obj(A, self.fair_weight)
+        )
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self)
+        X = check_array(X)
+        if not self.use_sensitive_attr:
+            dtest = xgb.DMatrix(X[:, 1:])
+        else:
+            dtest = xgb.DMatrix(X)
+        preds = self.model_.predict(dtest)
+        return (preds > 0.5).astype(int)
+
+    def predict_proba(self, X):
+        check_is_fitted(self)
+        X = check_array(X)
+        if not self.use_sensitive_attr:
+            dtest = xgb.DMatrix(X[:, 1:])
+        else:
+            dtest = xgb.DMatrix(X)
+        preds_pos = self.model_.predict(dtest)
+        preds = np.ones((preds_pos.shape[0], 2))
+        preds[:, 1] = preds_pos
+        preds[:, 0] -= preds_pos
+        return preds
+
+    def fairness_score(self, X, y, preds):
+        A = X[:, 0].reshape(-1)
+        EOD = np.mean(preds[(A == 1) & (y == 1)]) - np.mean(preds[(A == 0) & (y == 1)])
+        return 1 - np.abs(EOD)
+
+    def score(self, X, y):
+        check_is_fitted(self)
+        X = check_array(X)
+        if not self.use_sensitive_attr:
+            dtest = xgb.DMatrix(X[:, 1:])
+        else:
+            dtest = xgb.DMatrix(X)
+        preds = self.model_.predict(dtest)
+        acc = accuracy_score(y, preds > 0.5)
+        if self.alpha == 1:
+            return acc
+        fair = self.fairness_score(X, y, preds)
+        return acc * self.alpha + (1 - self.alpha) * fair
