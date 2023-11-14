@@ -12,6 +12,7 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
     :param alpha: weight of the performance objective, must be in [0, 1], 1 - alpha is the weight of the fairness objective
     :param ClassifierMixin: _description_
     """
+
     def __init__(
         self,
         n_estimators=10,
@@ -22,7 +23,7 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
         max_leaves=0,
         l2_weight=1,
         objective=None,
-        alpha = 1,
+        alpha=1,
         sensitive_idx=None,
         seed=None,
     ):
@@ -84,7 +85,6 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
         A = A.astype(int)
         EOD = np.mean(preds[(A == 1) & (y == 1)]) - np.mean(preds[(A == 0) & (y == 1)])
         return 1 - np.abs(EOD)
-     
 
     def score(self, X, y):
         check_is_fitted(self)
@@ -96,11 +96,10 @@ class XGBoostWrapper(BaseEstimator, ClassifierMixin):
             return roc
         fair = self.fairness_score(X, y, preds)
         return roc * self.alpha + (1 - self.alpha) * fair
-       
 
 
 def logloss_grad(predt, dtrain):
-    """Compute the gradient for log loss."""
+    """Compute the gradient for cross entropy log loss."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
     grad = -(y - predt)
@@ -108,25 +107,25 @@ def logloss_grad(predt, dtrain):
 
 
 def logloss_hessian(predt, dtrain):
-    """Compute the hessian for log loss."""
+    """Compute the hessian for cross entropy log loss."""
     predt = 1 / (1 + np.exp(-predt))
     hess = predt * (1 - predt)
     return hess
 
 
 def logloss_group(predt, dtrain, subgroup):
+    """For each subgroup, calculates the mean log loss of the samples."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
     loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
     groups = np.unique(subgroup)
-    loss_matrix = np.zeros((len(y), len(groups)))
 
+    loss_matrix = np.zeros((len(y), len(groups)))
     for i, group in enumerate(groups):
         loss_matrix[:, i] = loss  # copy the column
-        loss_matrix[subgroup != group, i] = 0  # and set 0 for other groups
+        loss_matrix[subgroup != group, i] = np.nan  # and set nan for other groups
 
-    loss_matrix = np.sum(loss_matrix, axis=0) / np.sum(loss_matrix != 0, axis=0)
-    return loss_matrix
+    return np.nanmean(loss_matrix, axis=0)
 
 
 def logloss_grad_group(predt, dtrain, subgroup):
@@ -158,6 +157,20 @@ def logloss_hessian_group(predt, dtrain, subgroup):
     return hess_matrix
 
 
+def get_subgroup_indicator(subgroup):
+    """Return matrix with a column for each subgroup. 
+    Each column has value 1/n_g for the samples in the subgroup and 0 otherwise.
+    """
+    groups = np.unique(subgroup)
+    subgroup_ind = np.zeros((len(subgroup), len(groups)))
+
+    for i, group in enumerate(groups):
+        subgroup_ind[:, i] = subgroup == group
+        n_g = np.sum(subgroup_ind[:, i])
+        subgroup_ind[:, i] = subgroup_ind[:, i] / n_g
+    return subgroup_ind
+
+
 def penalize_max_loss_subgroups(subgroup_idx, fair_weight):
     weight_1 = 1
     weight_2 = fair_weight
@@ -166,33 +179,20 @@ def penalize_max_loss_subgroups(subgroup_idx, fair_weight):
         subgroup = (dtrain.get_data()[:, subgroup_idx]).toarray().reshape(-1)
 
         if weight_2 > 0:
-            # dual problem
+            # dual problem solved analytically
             loss_group = logloss_group(predt, dtrain, subgroup)
-            mu = cp.Variable(loss_group.shape[0])  # number of groups
-            # z = cp.Variable(1)  # z is the min of mu * loss
-            #constraints = [cp.sum(mu) == weight_2, mu >= 0] + [
-            #    z <= mu[i] * loss_group[i] for i in range(loss_group.shape[0])
-            #]
-            #objective = cp.Maximize(z)
-            
-            constraints = [cp.sum(mu) == weight_2, mu >= 0]
-            objective = cp.Maximize(cp.sum([mu[i] * loss_group[i] for i in range(loss_group.shape[0])]))
-            problem = cp.Problem(objective, constraints)
-            problem.solve()
-
-            # primal problem
-            mu_opt = mu.value
+            idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
+            # if is more than one, randomly choose one
+            idx_biggest_loss = np.random.choice(idx_biggest_loss)
+            mu_opt = np.zeros(loss_group.shape[0])
+            mu_opt[idx_biggest_loss] = weight_2
         else:
             mu_opt = np.zeros(len(np.unique(subgroup)))
 
-        grad_group = logloss_grad_group(predt, dtrain, subgroup)
-        hess_group = logloss_hessian_group(predt, dtrain, subgroup)
-        grad = logloss_grad(predt, dtrain) * weight_1 + np.sum(
-            mu_opt * grad_group, axis=1
-        )
-        hess = logloss_hessian(predt, dtrain) * weight_1 + np.sum(
-            mu_opt * hess_group, axis=1
-        )
+        n = len(subgroup)
+        subgroup_ind = (get_subgroup_indicator(subgroup) * mu_opt).sum(axis=1)
+        grad = logloss_grad(predt, dtrain) * (1 / n + subgroup_ind)
+        hess = logloss_hessian(predt, dtrain) * (1 / n + subgroup_ind)
 
         return grad, hess
 
