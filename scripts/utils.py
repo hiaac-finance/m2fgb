@@ -60,11 +60,12 @@ def eval_model_subgroups(y_ground, y_pred, subgroup, p=None, name=""):
 
 
 def eval_model_train_test(
-    model, X_train, Y_train, subgroup_train, X_test, Y_test, subgroup_test
+    model, X_train, Y_train, subgroup_train, X_test, Y_test, subgroup_test, p=None
 ):
     results = []
     Y_train_pred = model.predict_proba(X_train)[:, 1]
-    p = get_best_threshold(Y_train, Y_train_pred)
+    if p is None:
+        p = get_best_threshold(Y_train, Y_train_pred)
     results += eval_model_subgroups(Y_train, Y_train_pred, subgroup_train, p, "train")
     Y_test_pred = model.predict_proba(X_test)[:, 1]
     results += eval_model_subgroups(Y_test, Y_test_pred, subgroup_test, p, "test")
@@ -127,7 +128,7 @@ def plot_metric_diff_lambda(results, metric, axs=None):
 def comparison_subgrous_metrics_lambda(results):
     fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(10, 10), sharey="row")
     plot_metric_lambda(results, "logloss", axs[0])
-    plot_metric_lambda(results, "roc", axs[1])
+    plot_metric_lambda(results, "accuracy", axs[1])
     plot_metric_lambda(results, "tpr", axs[2])
     
 
@@ -136,7 +137,7 @@ def comparison_subgrous_metrics_lambda(results):
 
     fig, axs = plt.subplots(nrows = 1, ncols = 3, figsize=(10, 3), sharey="row")
     plot_metric_diff_lambda(results, "logloss", axs[0])
-    plot_metric_diff_lambda(results, "roc", axs[1])
+    plot_metric_diff_lambda(results, "accuracy", axs[1])
     plot_metric_diff_lambda(results, "tpr", axs[2])
     plt.show()
 
