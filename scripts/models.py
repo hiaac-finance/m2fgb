@@ -128,35 +128,6 @@ def logloss_group(predt, dtrain, subgroup):
     return np.nanmean(loss_matrix, axis=0)
 
 
-def logloss_grad_group(predt, dtrain, subgroup):
-    """Compute the gradient for log loss for each group."""
-    y = dtrain.get_label()
-    predt = 1 / (1 + np.exp(-predt))
-    grad = -(y - predt)
-
-    groups = np.unique(subgroup)
-    grad_matrix = np.zeros((len(y), len(groups)))
-
-    for i, group in enumerate(groups):
-        grad_matrix[:, i] = grad  # copy the column
-        grad_matrix[subgroup != group, i] = 0  # and set 0 for other groups
-    return grad_matrix
-
-
-def logloss_hessian_group(predt, dtrain, subgroup):
-    """Compute the hessian for log loss for each group."""
-    predt = 1 / (1 + np.exp(-predt))
-    hess = predt * (1 - predt)
-
-    groups = np.unique(subgroup)
-    hess_matrix = np.zeros((len(hess), len(groups)))
-
-    for i, group in enumerate(groups):
-        hess_matrix[:, i] = hess  # copy the column
-        hess_matrix[subgroup != group, i] = 0  # and set 0 for other groups
-    return hess_matrix
-
-
 def get_subgroup_indicator(subgroup):
     """Return matrix with a column for each subgroup. 
     Each column has value 1/n_g for the samples in the subgroup and 0 otherwise.
@@ -198,13 +169,14 @@ def penalize_max_loss_subgroups(subgroup_idx, fair_weight):
 
     return custom_obj
 
-def dual_obj(subgroup, fair_weight):
+def dual_obj(fair_weight):
     weight_1 = 1
     weight_2 = fair_weight
-    n = len(subgroup)
-    n_g = get_subgroup_indicator(subgroup)
-
+    
     def custom_obj(predt, dtrain):
+        subgroup = (dtrain.get_data()[:, 0]).toarray().reshape(-1)
+        n = len(subgroup)
+        n_g = get_subgroup_indicator(subgroup)
         if weight_2 > 0:
             # dual problem solved analytically
             loss_group = logloss_group(predt, dtrain, subgroup)
@@ -217,8 +189,8 @@ def dual_obj(subgroup, fair_weight):
         else:
             mu_opt = np.zeros(len(np.unique(subgroup)))
         
-        grad = logloss_grad(predt, dtrain) * (1 / n + np.sum(n_g * mu_opt, axis=1))
-        hess = logloss_hessian(predt, dtrain) * (1 / n + np.sum(n_g * mu_opt, axis=1))
+        grad = logloss_grad(predt, dtrain) * (1 / n + np.sum(n_g * mu_opt, axis=1)) * n
+        hess = logloss_hessian(predt, dtrain) * (1 / n + np.sum(n_g * mu_opt, axis=1)) * n
         return grad, hess
 
     return custom_obj
@@ -234,7 +206,6 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         self,
         fairness_constraint = "equalized_loss",
         fair_weight=1,
-        use_sensitive_attr = True,
         n_estimators=10,
         eta=0.3,
         colsample_bytree=1,
@@ -254,7 +225,6 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         
         self.fairness_constraint = fairness_constraint
         self.fair_weight = fair_weight
-        self.use_sensitive_attr = use_sensitive_attr
         self.n_estimators = n_estimators
         self.eta = eta
         self.colsample_bytree = colsample_bytree
@@ -274,12 +244,8 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         :return: self
         """
         X, y = check_X_y(X, y)
-        A = X[:, 0].reshape(-1)
         self.classes_ = np.unique(y)
-        if not self.use_sensitive_attr:
-            dtrain = xgb.DMatrix(X[:, 1:], label=y)
-        else:
-            dtrain = xgb.DMatrix(X, label=y)
+        dtrain = xgb.DMatrix(X, label=y)
 
         params = {
             "tree_method": "hist",
@@ -298,27 +264,21 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
             params, 
             dtrain, 
             num_boost_round=self.n_estimators, 
-            obj=dual_obj(A, self.fair_weight)
+            obj=dual_obj(self.fair_weight)
         )
         return self
 
     def predict(self, X):
         check_is_fitted(self)
         X = check_array(X)
-        if not self.use_sensitive_attr:
-            dtest = xgb.DMatrix(X[:, 1:])
-        else:
-            dtest = xgb.DMatrix(X)
+        dtest = xgb.DMatrix(X)
         preds = self.model_.predict(dtest)
         return (preds > 0.5).astype(int)
 
     def predict_proba(self, X):
         check_is_fitted(self)
         X = check_array(X)
-        if not self.use_sensitive_attr:
-            dtest = xgb.DMatrix(X[:, 1:])
-        else:
-            dtest = xgb.DMatrix(X)
+        dtest = xgb.DMatrix(X)
         preds_pos = self.model_.predict(dtest)
         preds = np.ones((preds_pos.shape[0], 2))
         preds[:, 1] = preds_pos
@@ -333,10 +293,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
     def score(self, X, y):
         check_is_fitted(self)
         X = check_array(X)
-        if not self.use_sensitive_attr:
-            dtest = xgb.DMatrix(X[:, 1:])
-        else:
-            dtest = xgb.DMatrix(X)
+        dtest = xgb.DMatrix(X)
         preds = self.model_.predict(dtest)
         acc = accuracy_score(y, preds > 0.5)
         if self.alpha == 1:
