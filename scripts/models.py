@@ -77,10 +77,9 @@ def dual_obj(fair_weight):
         else:
             mu_opt = np.zeros(len(np.unique(subgroup)))
 
-        grad = logloss_grad(predt, dtrain) * (1 / n + np.sum(n_g * mu_opt, axis=1)) * n
-        hess = (
-            logloss_hessian(predt, dtrain) * (1 / n + np.sum(n_g * mu_opt, axis=1)) * n
-        )
+        multiplier = n / (1 + weight_2) * (1 / n + np.sum(n_g * mu_opt, axis=1))
+        grad = logloss_grad(predt, dtrain) * multiplier
+        hess = logloss_hessian(predt, dtrain) * multiplier
         return grad, hess
 
     return custom_obj
