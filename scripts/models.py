@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
 import xgboost as xgb
 
 
@@ -130,18 +130,13 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         max_leaves=0,
         l2_weight=1,
         alpha=1,
+        performance_metric="accuracy",
         fairness_metric="EOD",
         seed=None,
     ):
-        if fairness_constraint != "equalized_loss":
-            raise NotImplementedError(
-                f"Fairness constraint {fairness_constraint} not implemented."
-            )
-
-        if fairness_metric != "EOD":
-            raise NotImplementedError(
-                f"Fairness score {fairness_metric} not implemented."
-            )
+        assert fairness_constraint in ["equalized_loss"]
+        assert performance_metric in ["accuracy", "auc"]
+        assert fairness_metric in ["EOP", "SPD"]
 
         self.fairness_constraint = fairness_constraint
         self.fair_weight = fair_weight
@@ -153,8 +148,9 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         self.max_leaves = max_leaves
         self.l2_weight = l2_weight
         self.alpha = alpha
-        self.seed = seed
+        self.performance_metric = performance_metric
         self.fairness_metric = fairness_metric
+        self.seed = seed
 
     def fit(self, X, y):
         """Fit the model to the data.
@@ -211,19 +207,41 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         return preds
 
     def fairness_score(self, X, y, preds):
-        """Calculate the fairness score of the model."""
+        """Calculate the fairness score of the model. The sensitive attribute must be in the first column of X."""
         A = X[:, 0].reshape(-1)
-        EOD = np.mean(preds[(A == 1) & (y == 1)]) - np.mean(preds[(A == 0) & (y == 1)])
-        return 1 - np.abs(EOD)
+        if self.fairness_metric == "EOD":
+            fair = np.mean(preds[(A == 1) & (y == 1)]) - np.mean(
+                preds[(A == 0) & (y == 1)]
+            )
+        elif self.fairness_metric == "SPD":
+            fair = np.mean(preds[A == 1]) - np.mean(preds[A == 0])
+        return 1 - np.abs(fair)
 
     def score(self, X, y):
-        """Calculate the performance-fairness score of the model."""
+        """
+        Calculate the performance-fairness score of the model. The score has the following formula:
+
+        $score = $perf * \alpha + (1 - |fair|) * (1 - \alpha)$$
+
+        where perf is the performance metric (accuracy or AUC), fair is the fairness metric (EOD or SPD), and alpha is the weight of the performance metric.
+        """
         check_is_fitted(self)
         X = check_array(X)
         dtest = xgb.DMatrix(X)
         preds = self.model_.predict(dtest)
-        acc = accuracy_score(y, preds > 0.5)
+        if self.performance_metric == "auc":
+            perf = roc_auc_score(y, preds)
+        elif self.performance_metric == "accuracy":
+            ts = ks_threshold(y, preds)
+            perf = accuracy_score(y, preds > ts)
         if self.alpha == 1:
-            return acc
+            return perf
         fair = self.fairness_score(X, y, preds)
-        return acc * self.alpha + (1 - self.alpha) * fair
+        return perf * self.alpha + (1 - self.alpha) * fair
+
+
+def ks_threshold(y_true, y_score):
+    """Identify the threshold that maximizes the Kolmogorov-Smirnov statistic."""
+    fpr, tpr, thresholds = roc_curve(y_true, y_score)
+    opt_threshold = thresholds[np.argmax(tpr - fpr)]
+    return opt_threshold
