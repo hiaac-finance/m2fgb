@@ -50,34 +50,30 @@ def get_subgroup_indicator(subgroup):
 
 
 def dual_obj(fair_weight):
-    """This helper function will define a custom objective function for XGBoost
-    using the fair_weight parameter.
+    """This helper function will define a custom objective function for XGBoost using the fair_weight parameter.
 
-    :param fair_weight: weight of the fairness loss term.
-    :type fair_weight: float
-    :return: objective function defined with the fair_weight
-    :rtype: function
+    Parameters
+    ----------
+    fair_weight : float
+        Weight of the fairness term in the loss function.
     """
-    weight_1 = 1
-    weight_2 = fair_weight
-
     def custom_obj(predt, dtrain):
         subgroup = (dtrain.get_data()[:, 0]).toarray().reshape(-1)
         n = len(subgroup)
         n_g = get_subgroup_indicator(subgroup)
-        if weight_2 > 0:
+        if fair_weight > 0:
             # dual problem solved analytically
             loss_group = logloss_group(predt, dtrain, subgroup)
             idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
             # if is more than one, randomly choose one
             idx_biggest_loss = np.random.choice(idx_biggest_loss)
             mu_opt = np.zeros(loss_group.shape[0])
-            mu_opt[idx_biggest_loss] = weight_2
+            mu_opt[idx_biggest_loss] = fair_weight
 
         else:
             mu_opt = np.zeros(len(np.unique(subgroup)))
 
-        multiplier = n / (1 + weight_2) * (1 / n + np.sum(n_g * mu_opt, axis=1))
+        multiplier = n / (1 + fair_weight) * (1 / n + np.sum(n_g * mu_opt, axis=1))
         grad = logloss_grad(predt, dtrain) * multiplier
         hess = logloss_hessian(predt, dtrain) * multiplier
         return grad, hess
@@ -92,30 +88,35 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
     It shares many of the parameters with XGBoost to control learning and decision trees.
     Currently it is only able to incorporate "equalized_loss" as a fairness constraint and "EOD" as a fairness metric.
 
-    :param fairness_constraint: type of constraint, defaults to "equalized_loss"
-    :type fairness_constraint: str, optional
-    :param fair_weight: weight of fairness term, defaults to 1
-    :type fair_weight: float, optional
-    :param n_estimators: number of trees, defaults to 10
-    :type n_estimators: int, optional
-    :param eta: learning rate of boosting, defaults to 0.3
-    :type eta: float, optional
-    :param colsample_bytree: fraction of data used in learning each tree, defaults to 1
-    :type colsample_bytree: float, optional
-    :param max_depth: max depth of each tree, lower values reduce complexity, defaults to 6
-    :type max_depth: int, optional
-    :param min_child_weight: weight to decide in node split of each tree, lower values increase complexity, defaults to 1
-    :type min_child_weight: float, optional
-    :param max_leaves: number of max leaves per tree, defaults to 0
-    :type max_leaves: int, optional
-    :param l2_weight: weight of L2 regularization of trees, defaults to 1
-    :type l2_weight: float, optional
-    :param alpha: weight of performance-fairness score, must be in [0, 1], defaults to 1
-    :type alpha: float, optional
-    :param fairness_metric: fairness metric, only supports "EOD", defaults to "EOD"
-    :type fairness_metric: str, optional
-    :param seed: random seed, defaults to None
-    :type seed: int, optional
+
+    Parameters
+    ----------
+    fairness_constraint : str, optional
+        Fairness constraint used in learning, currently only supports "equalized_loss", by default "equalized_loss"
+    fair_weight : int, optional
+        Weight for fairness in loss formulation, by default 1
+    n_estimators : int, optional
+        Number of estimators used in XGB, by default 10
+    eta : float, optional
+        Learning rate of XGB, by default 0.3
+    colsample_bytree : float, optional
+        Size of sample of of the columns used in each estimator, by default 1
+    max_depth : int, optional
+        Max depth of decision trees of XGB, by default 6
+    min_child_weight : int, optional
+        Weight used to choose partition of tree nodes, by default 1
+    max_leaves : int, optional
+        Max number of leaves of trees, by default 0
+    l2_weight : int, optional
+        Weight of L2 regularization, by default 1
+    alpha : int, optional
+        Weight used for the score function of the method, by default 1
+    performance_metric : str, optional
+        Performance metric used by model score, supports ["accuracy", "auc"], by default "accuracy"
+    fairness_metric : str, optional
+        Fairness metric used by model score, supports ["SPD", "EOP"] by default "EOP"
+    seed : int, optional
+        Random seed used in learning, by default None
     """
 
     def __init__(
@@ -131,7 +132,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         l2_weight=1,
         alpha=1,
         performance_metric="accuracy",
-        fairness_metric="EOD",
+        fairness_metric="EOP",
         seed=None,
     ):
         assert fairness_constraint in ["equalized_loss"]
@@ -155,12 +156,18 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
     def fit(self, X, y):
         """Fit the model to the data.
 
-        :param X: dataframe of shape (n_samples, n_features), sensitive attribute must be in the first column
-        :type X: pandas.DataFrame
-        :param y: labels array-like of shape (n_samples), must be (0 or 1)
-        :type y: pandas.Series
-        :return: fitted model
-        :rtype: XtremeFair
+
+        Parameters
+        ----------
+        X : pandas.DataFrame
+            Dataframe of shape (n_samples, n_features), sensitive attribute must be in the first column
+        y : pandas.Series
+            Labels array-like of shape (n_samples), must be (0 or 1)
+
+        Returns
+        -------
+        XtremeFair
+            Fitted model
         """
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
