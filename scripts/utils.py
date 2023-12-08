@@ -22,6 +22,22 @@ def tpr_score(y_ground, y_pred):
     tpr = tp / (tp + fn)
     return tpr
 
+
+def equal_opportunity_score(y_ground, y_pred, A):
+    return np.mean(y_pred[(A == 1) & (y_ground == 1)]) - np.mean(
+        y_pred[(A == 0) & (y_ground == 1)]
+    )
+
+
+def statistical_parity_score(y_ground, y_pred, A):
+    return np.mean(y_pred[A == 1]) - np.mean(y_pred[A == 0])
+
+
+def equalized_loss_score(y_ground, y_prob, A):
+    loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
+    return np.mean(loss[A == 1]) - np.mean(loss[A == 0])
+
+
 def logloss_score(y_ground, y_pred):
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
 
@@ -90,55 +106,51 @@ def plot_metric_lambda(results, metric, axs=None):
         axs[i].grid(True)
     return
 
+
 def plot_metric_diff_lambda(results, metric, axs=None):
     if axs is None:
         fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(12, 3))
 
-    color_map = {
-        "train": "b",
-        "test": "r"
-    }
+    color_map = {"train": "b", "test": "r"}
     for i, ds in enumerate(["train", "test"]):
         results_ = results[results.name.str.contains(ds)]
         results_0 = results_[results_.name.str.contains("0")]
         results_1 = results_[results_.name.str.contains("1")]
         axs.set_xscale("symlog", linthresh=0.01)
         axs.plot(
-            results_0["lambda"], 
-            results_0[metric].values - results_1[metric].values, 
+            results_0["lambda"],
+            results_0[metric].values - results_1[metric].values,
             label=f"{ds}",
-            color = color_map[ds],
-            lw = 2
-            )
+            color=color_map[ds],
+            lw=2,
+        )
         axs.set_xlabel("Fairness weight")
         axs.set_ylabel(metric + " difference")
         axs.legend()
         axs.grid(True)
-    
+
     # plot the zero line
     axs.plot(
-        results_0["lambda"], 
-        np.zeros(results_0["lambda"].shape), 
-        color = "k",
-        ls = "--",
-        lw = 1
+        results_0["lambda"],
+        np.zeros(results_0["lambda"].shape),
+        color="k",
+        ls="--",
+        lw=1,
     )
     return
+
 
 def comparison_subgrous_metrics_lambda(results):
     fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(10, 10), sharey="row")
     plot_metric_lambda(results, "logloss", axs[0])
     plot_metric_lambda(results, "accuracy", axs[1])
     plot_metric_lambda(results, "tpr", axs[2])
-    
 
     plt.tight_layout()
     plt.show()
 
-    fig, axs = plt.subplots(nrows = 1, ncols = 3, figsize=(10, 3), sharey="row")
+    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(10, 3), sharey="row")
     plot_metric_diff_lambda(results, "logloss", axs[0])
     plot_metric_diff_lambda(results, "accuracy", axs[1])
     plot_metric_diff_lambda(results, "tpr", axs[2])
     plt.show()
-
-
