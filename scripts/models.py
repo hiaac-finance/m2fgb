@@ -50,7 +50,7 @@ def get_subgroup_indicator(subgroup):
     return subgroup_ind
 
 
-def dual_obj(fair_weight):
+def dual_obj(fair_weight, group_losses):
     """This helper function will define a custom objective function for XGBoost using the fair_weight parameter.
 
     Parameters
@@ -62,9 +62,10 @@ def dual_obj(fair_weight):
         subgroup = (dtrain.get_data()[:, 0]).toarray().reshape(-1)
         n = len(subgroup)
         n_g = get_subgroup_indicator(subgroup)
+        loss_group = logloss_group(predt, dtrain, subgroup)
+        group_losses.append(loss_group)
         if fair_weight > 0:
             # dual problem solved analytically
-            loss_group = logloss_group(predt, dtrain, subgroup)
             idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
             # if is more than one, randomly choose one
             idx_biggest_loss = np.random.choice(idx_biggest_loss)
@@ -153,6 +154,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         self.performance_metric = performance_metric
         self.fairness_metric = fairness_metric
         self.seed = seed
+        self.group_losses = []
 
     def fit(self, X, y):
         """Fit the model to the data.
@@ -191,8 +193,9 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
             params,
             dtrain,
             num_boost_round=self.n_estimators,
-            obj=dual_obj(self.fair_weight),
+            obj=dual_obj(self.fair_weight, self.group_losses),
         )
+        self.group_losses = np.array(self.group_losses)
         return self
 
     def predict(self, X):
