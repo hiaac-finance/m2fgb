@@ -24,6 +24,7 @@ def logloss_group(predt, dtrain, subgroup):
     """For each subgroup, calculates the mean log loss of the samples."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
+    predt = np.clip(predt, 1e-6, 1 - 1e-6) # avoid log(0)
     loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
     groups = np.unique(subgroup)
 
@@ -216,7 +217,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
     def fairness_score(self, X, y, preds):
         """Calculate the fairness score of the model. The sensitive attribute must be in the first column of X."""
         A = X[:, 0].reshape(-1)
-        if self.fairness_metric == "EOD":
+        if self.fairness_metric == "EOP":
             fair = np.mean(preds[(A == 1) & (y == 1)]) - np.mean(
                 preds[(A == 0) & (y == 1)]
             )
