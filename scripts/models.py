@@ -24,7 +24,7 @@ def logloss_group(predt, dtrain, subgroup):
     """For each subgroup, calculates the mean log loss of the samples."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
-    predt = np.clip(predt, 1e-6, 1 - 1e-6) # avoid log(0)
+    predt = np.clip(predt, 1e-6, 1 - 1e-6)  # avoid log(0)
     loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
     groups = np.unique(subgroup)
 
@@ -34,6 +34,32 @@ def logloss_group(predt, dtrain, subgroup):
         loss_matrix[subgroup != group, i] = np.nan  # and set nan for other groups
 
     return np.nanmean(loss_matrix, axis=0)
+
+
+def logloss_group_grad(predt, dtrain, subgroup):
+    """Create a matrix with the gradient for each subgroup in each column."""
+    y = dtrain.get_label()
+    predt = 1 / (1 + np.exp(-predt))
+    grad = -(y - predt)
+
+    groups = np.unique(subgroup)
+    grad_matrix = np.tile(grad, (len(groups), 1)).T
+    for i, group in enumerate(groups):
+        grad_matrix[subgroup != group, i] = 0
+    return grad_matrix
+
+
+def logloss_group_hess(predt, dtrain, subgroup):
+    """Create a matrix with the hessian for each subgroup in each column."""
+    y = dtrain.get_label()
+    predt = 1 / (1 + np.exp(-predt))
+    hess = predt * (1 - predt)
+
+    groups = np.unique(subgroup)
+    hess_matrix = np.tile(hess, (len(groups), 1)).T
+    for i, group in enumerate(groups):
+        hess_matrix[subgroup != group, i] = 0
+    return hess_matrix
 
 
 def get_subgroup_indicator(subgroup):
@@ -58,6 +84,7 @@ def dual_obj(fair_weight, group_losses):
     fair_weight : float
         Weight of the fairness term in the loss function.
     """
+
     def custom_obj(predt, dtrain):
         subgroup = (dtrain.get_data()[:, 0]).toarray().reshape(-1)
         n = len(subgroup)
@@ -75,9 +102,19 @@ def dual_obj(fair_weight, group_losses):
         else:
             mu_opt = np.zeros(len(np.unique(subgroup)))
 
-        multiplier = n / (1 + fair_weight) * (1 / n + np.sum(n_g * mu_opt, axis=1))
-        grad = logloss_grad(predt, dtrain) * multiplier
-        hess = logloss_hessian(predt, dtrain) * multiplier
+        # multiplier = n / (1 + fair_weight) * (1 / n + np.sum(n_g * mu_opt, axis=1))
+        # grad = logloss_grad(predt, dtrain) * multiplier
+        # hess = logloss_hessian(predt, dtrain) * multiplier
+        grad = (
+            logloss_grad(predt, dtrain) / n
+            + logloss_group_grad(predt, dtrain, subgroup) * n_g @ mu_opt
+        )
+        hess = (
+            logloss_hessian(predt, dtrain) / n
+            + logloss_group_hess(predt, dtrain, subgroup) * n_g @ mu_opt
+        )
+        grad *= n / (1 + fair_weight)
+        hess *= n / (1 + fair_weight)
         return grad, hess
 
     return custom_obj
