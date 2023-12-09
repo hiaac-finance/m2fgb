@@ -114,7 +114,7 @@ def dual_obj(fair_weight, group_losses, dual_learning="optim"):
                     mu_opt = np.ones(loss_group.shape[0]) 
                     mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
                     mu_opt_list[0] = mu_opt
-
+                    
                 else:
                     mu_opt = mu_opt_list[-1]
                     mu_opt += 0.1 * loss_group
