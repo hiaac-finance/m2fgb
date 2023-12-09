@@ -76,14 +76,19 @@ def get_subgroup_indicator(subgroup):
     return subgroup_ind
 
 
-def dual_obj(fair_weight, group_losses):
+def dual_obj(fair_weight, group_losses, dual_learning="optim"):
     """This helper function will define a custom objective function for XGBoost using the fair_weight parameter.
 
     Parameters
     ----------
     fair_weight : float
         Weight of the fairness term in the loss function.
+    group_losses : list
+        List where the losses for each subgroup will be stored.
+    dual_learning : str, optional
+        Method used to learn the dual problem, by default "optim"
     """
+    mu_opt_list = [None]
 
     def custom_obj(predt, dtrain):
         subgroup = (dtrain.get_data()[:, 0]).toarray().reshape(-1)
@@ -92,19 +97,34 @@ def dual_obj(fair_weight, group_losses):
         loss_group = logloss_group(predt, dtrain, subgroup)
         group_losses.append(loss_group)
         if fair_weight > 0:
-            # dual problem solved analytically
-            idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
-            # if is more than one, randomly choose one
-            idx_biggest_loss = np.random.choice(idx_biggest_loss)
-            mu_opt = np.zeros(loss_group.shape[0])
-            mu_opt[idx_biggest_loss] = fair_weight
+            if dual_learning == "optim":
+                # dual problem solved analytically
+                idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
+                # if is more than one, randomly choose one
+                idx_biggest_loss = np.random.choice(idx_biggest_loss)
+                mu_opt = np.zeros(loss_group.shape[0])
+                mu_opt[idx_biggest_loss] = fair_weight
+                if mu_opt_list[0] is None:
+                    mu_opt_list[0] = mu_opt
+                else:
+                    mu_opt_list.append(mu_opt)
+            
+            elif dual_learning == "gradient":
+                if mu_opt_list[0] is None:
+                    mu_opt = np.ones(loss_group.shape[0]) 
+                    mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
+                    mu_opt_list[0] = mu_opt
+
+                else:
+                    mu_opt = mu_opt_list[-1]
+                    mu_opt += 0.1 * loss_group
+                    mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
+                    mu_opt_list.append(mu_opt)
+
 
         else:
             mu_opt = np.zeros(len(np.unique(subgroup)))
 
-        # multiplier = n / (1 + fair_weight) * (1 / n + np.sum(n_g * mu_opt, axis=1))
-        # grad = logloss_grad(predt, dtrain) * multiplier
-        # hess = logloss_hessian(predt, dtrain) * multiplier
         grad = (
             logloss_grad(predt, dtrain) / n
             + logloss_group_grad(predt, dtrain, subgroup) * n_g @ mu_opt
@@ -162,6 +182,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         self,
         fairness_constraint="equalized_loss",
         fair_weight=1,
+        dual_learning = "optim",
         n_estimators=10,
         eta=0.3,
         colsample_bytree=1,
@@ -175,10 +196,12 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         seed=None,
     ):
         assert fairness_constraint in ["equalized_loss"]
+        assert dual_learning in ["optim", "gradient"]
         assert performance_metric in ["accuracy", "auc"]
         assert fairness_metric in ["EOP", "SPD"]
 
         self.fairness_constraint = fairness_constraint
+        self.dual_learning = dual_learning
         self.fair_weight = fair_weight
         self.n_estimators = n_estimators
         self.eta = eta
@@ -230,7 +253,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
             params,
             dtrain,
             num_boost_round=self.n_estimators,
-            obj=dual_obj(self.fair_weight, self.group_losses),
+            obj=dual_obj(self.fair_weight, self.group_losses, self.dual_learning),
         )
         self.group_losses = np.array(self.group_losses)
         return self
