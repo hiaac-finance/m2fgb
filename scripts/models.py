@@ -20,12 +20,21 @@ def logloss_hessian(predt, dtrain):
     return hess
 
 
-def logloss_group(predt, dtrain, subgroup):
+def logloss_group(predt, dtrain, subgroup, fairness_constraint):
     """For each subgroup, calculates the mean log loss of the samples."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
     predt = np.clip(predt, 1e-6, 1 - 1e-6)  # avoid log(0)
-    loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
+    if fairness_constraint == "equalized_loss":
+        loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
+    if fairness_constraint == "demographic_parity":
+        y_ = np.ones(y.shape[0])  # all positive class
+        loss = -(y_ * np.log(predt) + (1 - y_) * np.log(1 - predt))
+        loss = loss * y  # only consider the loss of the positive class
+    elif fairness_constraint == "equal_opportunity":
+        loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
+        loss = loss * y  # only consider the loss of the positive class
+
     groups = np.unique(subgroup)
 
     loss_matrix = np.zeros((len(y), len(groups)))
@@ -36,11 +45,19 @@ def logloss_group(predt, dtrain, subgroup):
     return np.nanmean(loss_matrix, axis=0)
 
 
-def logloss_group_grad(predt, dtrain, subgroup):
+def logloss_group_grad(predt, dtrain, subgroup, fairness_constraint):
     """Create a matrix with the gradient for each subgroup in each column."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
-    grad = -(y - predt)
+    if fairness_constraint == "equalized_loss":
+        grad = -(y - predt)
+    elif fairness_constraint == "demographic_parity":
+        y_ = np.ones(y.shape[0])  # all positive class
+        grad = -(y_ - predt)
+        grad = grad * y  # only consider the loss of the positive class
+    elif fairness_constraint == "equal_opportunity":
+        grad = -(y - predt)
+        grad = grad * y  # only consider the loss of the positive class
 
     groups = np.unique(subgroup)
     grad_matrix = np.tile(grad, (len(groups), 1)).T
@@ -49,11 +66,18 @@ def logloss_group_grad(predt, dtrain, subgroup):
     return grad_matrix
 
 
-def logloss_group_hess(predt, dtrain, subgroup):
+def logloss_group_hess(predt, dtrain, subgroup, fairness_constraint):
     """Create a matrix with the hessian for each subgroup in each column."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
-    hess = predt * (1 - predt)
+    if fairness_constraint == "equalized_loss":
+        hess = predt * (1 - predt)
+    elif (
+        fairness_constraint == "demographic_parity"
+        or fairness_constraint == "equal_opportunity"
+    ):
+        hess = predt * (1 - predt)
+        hess = hess * y  # only consider the loss of the positive class
 
     groups = np.unique(subgroup)
     hess_matrix = np.tile(hess, (len(groups), 1)).T
@@ -76,7 +100,12 @@ def get_subgroup_indicator(subgroup):
     return subgroup_ind
 
 
-def dual_obj(fair_weight, group_losses, dual_learning="optim"):
+def dual_obj(
+    fair_weight,
+    group_losses,
+    fairness_constraint="equalized_loss",
+    dual_learning="optim",
+):
     """This helper function will define a custom objective function for XGBoost using the fair_weight parameter.
 
     Parameters
@@ -85,6 +114,8 @@ def dual_obj(fair_weight, group_losses, dual_learning="optim"):
         Weight of the fairness term in the loss function.
     group_losses : list
         List where the losses for each subgroup will be stored.
+    fairness_constraint: str, optional
+        Fairness constraint used in learning.
     dual_learning : str, optional
         Method used to learn the dual problem, by default "optim"
     """
@@ -94,7 +125,7 @@ def dual_obj(fair_weight, group_losses, dual_learning="optim"):
         subgroup = (dtrain.get_data()[:, 0]).toarray().reshape(-1)
         n = len(subgroup)
         n_g = get_subgroup_indicator(subgroup)
-        loss_group = logloss_group(predt, dtrain, subgroup)
+        loss_group = logloss_group(predt, dtrain, subgroup, fairness_constraint)
         group_losses.append(loss_group)
         if fair_weight > 0:
             if dual_learning == "optim":
@@ -108,31 +139,36 @@ def dual_obj(fair_weight, group_losses, dual_learning="optim"):
                     mu_opt_list[0] = mu_opt
                 else:
                     mu_opt_list.append(mu_opt)
-            
+
             elif dual_learning == "gradient":
                 if mu_opt_list[0] is None:
-                    mu_opt = np.ones(loss_group.shape[0]) 
+                    mu_opt = np.ones(loss_group.shape[0])
                     mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
                     mu_opt_list[0] = mu_opt
-                    
+
                 else:
                     mu_opt = mu_opt_list[-1]
                     mu_opt += 0.1 * loss_group
                     mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
                     mu_opt_list.append(mu_opt)
 
-
         else:
             mu_opt = np.zeros(len(np.unique(subgroup)))
 
-        grad = (
-            logloss_grad(predt, dtrain) / n
-            + logloss_group_grad(predt, dtrain, subgroup) * n_g @ mu_opt
-        )
-        hess = (
-            logloss_hessian(predt, dtrain) / n
-            + logloss_group_hess(predt, dtrain, subgroup) * n_g @ mu_opt
-        )
+        grad = logloss_grad(predt, dtrain) / n
+        hess = logloss_hessian(predt, dtrain) / n
+        if fair_weight > 0:
+            grad += (
+                logloss_group_grad(predt, dtrain, subgroup, fairness_constraint)
+                * n_g
+                @ mu_opt
+            )
+            hess += (
+                logloss_group_hess(predt, dtrain, subgroup, fairness_constraint)
+                * n_g
+                @ mu_opt
+            )
+
         grad *= n / (1 + fair_weight)
         hess *= n / (1 + fair_weight)
         return grad, hess
@@ -182,7 +218,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         self,
         fairness_constraint="equalized_loss",
         fair_weight=1,
-        dual_learning = "optim",
+        dual_learning="optim",
         n_estimators=10,
         eta=0.3,
         colsample_bytree=1,
@@ -195,7 +231,11 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         fairness_metric="EOP",
         seed=None,
     ):
-        assert fairness_constraint in ["equalized_loss"]
+        assert fairness_constraint in [
+            "equalized_loss",
+            "equal_opportunity",
+            "demographic_parity",
+        ]
         assert dual_learning in ["optim", "gradient"]
         assert performance_metric in ["accuracy", "auc"]
         assert fairness_metric in ["EOP", "SPD"]
@@ -253,7 +293,12 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
             params,
             dtrain,
             num_boost_round=self.n_estimators,
-            obj=dual_obj(self.fair_weight, self.group_losses, self.dual_learning),
+            obj=dual_obj(
+                self.fair_weight,
+                self.group_losses,
+                self.fairness_constraint,
+                self.dual_learning,
+            ),
         )
         self.group_losses = np.array(self.group_losses)
         return self
