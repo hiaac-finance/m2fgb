@@ -333,7 +333,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
             fair = np.mean(preds[A == 1]) - np.mean(preds[A == 0])
         return 1 - np.abs(fair)
 
-    def score(self, X, y):
+    def score(self, X, y, return_type="combined"):
         """
         Calculate the performance-fairness score of the model. The score has the following formula:
 
@@ -353,7 +353,17 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         if self.alpha == 1:
             return perf
         fair = self.fairness_score(X, y, preds)
-        return perf * self.alpha + (1 - self.alpha) * fair
+        combined_score = perf * self.alpha + (1 - self.alpha) * fair
+        if return_type == "combined":
+            return combined_score
+        elif return_type == "performance":
+            return perf
+        elif return_type == "fairness":
+            return fair
+        else:
+            raise ValueError(
+                "Invalid return_type. Choose 'combined', 'performance', or 'fairness'."
+            )
 
 
 def ks_threshold(y_true, y_score):
