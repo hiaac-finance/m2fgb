@@ -23,7 +23,7 @@ def logloss_hessian(predt, dtrain):
 def logloss_group(predt, dtrain, subgroup, fairness_constraint):
     """For each subgroup, calculates the mean log loss of the samples."""
     y = dtrain.get_label()
-    predt = 1 / (1 + np.exp(-predt))
+    predt = 1 / (1 + np.exp(-predt)
     predt = np.clip(predt, 1e-6, 1 - 1e-6)  # avoid log(0)
     if fairness_constraint == "equalized_loss":
         loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
