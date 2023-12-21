@@ -14,6 +14,12 @@ def load_taiwan():
     X = X.drop(columns = ["SEX_Female", "SEX_Male"])
     return X, Y
 
+def load_german2():
+    df = pd.read_csv("../data/german_preprocessed.csv")
+    X=df.drop(["DEFAULT"],axis=1)
+    Y=df["DEFAULT"]
+    return X, Y
+
 def load_dataset(dataset):
     if dataset == "german":
         return load_german()
