@@ -30,11 +30,44 @@ def equal_opportunity_score(y_ground, y_pred, A):
 
 
 def statistical_parity_score(y_ground, y_pred, A):
+    if len(np.unique(A)) > 2:
+        max_ = -np.inf
+        min_ = np.inf
+        for a in np.unique(A):
+            max_ = max(max_, np.mean(y_pred[A == a]))
+            min_ = min(min_, np.mean(y_pred[A == a]))
+        return max_ - min_
+    
     return np.mean(y_pred[A == 1]) - np.mean(y_pred[A == 0])
 
 
 def equalized_loss_score(y_ground, y_prob, A):
+    """Calculate the difference between the mean loss of groups. The loss is binary cross entropy.
+    If A has two values, it must be 0 and 1, and it can also be applied to more than two groups (the result is the difference between the max loss and min loss).
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        Difference between the mean loss of groups
+    """
     loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
+    if len(np.unique(A)) > 2:
+        max_ = -np.inf
+        min_ = np.inf
+        for a in np.unique(A):
+            max_ = max(max_, np.mean(loss[A == a]))
+            min_ = min(min_, np.mean(loss[A == a]))
+        return max_ - min_
+
     return np.mean(loss[A == 1]) - np.mean(loss[A == 0])
 
 
