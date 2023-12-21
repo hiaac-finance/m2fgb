@@ -24,6 +24,14 @@ def tpr_score(y_ground, y_pred):
 
 
 def equal_opportunity_score(y_ground, y_pred, A):
+    if len(np.unique(A)) > 2:
+        max_ = -np.inf
+        min_ = np.inf
+        for a in np.unique(A):
+            max_ = max(max_, np.mean(y_pred[(A == a) & (y_ground == 1)]))
+            min_ = min(min_, np.mean(y_pred[(A == a) & (y_ground == 1)]))
+        return max_ - min_
+
     return np.mean(y_pred[(A == 1) & (y_ground == 1)]) - np.mean(
         y_pred[(A == 0) & (y_ground == 1)]
     )

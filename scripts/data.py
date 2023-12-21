@@ -21,7 +21,7 @@ def load_taiwan():
 def load_german2():
     df = pd.read_csv("../data/german_preprocessed.csv")
     X = df.drop(["DEFAULT"], axis=1)
-    Y = df["DEFAULT"]
+    Y = 1 - df["DEFAULT"]
     return X, Y
 
 
