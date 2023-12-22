@@ -4,6 +4,25 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
 import xgboost as xgb
 
+PARAM_SPACES = {
+    "XtremeFair": {
+        "min_child_weight": {"type": "float", "low": 0.01, "high": 100, "log": True},
+        "n_estimators": {"type": "int", "low": 10, "high": 100},
+        "eta": {"type": "float", "low": 0.1, "high": 0.5},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "fair_weight": {"type": "float", "low": 0.01, "high": 10, "log": True},
+    },
+    "XGBClassifier": {
+        "min_child_weight": {"type": "float", "low": 0.01, "high": 100, "log": True},
+        "n_estimators": {"type": "int", "low": 10, "high": 100},
+        "eta": {"type": "float", "low": 0.1, "high": 0.5},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "fair_weight": {"type": "float", "low": 0, "high": 0, "log": True},
+    },
+}
+
 
 def logloss_grad(predt, dtrain):
     """Compute the gradient for cross entropy log loss."""
@@ -258,7 +277,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         self.seed = seed
         self.group_losses = []
 
-    def fit(self, X, y, sensitive_attribute = None):
+    def fit(self, X, y, sensitive_attribute=None):
         """Fit the model to the data.
 
 
