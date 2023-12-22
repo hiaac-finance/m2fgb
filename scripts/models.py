@@ -101,6 +101,7 @@ def get_subgroup_indicator(subgroup):
 
 
 def dual_obj(
+    subgroup,
     fair_weight,
     group_losses,
     fairness_constraint="equalized_loss",
@@ -110,6 +111,8 @@ def dual_obj(
 
     Parameters
     ----------
+    soubgroup : ndarray
+        Array with the subgroup labels.
     fair_weight : float
         Weight of the fairness term in the loss function.
     group_losses : list
@@ -120,11 +123,10 @@ def dual_obj(
         Method used to learn the dual problem, by default "optim"
     """
     mu_opt_list = [None]
+    n = len(subgroup)
+    n_g = get_subgroup_indicator(subgroup)
 
     def custom_obj(predt, dtrain):
-        subgroup = (dtrain.get_data()[:, 0]).toarray().reshape(-1)
-        n = len(subgroup)
-        n_g = get_subgroup_indicator(subgroup)
         loss_group = logloss_group(predt, dtrain, subgroup, fairness_constraint)
         group_losses.append(loss_group)
         if fair_weight > 0:
@@ -256,22 +258,26 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         self.seed = seed
         self.group_losses = []
 
-    def fit(self, X, y):
+    def fit(self, X, y, sensitive_attribute = None):
         """Fit the model to the data.
 
 
         Parameters
         ----------
         X : pandas.DataFrame
-            Dataframe of shape (n_samples, n_features), sensitive attribute must be in the first column
-        y : pandas.Series
+            Dataframe of shape (n_samples, n_features)
+        y : pandas.Series or numpy.ndarray
             Labels array-like of shape (n_samples), must be (0 or 1)
+        sensitive_attribute : pandas.Series or numpy.ndarray
+            Sensitive attribute array-like of shape (n_samples)
 
         Returns
         -------
         XtremeFair
             Fitted model
         """
+        if sensitive_attribute is None:
+            sensitive_attribute = np.ones(X.shape[0])
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
         dtrain = xgb.DMatrix(X, label=y)
@@ -294,6 +300,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
             dtrain,
             num_boost_round=self.n_estimators,
             obj=dual_obj(
+                sensitive_attribute,
                 self.fair_weight,
                 self.group_losses,
                 self.fairness_constraint,
