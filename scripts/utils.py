@@ -5,11 +5,13 @@ from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score, precision_
 
 
 def get_best_threshold(y_ground, y_pred):
+    """Calculates the threshold according to the KS statistic"""
     fpr, tpr, thresholds = roc_curve(y_ground, y_pred)
     return thresholds[np.argmax(tpr - fpr)]
 
 
 def fnr_score(y_ground, y_pred):
+    """Calculates the false negative rate"""
     fn = ((y_pred == 0) & (y_ground == 1)).sum()
     tp = ((y_pred == 1) & (y_ground == 1)).sum()
     fnr = fn / (fn + tp)
@@ -17,6 +19,7 @@ def fnr_score(y_ground, y_pred):
 
 
 def tpr_score(y_ground, y_pred):
+    """Calculates the true positive rate"""
     fn = ((y_pred == 0) & (y_ground == 1)).sum()
     tp = ((y_pred == 1) & (y_ground == 1)).sum()
     tpr = tp / (tp + fn)
@@ -24,6 +27,23 @@ def tpr_score(y_ground, y_pred):
 
 
 def equal_opportunity_score(y_ground, y_pred, A):
+    """Calculate the difference between true poisitive rates of the groups.
+    If A has two values, it must be 0 and 1, and it can also be applied to more than two groups (the result is the difference between the max value and min value).
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        Equal opportunity score score
+    """
     if len(np.unique(A)) > 2:
         max_ = -np.inf
         min_ = np.inf
@@ -38,6 +58,23 @@ def equal_opportunity_score(y_ground, y_pred, A):
 
 
 def statistical_parity_score(y_ground, y_pred, A):
+    """Calculate the difference between probability of true outcome of the groups.
+    If A has two values, it must be 0 and 1, and it can also be applied to more than two groups (the result is the difference between the max value and min value).
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        Statistical parity score
+    """
     if len(np.unique(A)) > 2:
         max_ = -np.inf
         min_ = np.inf
@@ -45,8 +82,27 @@ def statistical_parity_score(y_ground, y_pred, A):
             max_ = max(max_, np.mean(y_pred[A == a]))
             min_ = min(min_, np.mean(y_pred[A == a]))
         return max_ - min_
-    
+
     return np.mean(y_pred[A == 1]) - np.mean(y_pred[A == 0])
+
+
+def get_combined_metrics_scorer(
+    alpha=1, performance_metric="acc", fairness_metric="eod"
+):
+    def scorer(y_ground, y_pred, A):
+        if performance_metric == "acc":
+            perf = accuracy_score(y_ground, y_pred)
+        elif performance_metric == "roc_auc":
+            perf = roc_auc_score(y_ground, y_pred)
+
+        if fairness_metric == "eod":
+            fair = equal_opportunity_score(y_ground, y_pred, A)
+        elif fairness_metric == "spd":
+            fair = statistical_parity_score(y_ground, y_pred, A)
+
+        return alpha * perf + (1 - alpha) * abs(fair)
+
+    return scorer
 
 
 def equalized_loss_score(y_ground, y_prob, A):
