@@ -19,7 +19,7 @@ PARAM_SPACES = {
         "eta": {"type": "float", "low": 0.1, "high": 0.5},
         "max_depth": {"type": "int", "low": 2, "high": 10},
         "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 0, "high": 0, "log": True},
+        "fair_weight": {"type": "float", "low": 0, "high": 0},
     },
 }
 
