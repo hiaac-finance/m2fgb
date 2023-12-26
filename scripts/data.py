@@ -2,6 +2,47 @@ import pandas as pd
 from ucimlrepo import fetch_ucirepo
 from sklearn.model_selection import KFold, train_test_split
 
+CAT_FEATURES = {
+    "german2": [
+        "CheckingAccount",
+        "CreditHistory",
+        "Purpose",
+        "SavingsAccount",
+        "EmploymentSince",
+        "Gender",
+        "OtherDebtors",
+        "Property",
+        "OtherInstallmentPlans",
+        "Housing",
+        "Job",
+        "Telephone",
+        "ForeignWorker",
+    ],
+    "adult": [
+        "workclass",
+        "education",
+        "marital-status",
+        "occupation",
+        "relationship",
+        "race",
+        "sex",
+        "native-country",
+    ],
+}
+
+NUM_FEATURES = {
+    "german2": [
+        "Age",
+        "CreditAmount",
+        "Dependents",
+        "Duration",
+        "ExistingCredits",
+        "InstallmentRate",
+        "ResidenceSince",
+    ],
+    "adult": ["age", "capital-gain", "capital-loss", "education-num", "hours-per-week"],
+}
+
 
 def load_german():
     df = pd.read_csv("../data/german_credit_data_K_preprocessed.csv")
@@ -50,7 +91,7 @@ def load_adult():
     adult = fetch_ucirepo(id=2)
     X = adult.data.features.copy()
     Y = adult.data.targets
-    X = X.drop(columns = ["fnlwgt"])
+    X = X.drop(columns=["fnlwgt"])
     cat_features = [
         "workclass",
         "education",
