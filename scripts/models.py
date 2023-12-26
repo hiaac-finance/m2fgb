@@ -211,6 +211,8 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         Fairness constraint used in learning, currently only supports "equalized_loss", by default "equalized_loss"
     fair_weight : int, optional
         Weight for fairness in loss formulation, by default 1
+    dual_learning : str, optional
+        Method used to learn the dual problem, by default "optim"
     n_estimators : int, optional
         Number of estimators used in XGB, by default 10
     eta : float, optional
