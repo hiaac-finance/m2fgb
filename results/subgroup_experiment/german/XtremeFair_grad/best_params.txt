@@ -1,1 +1,0 @@
-{'min_child_weight': 0.3957201418627801, 'n_estimators': 71, 'eta': 0.3426594427007709, 'max_depth': 7, 'l2_weight': 7.300018083665503, 'fair_weight': 3.82967643619301}
