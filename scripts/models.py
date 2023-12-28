@@ -7,20 +7,28 @@ import xgboost as xgb
 PARAM_SPACES = {
     "XtremeFair": {
         "min_child_weight": {"type": "float", "low": 0.01, "high": 100, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 100},
-        "eta": {"type": "float", "low": 0.1, "high": 0.5},
+        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
+        "eta": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 10},
         "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "fair_weight": {"type": "float", "low": 0.01, "high": 10, "log": True},
     },
     "XGBClassifier": {
         "min_child_weight": {"type": "float", "low": 0.01, "high": 100, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 100},
-        "eta": {"type": "float", "low": 0.1, "high": 0.5},
+        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
+        "eta": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 10},
         "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "fair_weight": {"type": "float", "low": 0, "high": 0},
     },
+    "FairGBMClassifier":{
+        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
+        "min_child_samples" : {"type" : "int", "low": 5, "high": 500},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "reg_lambda" : {"type": "float", "low": 0.001, "high": 1, "log": True},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "multiplier_learning_rate" : {"type": "float", "low": 0.005, "high": 0.5, "log": True},
+    }
 }
 
 
@@ -233,7 +241,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         Performance metric used by model score, supports ["accuracy", "auc"], by default "accuracy"
     fairness_metric : str, optional
         Fairness metric used by model score, supports ["SPD", "EOP"] by default "EOP"
-    seed : int, optional
+    random_state : int, optional
         Random seed used in learning, by default None
     """
 
@@ -252,7 +260,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         alpha=1,
         performance_metric="accuracy",
         fairness_metric="EOP",
-        seed=None,
+        random_state=None,
     ):
         assert fairness_constraint in [
             "equalized_loss",
@@ -276,7 +284,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         self.alpha = alpha
         self.performance_metric = performance_metric
         self.fairness_metric = fairness_metric
-        self.seed = seed
+        self.random_state = random_state
         self.group_losses = []
 
     def fit(self, X, y, sensitive_attribute=None):
@@ -313,8 +321,8 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
             "max_leaves": self.max_leaves,
             "lambda": self.l2_weight,
         }
-        if self.seed is not None:
-            params["seed"] = self.seed
+        if self.random_state is not None:
+            params["seed"] = self.random_state
 
         self.model_ = xgb.train(
             params,
