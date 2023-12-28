@@ -1,5 +1,4 @@
 import pandas as pd
-from ucimlrepo import fetch_ucirepo
 from sklearn.model_selection import KFold, train_test_split
 
 CAT_FEATURES = {
@@ -64,23 +63,8 @@ def load_german2():
     df = pd.read_csv("../data/german_preprocessed.csv")
     X = df.drop(["DEFAULT"], axis=1)
     Y = 1 - df["DEFAULT"]
-    cat_features = [
-        "CheckingAccount",
-        "CreditHistory",
-        "Purpose",
-        "SavingsAccount",
-        "EmploymentSince",
-        "Gender",
-        "OtherDebtors",
-        "Property",
-        "OtherInstallmentPlans",
-        "Housing",
-        "Job",
-        "Telephone",
-        "ForeignWorker",
-    ]
     for col in X.columns:
-        if col in cat_features:
+        if col in CAT_FEATURES["german2"]:
             X[col] = X[col].astype("category")
         else:
             X[col] = X[col].astype(float)
@@ -88,22 +72,11 @@ def load_german2():
 
 
 def load_adult():
-    adult = fetch_ucirepo(id=2)
-    X = adult.data.features.copy()
-    Y = adult.data.targets
-    X = X.drop(columns=["fnlwgt"])
-    cat_features = [
-        "workclass",
-        "education",
-        "marital-status",
-        "occupation",
-        "relationship",
-        "race",
-        "sex",
-        "native-country",
-    ]
+    df = pd.read_csv("../data/adult_preprocessed.csv")
+    X = df.drop(["INCOME"], axis=1)
+    Y = df["INCOME"]
     for col in X.columns:
-        if col in cat_features:
+        if col in CAT_FEATURES["adult"]:
             X[col] = X[col].astype("category")
         else:
             X[col] = X[col].astype(float)

@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from ucimlrepo import fetch_ucirepo
 from sklearn.preprocessing import MinMaxScaler
 
 def preprocess_german():
@@ -236,6 +237,13 @@ def preprocess_german2():
     for col in cat_cols:
         df[col] = pd.Categorical(df[col])
     df.to_csv("data/german_preprocessed.csv", index=False)
+
+def preprocess_adult():
+    adult = fetch_ucirepo(id=2)
+    df = adult.data.features.copy()
+    df["INCOME"] = adult.data.targets
+    df = df.drop(columns=["fnlwgt"])
+    df.to_csv("data/adult_preprocessed.csv", index=False)
 
 
 if __name__ == "__main__":
