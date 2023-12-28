@@ -117,6 +117,8 @@ def load_dataset(dataset):
         return load_taiwan()
     elif dataset == "german2":
         return load_german2()
+    elif dataset == "adult":
+        return load_adult()
     else:
         raise ValueError(f"Unknown dataset {dataset}")
 
