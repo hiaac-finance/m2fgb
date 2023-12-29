@@ -61,8 +61,8 @@ def load_taiwan():
 
 def load_german2():
     df = pd.read_csv("../data/german_preprocessed.csv")
-    X = df.drop(["DEFAULT"], axis=1)
-    Y = 1 - df["DEFAULT"]
+    X = df.drop(["GOOD_RISK"], axis=1)
+    Y = df["GOOD_RISK"]
     for col in X.columns:
         if col in CAT_FEATURES["german2"]:
             X[col] = X[col].astype("category")

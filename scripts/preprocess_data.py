@@ -219,23 +219,8 @@ def preprocess_german2():
     df.Telephone = df.Telephone.apply({"A191": 0, "A192": 1}.get)
     df.ForeignWorker = df.ForeignWorker.apply({"A201": 1, "A202": 0}.get)
     df = df.drop(columns=["PersonalStatus"])
-    cat_cols = [
-        "CheckingAccount",
-        "CreditHistory",
-        "Purpose",
-        "SavingsAccount",
-        "EmploymentSince",
-        "Gender",
-        "OtherDebtors",
-        "Property",
-        "OtherInstallmentPlans",
-        "Housing",
-        "Job",
-        "Telephone",
-        "ForeignWorker",
-    ]
-    for col in cat_cols:
-        df[col] = pd.Categorical(df[col])
+    df["DEFAULT"] = 1 - df["DEFAULT"]
+    df = df.rename(columns={"DEFAULT": "GOOD_RISK"})
     df.to_csv("data/german_preprocessed.csv", index=False)
 
 def preprocess_adult():
@@ -245,8 +230,13 @@ def preprocess_adult():
     df = df.drop(columns=["fnlwgt"])
     df.to_csv("data/adult_preprocessed.csv", index=False)
 
+def download_data():
+    import gdown
+    url = "https://drive.google.com/drive/folders/12r-AU7HS9XBcfv__9aUYvwEZDsAbcOwK"
+    gdown.download_folder(url, quiet=True, use_cookies=False)
 
 if __name__ == "__main__":
     #preprocess_german()
     #preprocess_taiwan()
     preprocess_german2()
+    preprocess_adult()
