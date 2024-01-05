@@ -75,6 +75,7 @@ def load_adult():
     df = pd.read_csv("../data/adult_preprocessed.csv")
     X = df.drop(["INCOME"], axis=1)
     Y = df["INCOME"]
+    Y = Y.map({"<=50K": 0, "<=50K.": 0, ">50K": 1, ">50K.": 1})
     for col in X.columns:
         if col in CAT_FEATURES["adult"]:
             X[col] = X[col].astype("category")

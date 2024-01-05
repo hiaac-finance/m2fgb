@@ -234,7 +234,7 @@ def summarize(dataset_name):
 for dataset in ["german2", "adult"]:
     for alpha in [1, 0.75]:
         for model_name in [
-            "XtremeFair_1",
+            "XtremeFair",
             "XtremeFair_grad",
             "XGBClassifier",
             "FairGBMClassifier",
