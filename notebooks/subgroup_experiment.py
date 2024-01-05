@@ -246,7 +246,6 @@ for dataset in ["german2", "adult"]:
                 "model_name": model_name,
                 "n_trials": 5,
             }
-        subgroup_experiment(args)
+            subgroup_experiment(args)
 
-    print(dataset)
-    print(summarize(dataset))
+        print(summarize(dataset))
