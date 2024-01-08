@@ -13,6 +13,20 @@ PARAM_SPACES = {
         "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "fair_weight": {"type": "float", "low": 0.01, "high": 10, "log": True},
     },
+    "XtremeFair_grad": {
+        "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
+        "eta": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "fair_weight": {"type": "float", "low": 0.01, "high": 10, "log": True},
+        "multiplier_learning_rate": {
+            "type": "float",
+            "low": 0.005,
+            "high": 0.5,
+            "log": True,
+        }
+    },
     "XGBClassifier": {
         "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
@@ -21,14 +35,19 @@ PARAM_SPACES = {
         "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "fair_weight": {"type": "float", "low": 0, "high": 0},
     },
-    "FairGBMClassifier":{
+    "FairGBMClassifier": {
         "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
-        "min_child_samples" : {"type" : "int", "low": 5, "high": 500, "log": True},
+        "min_child_samples": {"type": "int", "low": 5, "high": 500, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 10},
-        "lambda_l2" : {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
-        "multiplier_learning_rate" : {"type": "float", "low": 0.005, "high": 0.5, "log": True},
-    }
+        "multiplier_learning_rate": {
+            "type": "float",
+            "low": 0.005,
+            "high": 0.5,
+            "log": True,
+        },
+    },
 }
 
 
@@ -133,6 +152,7 @@ def dual_obj(
     group_losses,
     fairness_constraint="equalized_loss",
     dual_learning="optim",
+    multiplier_learning_rate=0.1,
 ):
     """This helper function will define a custom objective function for XGBoost using the fair_weight parameter.
 
@@ -148,6 +168,8 @@ def dual_obj(
         Fairness constraint used in learning.
     dual_learning : str, optional
         Method used to learn the dual problem, by default "optim"
+    multiplier_learning_rate: float, optional
+        Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
     mu_opt_list = [None]
     n = len(subgroup)
@@ -171,14 +193,13 @@ def dual_obj(
 
             elif dual_learning == "gradient":
                 if mu_opt_list[0] is None:
-                    mu_opt = np.ones(loss_group.shape[0])
-                    mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
+                    mu_opt = np.zeros(loss_group.shape[0])
+                    # mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
                     mu_opt_list[0] = mu_opt
 
                 else:
                     mu_opt = mu_opt_list[-1]
-                    mu_opt += 0.1 * loss_group
-                    mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
+                    mu_opt += multiplier_learning_rate * fair_weight * loss_group
                     mu_opt_list.append(mu_opt)
 
         else:
@@ -221,6 +242,8 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         Weight for fairness in loss formulation, by default 1
     dual_learning : str, optional
         Method used to learn the dual problem, by default "optim"
+    multiplier_learning_rate: float, optional
+        Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     n_estimators : int, optional
         Number of estimators used in XGB, by default 10
     eta : float, optional
@@ -250,6 +273,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
         fairness_constraint="equalized_loss",
         fair_weight=1,
         dual_learning="optim",
+        multiplier_learning_rate=0.1,
         n_estimators=10,
         eta=0.3,
         colsample_bytree=1,
@@ -273,6 +297,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
 
         self.fairness_constraint = fairness_constraint
         self.dual_learning = dual_learning
+        self.multiplier_learning_rate = multiplier_learning_rate
         self.fair_weight = fair_weight
         self.n_estimators = n_estimators
         self.eta = eta
@@ -334,6 +359,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
                 self.group_losses,
                 self.fairness_constraint,
                 self.dual_learning,
+                self.multiplier_learning_rate,
             ),
         )
         self.group_losses = np.array(self.group_losses)

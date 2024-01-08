@@ -179,7 +179,7 @@ def subgroup_experiment(args):
             get_model(args["model_name"], random_state = SEED),
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"])
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=4)
         best_params = study.best_params.copy()
 
 
@@ -234,13 +234,15 @@ def summarize(dataset_name):
 
 
 for dataset in ["german2", "adult"]:
-    continue
-    for alpha in [1, 0.75]:
+    for alpha in [
+        #1, 
+        0.75
+    ]:
         for model_name in [
-            "XtremeFair",
+            #"XtremeFair",
             "XtremeFair_grad",
-            "XGBClassifier",
-            "FairGBMClassifier",
+            #"XGBClassifier",
+            #"FairGBMClassifier",
         ]:
             args = {
                 "dataset": dataset,
