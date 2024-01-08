@@ -19,6 +19,7 @@ import data
 import models
 import utils
 
+SEED = 0
 
 def run_trial(
     trial,
@@ -30,8 +31,7 @@ def run_trial(
     Y_val,
     A_val,
     model_class,
-    param_space,
-    random_state=None,
+    param_space
 ):
     params = {}
     for name, values in param_space.items():
@@ -176,16 +176,12 @@ def subgroup_experiment(args):
             X_val,
             Y_val,
             A_val,
-            get_model(args["model_name"]),
+            get_model(args["model_name"], random_state = SEED),
             get_param_spaces(args["model_name"]),
-            0,
         )
         study.optimize(objective, n_trials=args["n_trials"])
+        best_params = study.best_params.copy()
 
-        # save best params
-        with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
-            f.write(str(study.best_params))
-            f.write("\n")
 
         model = get_model(args["model_name"])(**study.best_params)
         if isinstance(model, FairGBMClassifier):
@@ -196,6 +192,12 @@ def subgroup_experiment(args):
         thresh = utils.get_best_threshold(Y_train, y_prob)
         y_prob_test = model.predict_proba(X_test)[:, 1]
         y_pred_test = y_prob_test > thresh
+        best_params["threshold"] = thresh
+
+        # save best params
+        with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
+            f.write(str(best_params))
+            f.write("\n")
 
         metrics = eval_model(Y_test, y_prob_test, y_pred_test, A_test)
         results.append(metrics)
@@ -232,6 +234,7 @@ def summarize(dataset_name):
 
 
 for dataset in ["german2", "adult"]:
+    continue
     for alpha in [1, 0.75]:
         for model_name in [
             "XtremeFair",
@@ -244,7 +247,7 @@ for dataset in ["german2", "adult"]:
                 "alpha": alpha,
                 "output_dir": f"../results/subgroup_experiment/{dataset}/{model_name}_{alpha}",
                 "model_name": model_name,
-                "n_trials": 5,
+                "n_trials": 100,
             }
             subgroup_experiment(args)
 
