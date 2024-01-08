@@ -123,6 +123,8 @@ def equalized_loss_score(y_ground, y_prob, A):
     float
         Difference between the mean loss of groups
     """
+    eps = 1e-15
+    y_prob = np.clip(y_prob, eps, 1 - eps)
     loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
     if len(np.unique(A)) > 2:
         max_ = -np.inf
