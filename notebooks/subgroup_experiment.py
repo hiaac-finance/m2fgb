@@ -152,7 +152,7 @@ def subgroup_experiment(args):
     for i in tqdm(range(10)):
         # Load and prepare data
         X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
-            args["dataset"], i, 0
+            args["dataset"], i, SEED
         )
 
         # Define sensitive attribute from gender and age
@@ -213,7 +213,7 @@ def summarize(dataset_name):
     for experiment in experiments:
         df = pd.read_csv(os.path.join(experiment, "results.csv"))
         df["experiment"] = experiment.split("/")[-1]
-        df["eq_loss"] = 1 - df["eq_loss"].abs()
+        df["eq_loss"] = -df["eq_loss"].abs()
         df["spd"] = 1 - df["spd"].abs()
         df["eod"] = 1 - df["eod"].abs()
         results.append(df.iloc[:, 1:])
