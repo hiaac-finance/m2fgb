@@ -27,14 +27,6 @@ PARAM_SPACES = {
             "log": True,
         }
     },
-    "XGBClassifier": {
-        "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
-        "eta": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
-        "max_depth": {"type": "int", "low": 2, "high": 10},
-        "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 0, "high": 0},
-    },
     "FairGBMClassifier": {
         "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
         "min_child_samples": {"type": "int", "low": 5, "high": 500, "log": True},
@@ -47,7 +39,16 @@ PARAM_SPACES = {
             "high": 0.5,
             "log": True,
         },
+        "constraint_fnr_tolerance": {"type": "float", "low" : 0.005, "high" : 0.5, "log" : True}
     },
+    "LGBMClassifier": {
+        "num_leaves" : {"type": "int", "low": 2, "high": 500, "log": True},
+        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
+        "min_child_samples": {"type": "int", "low": 5, "high": 500, "log": True},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+    }
 }
 
 
