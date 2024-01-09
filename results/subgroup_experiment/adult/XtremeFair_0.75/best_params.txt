@@ -1,2 +1,10 @@
-{'min_child_weight': 407.8455819641986, 'n_estimators': 23, 'eta': 0.03057364536673044, 'max_depth': 9, 'l2_weight': 0.026200532292563788, 'fair_weight': 9.808540967559708, 'threshold': 0.3753885328769684}
-{'min_child_weight': 943.4811969437704, 'n_estimators': 52, 'eta': 0.22231298932006047, 'max_depth': 9, 'l2_weight': 0.0028349099287922823, 'fair_weight': 2.8822590040255314, 'threshold': 0.2296440750360489}
+{'min_child_weight': 0.010883951956047794, 'n_estimators': 595, 'eta': 0.03296622324400446, 'max_depth': 7, 'l2_weight': 0.08708160399466548, 'fair_weight': 0.06435081035346424, 'threshold': 0.5}
+{'min_child_weight': 8.436602767471326, 'n_estimators': 59, 'eta': 0.27047446204720577, 'max_depth': 4, 'l2_weight': 682.9363845770903, 'fair_weight': 9.934777393871801, 'threshold': 0.5}
+{'min_child_weight': 0.15629156408308226, 'n_estimators': 62, 'eta': 0.3514260619923741, 'max_depth': 7, 'l2_weight': 927.7783738080121, 'fair_weight': 9.87722048392227, 'threshold': 0.5}
+{'min_child_weight': 723.9095209853083, 'n_estimators': 274, 'eta': 0.22514859226887332, 'max_depth': 10, 'l2_weight': 1.4649410711597826, 'fair_weight': 0.031008285984711226, 'threshold': 0.5}
+{'min_child_weight': 584.368564791694, 'n_estimators': 17, 'eta': 0.4121495688301229, 'max_depth': 4, 'l2_weight': 30.864255169484323, 'fair_weight': 0.013371333796465034, 'threshold': 0.5}
+{'min_child_weight': 997.0079819251854, 'n_estimators': 89, 'eta': 0.3378407372761591, 'max_depth': 4, 'l2_weight': 0.006996004382687709, 'fair_weight': 9.919622378824858, 'threshold': 0.5}
+{'min_child_weight': 141.0702862431089, 'n_estimators': 64, 'eta': 0.3112920626763843, 'max_depth': 8, 'l2_weight': 11.138542132165142, 'fair_weight': 8.365162463555937, 'threshold': 0.5}
+{'min_child_weight': 4.669008233105514, 'n_estimators': 216, 'eta': 0.019151483622190085, 'max_depth': 9, 'l2_weight': 0.0018028212561689296, 'fair_weight': 6.269866934740619, 'threshold': 0.5}
+{'min_child_weight': 39.21430178262872, 'n_estimators': 256, 'eta': 0.15842029392293638, 'max_depth': 6, 'l2_weight': 256.68037346862275, 'fair_weight': 6.9993917593118695, 'threshold': 0.5}
+{'min_child_weight': 0.029929732934359958, 'n_estimators': 374, 'eta': 0.3129497428673043, 'max_depth': 3, 'l2_weight': 692.4409437004377, 'fair_weight': 9.0538054414622, 'threshold': 0.5}
