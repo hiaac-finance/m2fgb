@@ -108,6 +108,10 @@ def get_model(model_name, random_state=None):
 
         def model(**params):
             return FairGBMClassifier(random_state=random_state, **params)
+        
+    elif model_name == "ExponentiatedGradient":
+        def model(**params):
+            return models.ExponentiatedGradient_LGBM(random_state=random_state, **params)
 
     return model
 
@@ -121,6 +125,8 @@ def get_param_spaces(model_name):
         return models.PARAM_SPACES["LGBMClassifier"]
     elif model_name == "FairGBMClassifier":
         return models.PARAM_SPACES["FairGBMClassifier"]
+    elif model_name == "ExponentiatedGradient":
+        return models.PARAM_SPACES["ExponentiatedGradient"]
 
 
 def group_experiment(args):
