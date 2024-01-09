@@ -2,6 +2,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.metrics import roc_auc_score, accuracy_score
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 import pandas as pd
 from tqdm import tqdm
 import optuna
@@ -217,31 +220,52 @@ def summarize(dataset_name):
     results = []
     for experiment in experiments:
         df = pd.read_csv(os.path.join(experiment, "results.csv"))
-        df["experiment"] = experiment.split("/")[-1]
+        df["experiment"] = "_".join(experiment.split("/")[-1].split("_")[:-1])
+        df["alpha"] = float(experiment.split("/")[-1].split("_")[-1])
         df["eq_loss"] = df["eq_loss"].abs()
         df["spd"] = 1 - df["spd"].abs()
         df["eod"] = 1 - df["eod"].abs()
         results.append(df.iloc[:, 1:])
     results = pd.concat(results)
     # for each experiment, calculate the mean and std of each metric
-    results_mean = results.groupby("experiment").mean()
-    results_std = results.groupby("experiment").std()
+    results_mean = results.groupby(["experiment", "alpha"]).mean()
+    #results_std = results.groupby(["experiment", "alpha"]).std()
 
     # combine dataframes into one with reorganized columns
-    results = pd.concat([results_mean, results_std], axis=1)
-    results.columns = pd.MultiIndex.from_product(
-        [["mean", "std"], results_mean.columns]
-    )
-    results = results.swaplevel(axis=1)
+    #results = pd.concat([results_mean, results_std], axis=1)
+    #results.columns = pd.MultiIndex.from_product(
+    #    [["mean", "std"], results_mean.columns]
+    #)
+    #results = results.swaplevel(axis=1)
+    results = results_mean
     results = results[["acc", "eod"]]
     results = results.round(3)
+    results = results.reset_index()
     print(results)
+
+    fig = plt.figure(figsize=(4, 3))
+    ax = fig.add_subplot(111)
+    for i, model_name in enumerate(model_names):
+        df = results[results["experiment"] == model_name]
+        ax.scatter(df["acc"], df["eod"], label=model_name)
+    ax.legend()
+    ax.set_xlabel("Accuracy")
+    ax.set_ylabel("1 - Equal Opportunity Difference")
+    ax.set_title(dataset_name)
+    ax.grid()
+    plt.tight_layout()
+    fig.savefig(f"../results/group_experiment/{dataset_name}_plot.jpg")
+
+
+    
 
 datasets = ["german"]
 model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair"]#, "XtremeFair_grad"]
 alphas = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-for dataset in datasets:
+summarize("german")
+
+for dataset in []: #datasets:
     for alpha in alphas:
         for model_name in model_names:
             args = {
