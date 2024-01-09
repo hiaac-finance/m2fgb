@@ -49,6 +49,8 @@ def run_trial(
     model = model_class(**params)
     if isinstance(model, FairGBMClassifier):
         model.fit(X_train, Y_train, constraint_group=A_train)
+    elif isinstance(model, LGBMClassifier):
+        model.fit(X_train, Y_train)
     else:
         model.fit(X_train, Y_train, A_train)
     Y_val_pred = model.predict(X_val)
@@ -166,6 +168,7 @@ def subgroup_experiment(args):
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
 
+        model_class = get_model(args["model_name"], random_state = SEED)
         study = optuna.create_study(direction="maximize")
         objective = lambda trial: run_trial(
             trial,
@@ -176,16 +179,18 @@ def subgroup_experiment(args):
             X_val,
             Y_val,
             A_val,
-            get_model(args["model_name"], random_state = SEED),
+            model_class,
             get_param_spaces(args["model_name"]),
         )
         study.optimize(objective, n_trials=args["n_trials"], n_jobs=4)
         best_params = study.best_params.copy()
 
 
-        model = get_model(args["model_name"])(**study.best_params)
+        model = model_class(**study.best_params)
         if isinstance(model, FairGBMClassifier):
             model.fit(X_train, Y_train, constraint_group=A_train)
+        if isinstance(model, LGBMClassifier):
+            model.fit(X_train, Y_train)
         else:
             model.fit(X_train, Y_train, A_train)
         y_prob = model.predict_proba(X_train)[:, 1]
