@@ -233,7 +233,7 @@ def summarize(dataset_name):
         [["mean", "std"], results_mean.columns]
     )
     results = results.swaplevel(axis=1)
-    results = results[["acc", "eop"]]
+    results = results[["acc", "eod"]]
     results = results.round(3)
     print(results)
 
