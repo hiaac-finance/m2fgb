@@ -12,6 +12,7 @@ import os
 import glob
 
 from fairgbm import FairGBMClassifier
+from lightgbm import LGBMClassifier
 
 
 sys.path.append("../scripts")
@@ -93,11 +94,10 @@ def get_model(model_name, random_state=None):
                 dual_learning="gradient", random_state=random_state, **params
             )
 
-    elif model_name == "XGBClassifier":
+    elif model_name == "LGBMClassifier":
 
         def model(**params):
-            assert params["fair_weight"] == 0
-            return models.XtremeFair(random_state=random_state, **params)
+            return LGBMClassifier(random_state=random_state, **params)
 
     elif model_name == "FairGBMClassifier":
 
@@ -111,9 +111,9 @@ def get_param_spaces(model_name):
     if model_name == "XtremeFair":
         return models.PARAM_SPACES["XtremeFair"]
     elif model_name == "XtremeFair_grad":
-        return models.PARAM_SPACES["XtremeFair"]
-    elif model_name == "XGBClassifier":
-        return models.PARAM_SPACES["XGBClassifier"]
+        return models.PARAM_SPACES["XtremeFair_grad"]
+    elif model_name == "LGBMClassifier":
+        return models.PARAM_SPACES["LGBMClassifier"]
     elif model_name == "FairGBMClassifier":
         return models.PARAM_SPACES["FairGBMClassifier"]
 
@@ -189,7 +189,7 @@ def subgroup_experiment(args):
         else:
             model.fit(X_train, Y_train, A_train)
         y_prob = model.predict_proba(X_train)[:, 1]
-        thresh = utils.get_best_threshold(Y_train, y_prob)
+        thresh = 0.5 #utils.get_best_threshold(Y_train, y_prob)
         y_prob_test = model.predict_proba(X_test)[:, 1]
         y_pred_test = y_prob_test > thresh
         best_params["threshold"] = thresh
@@ -228,22 +228,15 @@ def summarize(dataset_name):
         [["mean", "std"], results_mean.columns]
     )
     results = results.swaplevel(axis=1)
-    results = results[["roc", "acc", "eod", "eq_loss", "spd"]]
+    results = results[["acc", "eod"]]
     results = results.round(3)
     print(results)
 
-
-for dataset in ["german2", "adult"]:
-    for alpha in [
-        #1, 
-        0.75
-    ]:
-        for model_name in [
-            #"XtremeFair",
-            "XtremeFair_grad",
-            #"XGBClassifier",
-            #"FairGBMClassifier",
-        ]:
+datasets = ["german2"]
+model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair", "XtremeFair_grad"]
+for dataset in datasets:
+    for alpha in [1, 0.75]:
+        for model_name in model_names:
             args = {
                 "dataset": dataset,
                 "alpha": alpha,
@@ -253,4 +246,4 @@ for dataset in ["german2", "adult"]:
             }
             subgroup_experiment(args)
 
-        print(summarize(dataset))
+            print(summarize(dataset))
