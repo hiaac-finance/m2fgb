@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.model_selection import KFold, train_test_split
 
 CAT_FEATURES = {
-    "german2": [
+    "german": [
         "CheckingAccount",
         "CreditHistory",
         "Purpose",
@@ -30,7 +30,7 @@ CAT_FEATURES = {
 }
 
 NUM_FEATURES = {
-    "german2": [
+    "german": [
         "Age",
         "CreditAmount",
         "Dependents",
@@ -43,13 +43,6 @@ NUM_FEATURES = {
 }
 
 
-def load_german():
-    df = pd.read_csv("../data/german_credit_data_K_preprocessed.csv")
-    X = df.drop(["Risk"], axis=1)
-    Y = df["Risk"]
-    return X, Y
-
-
 def load_taiwan():
     df = pd.read_csv("../data/taiwan_preprocessed.csv")
     X = df.drop(["DEFAULT"], axis=1)
@@ -59,12 +52,12 @@ def load_taiwan():
     return X, Y
 
 
-def load_german2():
+def load_german():
     df = pd.read_csv("../data/german_preprocessed.csv")
     X = df.drop(["GOOD_RISK"], axis=1)
     Y = df["GOOD_RISK"]
     for col in X.columns:
-        if col in CAT_FEATURES["german2"]:
+        if col in CAT_FEATURES["german"]:
             X[col] = X[col].astype("category")
         else:
             X[col] = X[col].astype(float)
@@ -85,24 +78,14 @@ def load_adult():
 
 
 def load_dataset(dataset):
-    if dataset == "german":
-        return load_german()
-    elif dataset == "taiwan":
+    if dataset == "taiwan":
         return load_taiwan()
-    elif dataset == "german2":
-        return load_german2()
+    elif dataset == "german":
+        return load_german()
     elif dataset == "adult":
         return load_adult()
     else:
         raise ValueError(f"Unknown dataset {dataset}")
-
-
-def load_unbalanced_german():
-    df = pd.read_csv("../data/german_credit_data_K_preprocessed.csv")
-    df = pd.concat([df[df.Sex == 0], df[df.Sex == 1].sample(70)]).reset_index(drop=True)
-    X = df.drop(["Risk"], axis=1)
-    Y = df["Risk"]
-    return X, Y
 
 
 def get_fold(dataset, fold, random_state=None):
