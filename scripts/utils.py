@@ -100,7 +100,7 @@ def get_combined_metrics_scorer(
         elif fairness_metric == "spd":
             fair = statistical_parity_score(y_ground, y_pred, A)
 
-        return alpha * perf + (1 - alpha) * abs(fair)
+        return alpha * perf + (1 - alpha) * (1 - abs(fair))
 
     return scorer
 
