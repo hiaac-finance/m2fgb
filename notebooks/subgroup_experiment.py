@@ -56,7 +56,7 @@ def run_trial(
 
 
 def get_subgroup_feature(dataset, X_train, X_val, X_test):
-    if dataset == "german2":
+    if dataset == "german":
         A_train = X_train.Gender.astype(str) + "_" + (X_train.Age > 50).astype(str)
         A_val = X_val.Gender.astype(str) + "_" + (X_val.Age > 50).astype(str)
         A_test = X_test.Gender.astype(str) + "_" + (X_test.Age > 50).astype(str)
@@ -213,7 +213,7 @@ def summarize(dataset_name):
     for experiment in experiments:
         df = pd.read_csv(os.path.join(experiment, "results.csv"))
         df["experiment"] = experiment.split("/")[-1]
-        df["eq_loss"] = -df["eq_loss"].abs()
+        df["eq_loss"] = df["eq_loss"].abs()
         df["spd"] = 1 - df["spd"].abs()
         df["eod"] = 1 - df["eod"].abs()
         results.append(df.iloc[:, 1:])
@@ -228,11 +228,11 @@ def summarize(dataset_name):
         [["mean", "std"], results_mean.columns]
     )
     results = results.swaplevel(axis=1)
-    results = results[["acc", "eod"]]
+    results = results[["acc", "eop"]]
     results = results.round(3)
     print(results)
 
-datasets = ["german2"]
+datasets = ["german"]
 model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair", "XtremeFair_grad"]
 for dataset in datasets:
     for alpha in [1, 0.75]:
