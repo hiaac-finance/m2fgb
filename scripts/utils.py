@@ -104,6 +104,39 @@ def get_combined_metrics_scorer(
 
     return scorer
 
+def get_fairness_goal_scorer(fairness_goal, M = 10, performance_metric="acc", fairness_metric="eod"):
+    """Create a scorer for fairness metrics. The scorer can be used in hyperparameter tuning.
+    
+    It will return the value of the roc auc if the fairness goal is reached, otherwise it will return a low value.
+
+    Parameters
+    ----------
+    fairness_goal : float
+        Value of the fairness metric to be reached. The lower the value, the more fair the model.
+    performance_metric : str, optional
+        Performance metric in ["acc", "roc_auc"], by default "acc"
+    fairness_metric : str, optional
+        Fairness metric in ["eod", "spd"], by default "eod"
+    M : int, optional
+        Penalty for not reaching the fairness goal, by default 10
+    """
+    def scorer(y_ground, y_pred, A):
+        if performance_metric == "acc":
+            perf = accuracy_score(y_ground, y_pred)
+        elif performance_metric == "roc_auc":
+            perf = roc_auc_score(y_ground, y_pred)
+
+        if fairness_metric == "eod":
+            fair = equal_opportunity_score(y_ground, y_pred, A)
+        elif fairness_metric == "spd":
+            fair = statistical_parity_score(y_ground, y_pred, A)
+            
+        if fair <= fairness_goal:
+            return perf
+        else:
+            return perf - M * abs(fair - fairness_goal)
+    return scorer
+
 
 def equalized_loss_score(y_ground, y_prob, A):
     """Calculate the difference between the mean loss of groups. The loss is binary cross entropy.
