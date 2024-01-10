@@ -56,7 +56,10 @@ def run_trial(
         model.fit(X_train, Y_train)
     else:
         model.fit(X_train, Y_train, A_train)
-    Y_val_pred = model.predict(X_val)
+    
+    Y_val_prob = model.predict_proba(X_val)
+    thresh = utils.get_best_threshold(Y_val, Y_val_prob[:, 1])
+    Y_val_pred = Y_val_prob[:, 1] > thresh
     return scorer(Y_val, Y_val_pred, A_val)
 
 
@@ -111,7 +114,7 @@ def get_model(model_name, random_state=None):
         
     elif model_name == "ExponentiatedGradient":
         def model(**params):
-            return models.ExponentiatedGradient_LGBM(random_state=random_state, **params)
+            return models.ExponentiatedGradient_Wrap(random_state=random_state, **params)
 
     return model
 
@@ -202,8 +205,8 @@ def group_experiment(args):
             model.fit(X_train, Y_train)
         else:
             model.fit(X_train, Y_train, A_train)
-        y_prob = model.predict_proba(X_train)[:, 1]
-        thresh = 0.5 #utils.get_best_threshold(Y_train, y_prob)
+        y_prob = model.predict_proba(X_val)[:, 1]
+        thresh = utils.get_best_threshold(Y_val, y_prob)
         y_prob_test = model.predict_proba(X_test)[:, 1]
         y_pred_test = y_prob_test > thresh
         best_params["threshold"] = thresh
@@ -271,7 +274,7 @@ alphas = [0.2, 0.4, 0.6, 0.8, 1.0]
 
 summarize("german")
 
-for dataset in []: #datasets:
+for dataset in datasets:
     for alpha in alphas:
         for model_name in model_names:
             args = {

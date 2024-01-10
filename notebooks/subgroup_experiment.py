@@ -22,6 +22,7 @@ import utils
 
 SEED = 0
 
+
 def run_trial(
     trial,
     scorer,
@@ -32,7 +33,7 @@ def run_trial(
     Y_val,
     A_val,
     model_class,
-    param_space
+    param_space,
 ):
     params = {}
     for name, values in param_space.items():
@@ -96,6 +97,25 @@ def get_model(model_name, random_state=None):
                 dual_learning="gradient", random_state=random_state, **params
             )
 
+    elif model_name == "XtremeFair_eod":
+
+        def model(**params):
+            return models.XtremeFair(
+                fairness_constraint="equal_opportunity",
+                random_state=random_state,
+                **params,
+            )
+
+    elif model_name == "XtremeFair_eod_grad":
+
+        def model(**params):
+            return models.XtremeFair(
+                fairness_constraint="equal_opportunity",
+                dual_learning="gradient",
+                random_state=random_state,
+                **params,
+            )
+
     elif model_name == "LGBMClassifier":
 
         def model(**params):
@@ -110,9 +130,9 @@ def get_model(model_name, random_state=None):
 
 
 def get_param_spaces(model_name):
-    if model_name == "XtremeFair":
+    if model_name == "XtremeFair" or model_name == "XtremeFair_eod":
         return models.PARAM_SPACES["XtremeFair"]
-    elif model_name == "XtremeFair_grad":
+    elif model_name == "XtremeFair_grad" or model_name == "XtremeFair_eod_grad":
         return models.PARAM_SPACES["XtremeFair_grad"]
     elif model_name == "LGBMClassifier":
         return models.PARAM_SPACES["LGBMClassifier"]
@@ -168,7 +188,7 @@ def subgroup_experiment(args):
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
 
-        model_class = get_model(args["model_name"], random_state = SEED)
+        model_class = get_model(args["model_name"], random_state=SEED)
         study = optuna.create_study(direction="maximize")
         objective = lambda trial: run_trial(
             trial,
@@ -185,7 +205,6 @@ def subgroup_experiment(args):
         study.optimize(objective, n_trials=args["n_trials"], n_jobs=4)
         best_params = study.best_params.copy()
 
-
         model = model_class(**study.best_params)
         if isinstance(model, FairGBMClassifier):
             model.fit(X_train, Y_train, constraint_group=A_train)
@@ -194,7 +213,7 @@ def subgroup_experiment(args):
         else:
             model.fit(X_train, Y_train, A_train)
         y_prob = model.predict_proba(X_train)[:, 1]
-        thresh = 0.5 #utils.get_best_threshold(Y_train, y_prob)
+        thresh = 0.5  # utils.get_best_threshold(Y_train, y_prob)
         y_prob_test = model.predict_proba(X_test)[:, 1]
         y_pred_test = y_prob_test > thresh
         best_params["threshold"] = thresh
@@ -237,8 +256,16 @@ def summarize(dataset_name):
     results = results.round(3)
     print(results)
 
+
 datasets = ["german"]
-model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair", "XtremeFair_grad"]
+model_names = [
+    # "LGBMClassifier",
+    # "FairGBMClassifier",
+    # "XtremeFair",
+    # "XtremeFair_grad",
+    "XtremeFair_eod",
+    "XtremeFair_eod_grad",
+]
 for dataset in datasets:
     for alpha in [1, 0.75]:
         for model_name in model_names:
