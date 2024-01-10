@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
+from sklearn.tree import DecisionTreeClassifier
 from lightgbm import LGBMClassifier
 import xgboost as xgb
 from fairlearn.reductions import (
@@ -65,11 +66,9 @@ PARAM_SPACES = {
         "eps": {"type": "float", "low": 0.001, "high": 0.5, "log": True},
         "max_iter": {"type": "int", "low": 10, "high": 1000, "log": True},
         "eta0": {"type": "float", "low": 0.1, "high": 100, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
-        "min_child_samples": {"type": "int", "low": 5, "high": 500, "log": True},
+        "min_child_leaf": {"type": "int", "low": 5, "high": 500, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 10},
-        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "criterion": {"type": "str", "options": ["gini", "entropy"]},
     },
 }
 
@@ -458,18 +457,16 @@ def ks_threshold(y_true, y_score):
     return opt_threshold
 
 
-class ExponentiatedGradient_LGBM(BaseEstimator, ClassifierMixin):
+class ExponentiatedGradient_Wrap(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
         fairness_constraint,
         eps,
         max_iter,
         eta0,
-        n_estimators,
-        min_child_samples,
+        min_samples_leaf,
         max_depth,
-        reg_lambda,
-        learning_rate,
+        criterion,
         random_state=None,
     ):
         assert fairness_constraint in [
@@ -486,20 +483,15 @@ class ExponentiatedGradient_LGBM(BaseEstimator, ClassifierMixin):
         self.eps = eps
         self.max_iter = max_iter
         self.eta0 = eta0
-        self.n_estimators = n_estimators
-        self.min_child_samples = min_child_samples
+        self.min_samples_leaf = min_samples_leaf
         self.max_depth = max_depth
-        self.reg_lambda = reg_lambda
-        self.learning_rate = learning_rate
+        self.criterion = criterion
 
-        self.estimator = LGBMClassifier(
-            n_estimators=self.n_estimators,
-            min_child_samples=self.min_child_samples,
+        self.estimator = DecisionTreeClassifier(
+            min_samples_leaf=self.min_samples_leaf,
             max_depth=self.max_depth,
-            reg_lambda=self.reg_lambda,
-            learning_rate=self.learning_rate,
+            criterion=self.criterion,
             random_state=random_state,
-            verbose=-1,
         )
 
     def fit(self, X, y, sensitive_attribute):
@@ -520,7 +512,7 @@ class ExponentiatedGradient_LGBM(BaseEstimator, ClassifierMixin):
         X = check_array(X)
         return self.model_.predict(X)
 
-    def predict_proba():
+    def predict_proba(self, X):
         check_is_fitted(self)
         X = check_array(X)
         return self.model_.predict_proba(X)
