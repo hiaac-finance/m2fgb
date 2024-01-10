@@ -98,10 +98,9 @@ def logloss_group(predt, dtrain, subgroup, fairness_constraint):
     if fairness_constraint == "demographic_parity":
         y_ = np.ones(y.shape[0])  # all positive class
         loss = -(y_ * np.log(predt) + (1 - y_) * np.log(1 - predt))
-        loss = loss * y  # only consider the loss of the positive class
     elif fairness_constraint == "equal_opportunity":
         loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
-        loss = loss * y  # only consider the loss of the positive class
+        loss[y == 0] = 0  # only consider the loss of the positive class
 
     groups = np.unique(subgroup)
 
@@ -122,10 +121,9 @@ def logloss_group_grad(predt, dtrain, subgroup, fairness_constraint):
     elif fairness_constraint == "demographic_parity":
         y_ = np.ones(y.shape[0])  # all positive class
         grad = -(y_ - predt)
-        grad = grad * y  # only consider the loss of the positive class
     elif fairness_constraint == "equal_opportunity":
         grad = -(y - predt)
-        grad = grad * y  # only consider the loss of the positive class
+        grad[y == 0] = 0  # only consider the loss of the positive class
 
     groups = np.unique(subgroup)
     grad_matrix = np.tile(grad, (len(groups), 1)).T
@@ -145,7 +143,7 @@ def logloss_group_hess(predt, dtrain, subgroup, fairness_constraint):
         or fairness_constraint == "equal_opportunity"
     ):
         hess = predt * (1 - predt)
-        hess = hess * y  # only consider the loss of the positive class
+        hess[y == 0] = 0  # only consider the loss of the positive class
 
     groups = np.unique(subgroup)
     hess_matrix = np.tile(hess, (len(groups), 1)).T
