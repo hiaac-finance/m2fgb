@@ -105,7 +105,7 @@ def get_model(model_name, random_state=None):
     elif model_name == "LGBMClassifier":
 
         def model(**params):
-            return LGBMClassifier(random_state=random_state, **params)
+            return LGBMClassifier(random_state=random_state, verbose = -1, **params)
 
     elif model_name == "FairGBMClassifier":
 
@@ -194,7 +194,7 @@ def group_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=4)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=9)
         best_params = study.best_params.copy()
 
 
@@ -269,7 +269,7 @@ def summarize(dataset_name):
     
 
 datasets = ["german"]
-model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair"]#, "XtremeFair_grad"]
+model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair", "XtremeFair_grad"]
 alphas = [0.2, 0.4, 0.6, 0.8, 1.0]
 
 summarize("german")
@@ -282,8 +282,9 @@ for dataset in datasets:
                 "alpha": alpha,
                 "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
                 "model_name": model_name,
-                "n_trials": 20,
+                "n_trials": 100,
             }
+            print(f"{dataset} {model_name} {alpha}")
             group_experiment(args)
 
-            print(summarize(dataset))
+    print(summarize(dataset))
