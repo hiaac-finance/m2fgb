@@ -250,13 +250,30 @@ def summarize(dataset_name):
     results = results[["acc", "eod"]]
     results = results.round(3)
     results = results.reset_index()
-    print(results)
 
-    fig = plt.figure(figsize=(4, 3))
+    # verify which points are not dominated
+    dominated = []
+    for i, row in results.iterrows():
+        is_dominated = False
+        for j, row2 in results.iterrows():
+            if i == j:
+                continue
+            if row["acc"] <= row2["acc"] and row["eod"] <= row2["eod"]:
+                is_dominated = True
+                break
+        dominated.append(is_dominated)
+    results["dominated"] = dominated
+    fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111)
-    for i, model_name in enumerate(model_names):
+    for i, model_name in enumerate(results["experiment"].unique()):
         df = results[results["experiment"] == model_name]
-        ax.scatter(df["acc"], df["eod"], label=model_name)
+        ax.scatter(
+            df["acc"], 
+            df["eod"], 
+            s = [20 if dominated else 50 for dominated in df["dominated"]],
+            label=model_name
+        )
+
     ax.legend()
     ax.set_xlabel("Accuracy")
     ax.set_ylabel("1 - Equal Opportunity Difference")
@@ -267,25 +284,32 @@ def summarize(dataset_name):
 
 
     
+def main():
+    datasets = ["german"]
+    model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair", "XtremeFair_grad"]
+    alphas = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
 
-datasets = ["adult"]
-model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair"]#, "XtremeFair_grad"]
-#alphas = [0.2, 0.4, 0.6, 0.8, 1.0]
-alphas = [0.4, 0.8]
+    summarize("german")
 
-summarize("adult")
+    return
 
-for dataset in datasets:
-    for alpha in alphas:
-        for model_name in model_names:
-            args = {
-                "dataset": dataset,
-                "alpha": alpha,
-                "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
-                "model_name": model_name,
-                "n_trials": 100,
-            }
-            print(f"{dataset} {model_name} {alpha}")
-            group_experiment(args)
 
-    print(summarize(dataset))
+    for dataset in datasets:
+        for alpha in alphas:
+            for model_name in model_names:
+                args = {
+                    "dataset": dataset,
+                    "alpha": alpha,
+                    "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
+                    "model_name": model_name,
+                    "n_trials": 25,
+                }
+                print(f"{dataset} {model_name} {alpha}")
+                group_experiment(args)
+
+        print(summarize(dataset))
+
+
+if __name__ == "__main__":
+    main()
+

@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 
 CAT_FEATURES = {
     "german": [
@@ -90,8 +90,8 @@ def load_dataset(dataset):
 
 def get_fold(dataset, fold, random_state=None):
     X, Y = load_dataset(dataset)
-    kf = KFold(n_splits=10, shuffle=True, random_state=random_state)
-    for i, (train_index, test_index) in enumerate(kf.split(X)):
+    kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=random_state)
+    for i, (train_index, test_index) in enumerate(kf.split(X, Y)):
         if i == fold:
             X_train, Y_train = X.iloc[train_index], Y.iloc[train_index]
             X_train, X_val, Y_train, Y_val = train_test_split(
