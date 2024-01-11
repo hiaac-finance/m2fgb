@@ -8,6 +8,7 @@ matplotlib.use('Agg')
 import pandas as pd
 from tqdm import tqdm
 import optuna
+import joblib
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 import sys
@@ -194,7 +195,7 @@ def group_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=9)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=11)
         best_params = study.best_params.copy()
 
 
@@ -205,6 +206,7 @@ def group_experiment(args):
             model.fit(X_train, Y_train)
         else:
             model.fit(X_train, Y_train, A_train)
+        joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
         y_prob = model.predict_proba(X_val)[:, 1]
         thresh = utils.get_best_threshold(Y_val, y_prob)
         y_prob_test = model.predict_proba(X_test)[:, 1]
@@ -268,11 +270,12 @@ def summarize(dataset_name):
 
     
 
-datasets = ["german"]
-model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair", "XtremeFair_grad"]
-alphas = [0.2, 0.4, 0.6, 0.8, 1.0]
+datasets = ["adult"]
+model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair"]#, "XtremeFair_grad"]
+#alphas = [0.2, 0.4, 0.6, 0.8, 1.0]
+alphas = [0.4, 0.8]
 
-summarize("german")
+summarize("adult")
 
 for dataset in datasets:
     for alpha in alphas:
