@@ -92,7 +92,7 @@ def logloss_group(predt, dtrain, subgroup, fairness_constraint):
     """For each subgroup, calculates the mean log loss of the samples."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
-    predt = np.clip(predt, 1e-15, 1 - 1e-15)  # avoid log(0)
+    predt = np.clip(predt, 1e-7, 1 - 1e-7)  # avoid log(0)
     if fairness_constraint == "equalized_loss":
         loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
     if fairness_constraint == "demographic_parity":
