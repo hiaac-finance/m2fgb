@@ -1,7 +1,7 @@
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.metrics import roc_auc_score, accuracy_score, balanced_accuracy_score
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
@@ -58,9 +58,9 @@ def run_trial(
     else:
         model.fit(X_train, Y_train, A_train)
     
-    Y_val_prob = model.predict_proba(X_val)
-    thresh = utils.get_best_threshold(Y_val, Y_val_prob[:, 1])
-    Y_val_pred = Y_val_prob[:, 1] > thresh
+    Y_val_score = model.predict_proba(X_val)[:, 1]
+    thresh = utils.get_best_threshold(Y_val, Y_val_score)
+    Y_val_pred = Y_val_score > thresh
     return scorer(Y_val, Y_val_pred, A_val)
 
 
@@ -81,13 +81,14 @@ def get_group_feature(dataset, X_train, X_val, X_test):
     return A_train, A_val, A_test
 
 
-def eval_model(y_ground, y_prob, y_pred, A):
-    acc = accuracy_score(y_ground, y_pred)
-    roc = roc_auc_score(y_ground, y_prob)
-    eq_loss = utils.equalized_loss_score(y_ground, y_prob, A)
-    eod = utils.equal_opportunity_score(y_ground, y_pred, A)
-    spd = utils.statistical_parity_score(y_ground, y_pred, A)
-    return {"acc": acc, "roc": roc, "eq_loss": eq_loss, "eod": eod, "spd": spd}
+def eval_model(y_true, y_score, y_pred, A):
+    acc = accuracy_score(y_true, y_pred)
+    bal_acc = balanced_accuracy_score(y_true, y_pred)
+    roc = roc_auc_score(y_true, y_score)
+    eq_loss = utils.equalized_loss_score(y_true, y_score, A)
+    eod = utils.equal_opportunity_score(y_true, y_pred, A)
+    spd = utils.statistical_parity_score(y_true, y_pred, A)
+    return {"acc": acc, "bal_acc" : bal_acc, "roc": roc, "eq_loss": eq_loss, "eod": eod, "spd": spd}
 
 
 def get_model(model_name, random_state=None):
@@ -137,29 +138,27 @@ def group_experiment(args):
     # create output directory if not exists
     if not os.path.exists(args["output_dir"]):
         os.makedirs(args["output_dir"])
-
     # clear best_params.txt if exists
     if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
         os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
-
     results = []
 
-    cat_features = data.CAT_FEATURES[args["dataset"]]
-    num_features = data.NUM_FEATURES[args["dataset"]]
     col_trans = ColumnTransformer(
         [
-            ("numeric", StandardScaler(), num_features),
+            ("numeric", StandardScaler(), data.NUM_FEATURES[args["dataset"]]),
             (
                 "categorical",
                 OneHotEncoder(
                     drop="if_binary", sparse_output=False, handle_unknown="ignore"
                 ),
-                cat_features,
+                data.CAT_FEATURES[args["dataset"]],
             ),
         ],
         verbose_feature_names_out=False,
     )
     col_trans.set_output(transform="pandas")
+
+
     scorer = utils.get_combined_metrics_scorer(
         alpha=args["alpha"], performance_metric="acc", fairness_metric="eod"
     )
@@ -206,24 +205,23 @@ def group_experiment(args):
             model.fit(X_train, Y_train)
         else:
             model.fit(X_train, Y_train, A_train)
-        joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
-        y_prob = model.predict_proba(X_val)[:, 1]
-        thresh = utils.get_best_threshold(Y_val, y_prob)
-        y_prob_test = model.predict_proba(X_test)[:, 1]
-        y_pred_test = y_prob_test > thresh
-        best_params["threshold"] = thresh
 
-        # save best params
+        y_val_score = model.predict_proba(X_val)[:, 1]
+        thresh = utils.get_best_threshold(Y_val, y_val_score)
+        y_test_score = model.predict_proba(X_test)[:, 1]
+        y_test_pred = y_test_score > thresh
+        metrics = eval_model(Y_test, y_test_score, y_test_pred, A_test)
+
+        best_params["threshold"] = thresh
+        # save results of fold
+        joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
         with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
             f.write(str(best_params))
             f.write("\n")
-
-        metrics = eval_model(Y_test, y_prob_test, y_pred_test, A_test)
         results.append(metrics)
 
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
-    results.mean().to_csv(os.path.join(args["output_dir"], "results_mean.csv"))
 
 
 def summarize(dataset_name):
