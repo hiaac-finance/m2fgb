@@ -92,7 +92,7 @@ def logloss_group(predt, dtrain, subgroup, fairness_constraint):
     """For each subgroup, calculates the mean log loss of the samples."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
-    predt = np.clip(predt, 1e-6, 1 - 1e-6)  # avoid log(0)
+    predt = np.clip(predt, 1e-15, 1 - 1e-15)  # avoid log(0)
     if fairness_constraint == "equalized_loss":
         loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
     if fairness_constraint == "demographic_parity":
@@ -126,8 +126,9 @@ def logloss_group_grad(predt, dtrain, subgroup, fairness_constraint):
         grad[y == 0] = 0  # only consider the loss of the positive class
 
     groups = np.unique(subgroup)
-    grad_matrix = np.tile(grad, (len(groups), 1)).T
+    grad_matrix = np.zeros((len(y), len(groups)))
     for i, group in enumerate(groups):
+        grad_matrix[:, i] = grad  # copy the column
         grad_matrix[subgroup != group, i] = 0
     return grad_matrix
 
@@ -146,8 +147,9 @@ def logloss_group_hess(predt, dtrain, subgroup, fairness_constraint):
         hess[y == 0] = 0  # only consider the loss of the positive class
 
     groups = np.unique(subgroup)
-    hess_matrix = np.tile(hess, (len(groups), 1)).T
+    hess_matrix = np.zeros((len(y), len(groups)))
     for i, group in enumerate(groups):
+        hess_matrix[:, i] = hess  # copy the column
         hess_matrix[subgroup != group, i] = 0
     return hess_matrix
 
