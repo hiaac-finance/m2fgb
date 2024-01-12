@@ -211,7 +211,7 @@ def subgroup_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=4)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=7)
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
