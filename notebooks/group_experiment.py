@@ -1,3 +1,4 @@
+import numpy as np
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -295,6 +296,86 @@ def summarize(dataset_name):
     ax.grid()
     plt.tight_layout()
     fig.savefig(f"../results/group_experiment/{dataset_name}_plot.jpg")
+
+
+def plot_min_max(dataset):
+    col_trans = ColumnTransformer(
+        [
+            ("numeric", StandardScaler(), data.NUM_FEATURES[dataset]),
+            (
+                "categorical",
+                OneHotEncoder(
+                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
+                ),
+                data.CAT_FEATURES[dataset],
+            ),
+        ],
+        verbose_feature_names_out=False,
+    )
+    col_trans.set_output(transform="pandas")
+
+    experiments = glob.glob(f"../results/group_experiment/{dataset}/*")
+    experiments_metrics = {}
+    for experiment in experiments:
+        tpr_max_values = []
+        tpr_min_values = []
+        for i in range(10):
+            X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
+                dataset, i, SEED
+            )
+            A_train, A_val, A_test = get_group_feature(dataset, X_train, X_val, X_test)
+            preprocess = Pipeline([("preprocess", col_trans)])
+            preprocess.fit(X_train)
+            X_train = preprocess.transform(X_train)
+            X_val = preprocess.transform(X_val)
+            X_test = preprocess.transform(X_test)
+
+            model = joblib.load(os.path.join(experiment, f"model_{i}.pkl"))
+
+            Y_test_pred = model.predict(X_test)
+            tpr_group_0 = np.mean(Y_test_pred[(A_test == 0) & (Y_test == 1)])
+            tpr_group_1 = np.mean(Y_test_pred[(A_test == 1) & (Y_test == 1)])
+
+            tpr_max = max(tpr_group_0, tpr_group_1)
+            tpr_min = min(tpr_group_0, tpr_group_1)
+            tpr_max_values.append(tpr_max)
+            tpr_min_values.append(tpr_min)
+
+        experiments_metrics[experiment] = {
+            "tpr_max": np.mean(tpr_max_values),
+            "tpr_min": np.mean(tpr_min_values),
+            "tpr_max_std": np.std(tpr_max_values),
+            "tpr_min_std": np.std(tpr_min_values),
+        }
+
+    experiments_metrics = pd.DataFrame(experiments_metrics).T
+
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111)
+    for i, model_name in enumerate(experiments_metrics.index):
+        df = experiments_metrics.loc[model_name]
+        ax.plot(
+            [df["tpr_min"], df["tpr_max"]],
+            [i, i],
+            color="black",
+            linewidth=1,
+        )
+        ax.annotate(
+            f"{model_name}",
+            xy=(df["tpr_min"], i),
+            xytext=(df["tpr_min"], i),
+            textcoords="data",
+            ha="right",
+            va="center",
+            fontsize=8,
+        )
+
+    ax.set_xlabel("TPR")
+    ax.set_ylabel("Model")
+    ax.set_title(dataset)
+    ax.grid()
+    plt.tight_layout()
+    fig.savefig(f"../results/group_experiment/{dataset}_plot_min_max.jpg")
 
 
 def main():
