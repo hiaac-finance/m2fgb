@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
+
 def preprocess_taiwan():
     df = pd.read_csv("data/Taiwan.csv")
     df.columns = df.iloc[0, :].tolist()
@@ -49,10 +50,10 @@ def preprocess_taiwan():
         scaler = MinMaxScaler()
         df[col] = scaler.fit_transform(df[[col]])
 
-    df=pd.get_dummies(df,columns=cat_cols,prefix=cat_cols)
+    df = pd.get_dummies(df, columns=cat_cols, prefix=cat_cols)
 
-    df.to_csv("data/taiwan_preprocessed.csv", index = False)
-    
+    df.to_csv("data/taiwan_preprocessed.csv", index=False)
+
 
 def preprocess_german():
     df = pd.read_csv("data/german.csv", header=None)
@@ -77,9 +78,9 @@ def preprocess_german():
         "Dependents",
         "Telephone",
         "ForeignWorker",
-        "DEFAULT"
+        "DEFAULT",
     ]
-    df["DEFAULT"] = df.DEFAULT.apply(lambda x : 1 if x == 2 else 0)
+    df["DEFAULT"] = df.DEFAULT.apply(lambda x: 1 if x == 2 else 0)
     df["Gender"] = df.PersonalStatus
     df.CheckingAccount = df.CheckingAccount.apply(
         {"A11": "< 0", "A12": "0 - 200", "A13": "> 200", "A14": "No"}.get
@@ -167,18 +168,46 @@ def preprocess_german():
     df = df.rename(columns={"DEFAULT": "GOOD_RISK"})
     df.to_csv("data/german_preprocessed.csv", index=False)
 
+
 def preprocess_adult():
     from ucimlrepo import fetch_ucirepo
+
     adult = fetch_ucirepo(id=2)
     df = adult.data.features.copy()
     df["INCOME"] = adult.data.targets
     df = df.drop(columns=["fnlwgt"])
     df.to_csv("data/adult_preprocessed.csv", index=False)
 
+
+def preprocess_compas():
+    df = pd.read_csv("data/compas-scores-two-years.csv")
+    df = df[
+        [
+            "sex",
+            "age_cat",
+            "race",
+            "juv_fel_count",
+            "juv_misd_count",
+            "juv_other_count",
+            "priors_count",
+            "two_year_recid",
+        ]
+    ]
+    df = df.dropna()
+
+    for col in df.columns:
+        if df[col].dtype == "object":
+            df[col] = pd.Categorical(df[col])
+
+    df = df.to_csv("data/compas_preprocessed.csv", index=False)
+
+
 def download_data():
     import gdown
+
     url = "https://drive.google.com/drive/folders/12r-AU7HS9XBcfv__9aUYvwEZDsAbcOwK"
     gdown.download_folder(url, quiet=True, use_cookies=False)
+
 
 if __name__ == "__main__":
     download_data()

@@ -27,6 +27,11 @@ CAT_FEATURES = {
         "sex",
         "native-country",
     ],
+    "compas": [
+        "sex",
+        "age_cat",
+        "race",
+    ],
 }
 
 NUM_FEATURES = {
@@ -40,6 +45,13 @@ NUM_FEATURES = {
         "ResidenceSince",
     ],
     "adult": ["age", "capital-gain", "capital-loss", "education-num", "hours-per-week"],
+    "compas": [
+        "juv_fel_count",
+        "juv_misd_count",
+        "juv_other_count",
+        "priors_count",
+        "two_year_recid",
+    ],
 }
 
 
@@ -77,6 +89,18 @@ def load_adult():
     return X, Y
 
 
+def load_compas():
+    df = pd.read_csv("../data/compas_preprocessed.csv")
+    X = df.drop(["two_year_recid"], axis=1)
+    Y = 1 - df["two_year_recid"]
+    for col in X.columns:
+        if col in CAT_FEATURES["compas"]:
+            X[col] = X[col].astype("category")
+        else:
+            X[col] = X[col].astype(float)
+    return X, Y
+
+
 def load_dataset(dataset):
     if dataset == "taiwan":
         return load_taiwan()
@@ -84,6 +108,8 @@ def load_dataset(dataset):
         return load_german()
     elif dataset == "adult":
         return load_adult()
+    elif dataset == "compas":
+        return load_compas()
     else:
         raise ValueError(f"Unknown dataset {dataset}")
 
