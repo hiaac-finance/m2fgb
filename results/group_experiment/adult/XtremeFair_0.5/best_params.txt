@@ -1,0 +1,10 @@
+{'min_child_weight': 0.03815683123936589, 'n_estimators': 493, 'eta': 0.19094508831850446, 'max_depth': 8, 'l2_weight': 173.4688735969761, 'fair_weight': 0.07608928074803505, 'threshold': 0.16188663244247437}
+{'min_child_weight': 0.00808601752323654, 'n_estimators': 461, 'eta': 0.48453036013414513, 'max_depth': 6, 'l2_weight': 57.49544179120543, 'fair_weight': 4.942285095506377, 'threshold': 0.1800382286310196}
+{'min_child_weight': 21.140261170535826, 'n_estimators': 488, 'eta': 0.4656547209007373, 'max_depth': 6, 'l2_weight': 0.024134410585476333, 'fair_weight': 0.9812574790798875, 'threshold': 0.15239721536636353}
+{'min_child_weight': 0.06504390509906344, 'n_estimators': 469, 'eta': 0.18717528231833933, 'max_depth': 8, 'l2_weight': 0.006761617531102903, 'fair_weight': 8.351737038712676, 'threshold': 0.07469577342271805}
+{'min_child_weight': 0.002131296857572412, 'n_estimators': 449, 'eta': 0.27441968536001177, 'max_depth': 8, 'l2_weight': 15.004940983826001, 'fair_weight': 9.914067961558818, 'threshold': 0.2093678116798401}
+{'min_child_weight': 6.227040622883515, 'n_estimators': 489, 'eta': 0.2625546892579307, 'max_depth': 6, 'l2_weight': 0.015501017824056362, 'fair_weight': 0.4860695592372994, 'threshold': 0.23562674224376678}
+{'min_child_weight': 0.014392764996846658, 'n_estimators': 481, 'eta': 0.11647932510594551, 'max_depth': 10, 'l2_weight': 0.32109928493490886, 'fair_weight': 3.283093955235466, 'threshold': 0.15921254456043243}
+{'min_child_weight': 0.19795802333461718, 'n_estimators': 259, 'eta': 0.09258473900054712, 'max_depth': 6, 'l2_weight': 1.124508193107253, 'fair_weight': 0.0657713583936417, 'threshold': 0.21668680012226105}
+{'min_child_weight': 1.451171906228042, 'n_estimators': 50, 'eta': 0.47002439608654817, 'max_depth': 6, 'l2_weight': 2.6705366313204713, 'fair_weight': 0.6089905148918549, 'threshold': 0.28005486726760864}
+{'min_child_weight': 11.207743278912218, 'n_estimators': 136, 'eta': 0.20192340849751264, 'max_depth': 9, 'l2_weight': 0.1318264464721457, 'fair_weight': 1.1043802585921176, 'threshold': 0.2524043917655945}

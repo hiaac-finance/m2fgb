@@ -160,7 +160,7 @@ def group_experiment(args):
 
 
     scorer = utils.get_combined_metrics_scorer(
-        alpha=args["alpha"], performance_metric="acc", fairness_metric="eod"
+        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric="eod"
     )
 
     for i in tqdm(range(10)):
@@ -247,7 +247,7 @@ def summarize(dataset_name):
     #)
     #results = results.swaplevel(axis=1)
     results = results_mean
-    results = results[["acc", "eod"]]
+    results = results[["bal_acc", "eod"]]
     results = results.round(3)
     results = results.reset_index()
 
@@ -258,7 +258,7 @@ def summarize(dataset_name):
         for j, row2 in results.iterrows():
             if i == j:
                 continue
-            if row["acc"] <= row2["acc"] and row["eod"] <= row2["eod"]:
+            if row["bal_acc"] <= row2["bal_acc"] and row["eod"] <= row2["eod"]:
                 is_dominated = True
                 break
         dominated.append(is_dominated)
@@ -268,14 +268,14 @@ def summarize(dataset_name):
     for i, model_name in enumerate(results["experiment"].unique()):
         df = results[results["experiment"] == model_name]
         ax.scatter(
-            df["acc"], 
+            df["bal_acc"], 
             df["eod"], 
             s = [20 if dominated else 50 for dominated in df["dominated"]],
             label=model_name
         )
 
     ax.legend()
-    ax.set_xlabel("Accuracy")
+    ax.set_xlabel("Balanced Accuracy")
     ax.set_ylabel("1 - Equal Opportunity Difference")
     ax.set_title(dataset_name)
     ax.grid()
@@ -285,13 +285,9 @@ def summarize(dataset_name):
 
     
 def main():
-    datasets = ["german"]
+    datasets = ["adult"]
     model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair", "XtremeFair_grad"]
-    alphas = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
-
-    summarize("german")
-
-    return
+    alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
 
     for dataset in datasets:
@@ -302,7 +298,7 @@ def main():
                     "alpha": alpha,
                     "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
                     "model_name": model_name,
-                    "n_trials": 25,
+                    "n_trials": 50,
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 group_experiment(args)
