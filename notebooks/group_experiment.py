@@ -4,7 +4,8 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.metrics import roc_auc_score, accuracy_score, balanced_accuracy_score
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import pandas as pd
 from tqdm import tqdm
 import optuna
@@ -26,6 +27,7 @@ import utils
 
 SEED = 0
 
+
 def run_trial(
     trial,
     scorer,
@@ -36,7 +38,7 @@ def run_trial(
     Y_val,
     A_val,
     model_class,
-    param_space
+    param_space,
 ):
     params = {}
     for name, values in param_space.items():
@@ -57,7 +59,7 @@ def run_trial(
         model.fit(X_train, Y_train)
     else:
         model.fit(X_train, Y_train, A_train)
-    
+
     Y_val_score = model.predict_proba(X_val)[:, 1]
     thresh = utils.get_best_threshold(Y_val, Y_val_score)
     Y_val_pred = Y_val_score > thresh
@@ -88,7 +90,14 @@ def eval_model(y_true, y_score, y_pred, A):
     eq_loss = utils.equalized_loss_score(y_true, y_score, A)
     eod = utils.equal_opportunity_score(y_true, y_pred, A)
     spd = utils.statistical_parity_score(y_true, y_pred, A)
-    return {"acc": acc, "bal_acc" : bal_acc, "roc": roc, "eq_loss": eq_loss, "eod": eod, "spd": spd}
+    return {
+        "acc": acc,
+        "bal_acc": bal_acc,
+        "roc": roc,
+        "eq_loss": eq_loss,
+        "eod": eod,
+        "spd": spd,
+    }
 
 
 def get_model(model_name, random_state=None):
@@ -107,16 +116,19 @@ def get_model(model_name, random_state=None):
     elif model_name == "LGBMClassifier":
 
         def model(**params):
-            return LGBMClassifier(random_state=random_state, verbose = -1, **params)
+            return LGBMClassifier(random_state=random_state, verbose=-1, **params)
 
     elif model_name == "FairGBMClassifier":
 
         def model(**params):
             return FairGBMClassifier(random_state=random_state, **params)
-        
+
     elif model_name == "ExponentiatedGradient":
+
         def model(**params):
-            return models.ExponentiatedGradient_Wrap(random_state=random_state, **params)
+            return models.ExponentiatedGradient_Wrap(
+                random_state=random_state, **params
+            )
 
     return model
 
@@ -158,7 +170,6 @@ def group_experiment(args):
     )
     col_trans.set_output(transform="pandas")
 
-
     scorer = utils.get_combined_metrics_scorer(
         alpha=args["alpha"], performance_metric="bal_acc", fairness_metric="eod"
     )
@@ -180,7 +191,7 @@ def group_experiment(args):
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
 
-        model_class = get_model(args["model_name"], random_state = SEED)
+        model_class = get_model(args["model_name"], random_state=SEED)
         study = optuna.create_study(direction="maximize")
         objective = lambda trial: run_trial(
             trial,
@@ -196,7 +207,6 @@ def group_experiment(args):
         )
         study.optimize(objective, n_trials=args["n_trials"], n_jobs=11)
         best_params = study.best_params.copy()
-
 
         model = model_class(**study.best_params)
         if isinstance(model, FairGBMClassifier):
@@ -238,14 +248,14 @@ def summarize(dataset_name):
     results = pd.concat(results)
     # for each experiment, calculate the mean and std of each metric
     results_mean = results.groupby(["experiment", "alpha"]).mean()
-    #results_std = results.groupby(["experiment", "alpha"]).std()
+    # results_std = results.groupby(["experiment", "alpha"]).std()
 
     # combine dataframes into one with reorganized columns
-    #results = pd.concat([results_mean, results_std], axis=1)
-    #results.columns = pd.MultiIndex.from_product(
+    # results = pd.concat([results_mean, results_std], axis=1)
+    # results.columns = pd.MultiIndex.from_product(
     #    [["mean", "std"], results_mean.columns]
-    #)
-    #results = results.swaplevel(axis=1)
+    # )
+    # results = results.swaplevel(axis=1)
     results = results_mean
     results = results[["bal_acc", "eod"]]
     results = results.round(3)
@@ -268,10 +278,10 @@ def summarize(dataset_name):
     for i, model_name in enumerate(results["experiment"].unique()):
         df = results[results["experiment"] == model_name]
         ax.scatter(
-            df["bal_acc"], 
-            df["eod"], 
-            s = [20 if dominated else 50 for dominated in df["dominated"]],
-            label=model_name
+            df["bal_acc"],
+            df["eod"],
+            s=[20 if dominated else 50 for dominated in df["dominated"]],
+            label=model_name,
         )
 
     ax.legend()
@@ -283,12 +293,15 @@ def summarize(dataset_name):
     fig.savefig(f"../results/group_experiment/{dataset_name}_plot.jpg")
 
 
-    
 def main():
     datasets = ["adult"]
-    model_names = ["LGBMClassifier", "FairGBMClassifier", "XtremeFair", "XtremeFair_grad"]
+    model_names = [
+        "LGBMClassifier",
+        "FairGBMClassifier",
+        "XtremeFair",
+        "XtremeFair_grad",
+    ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-
 
     for dataset in datasets:
         for alpha in alphas:
@@ -308,4 +321,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -1,7 +1,13 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score, precision_score, balanced_accuracy_score
+from sklearn.metrics import (
+    roc_curve,
+    roc_auc_score,
+    accuracy_score,
+    precision_score,
+    balanced_accuracy_score,
+)
 
 
 def get_best_threshold(y_ground, y_pred):
@@ -106,9 +112,12 @@ def get_combined_metrics_scorer(
 
     return scorer
 
-def get_fairness_goal_scorer(fairness_goal, M = 10, performance_metric="acc", fairness_metric="eod"):
+
+def get_fairness_goal_scorer(
+    fairness_goal, M=10, performance_metric="acc", fairness_metric="eod"
+):
     """Create a scorer for fairness metrics. The scorer can be used in hyperparameter tuning.
-    
+
     It will return the value of the roc auc if the fairness goal is reached, otherwise it will return a low value.
 
     Parameters
@@ -122,6 +131,7 @@ def get_fairness_goal_scorer(fairness_goal, M = 10, performance_metric="acc", fa
     M : int, optional
         Penalty for not reaching the fairness goal, by default 10
     """
+
     def scorer(y_ground, y_pred, A):
         if performance_metric == "acc":
             perf = accuracy_score(y_ground, y_pred)
@@ -132,11 +142,12 @@ def get_fairness_goal_scorer(fairness_goal, M = 10, performance_metric="acc", fa
             fair = equal_opportunity_score(y_ground, y_pred, A)
         elif fairness_metric == "spd":
             fair = statistical_parity_score(y_ground, y_pred, A)
-            
+
         if fair <= fairness_goal:
             return perf
         else:
             return perf - M * abs(fair - fairness_goal)
+
     return scorer
 
 

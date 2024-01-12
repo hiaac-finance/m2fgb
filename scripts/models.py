@@ -449,6 +449,7 @@ class XtremeFair(BaseEstimator, ClassifierMixin):
                 "Invalid return_type. Choose 'combined', 'performance', or 'fairness'."
             )
 
+
 def dual_obj_1(
     subgroup,
     fair_weight,
@@ -477,10 +478,8 @@ def dual_obj_1(
     multiplier_learning_rate: float, optional
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
-    #mu_opt_list = [None]
     n = len(subgroup)
     n_g = get_subgroup_indicator(subgroup)
-    #print("n_g", n_g, n_g.max(axis = 0))
 
     def custom_obj(predt, dtrain):
         loss_group = logloss_group(predt, dtrain, subgroup, fairness_constraint)
@@ -501,7 +500,6 @@ def dual_obj_1(
             elif dual_learning == "gradient":
                 if mu_opt_list[0] is None:
                     mu_opt = np.zeros(loss_group.shape[0])
-                    # mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
                     mu_opt_list[0] = mu_opt
 
                 else:
@@ -516,14 +514,9 @@ def dual_obj_1(
             else:
                 mu_opt_list.append(mu_opt)
 
-
         grad = logloss_grad(predt, dtrain) / n
         hess = logloss_hessian(predt, dtrain) / n
 
-        #print("grad:", grad)
-        #print("hess:", hess)
-
-        #print("logloss_group_grad", (logloss_group_grad(predt, dtrain, subgroup, fairness_constraint) * n_g @ mu_opt))
         if fair_weight > 0:
             grad += (
                 logloss_group_grad(predt, dtrain, subgroup, fairness_constraint)
@@ -541,7 +534,6 @@ def dual_obj_1(
         return grad, hess
 
     return custom_obj
-
 
 
 class XtremeFair_1(BaseEstimator, ClassifierMixin):
