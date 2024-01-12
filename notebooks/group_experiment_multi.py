@@ -8,6 +8,8 @@ matplotlib.use('Agg')
 import pandas as pd
 from tqdm import tqdm
 import optuna
+from optuna.samplers import TPESampler
+from optuna.integration import BoTorchSampler
 import joblib
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -159,7 +161,7 @@ def group_experiment(args):
 
     for i in tqdm(range(10)):
         # Load and prepare data
-        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
+        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold_holdout(
             args["dataset"], i, SEED
         )
 
@@ -175,7 +177,7 @@ def group_experiment(args):
         X_test = preprocess.transform(X_test)
 
         model_class = get_model(args["model_name"], random_state = SEED)
-        study = optuna.create_study(directions=["maximize", "maximize"])
+        study = optuna.create_study(directions=["maximize", "maximize"], sampler = TPESampler())
         objective = lambda trial: run_trial(
             trial,
             X_train,
@@ -236,32 +238,16 @@ def group_experiment(args):
 
 
 def summarize(dataset_name):
-    experiments = glob.glob(f"../results/group_experiment/{dataset_name}/*")
+    experiments = glob.glob(f"../results/group_experiment_multi/{dataset_name}/*")
     results = []
     for experiment in experiments:
         df = pd.read_csv(os.path.join(experiment, "results.csv"))
-        df["experiment"] = "_".join(experiment.split("/")[-1].split("_")[:-1])
-        df["alpha"] = float(experiment.split("/")[-1].split("_")[-1])
         df["eq_loss"] = df["eq_loss"].abs()
         df["spd"] = 1 - df["spd"].abs()
         df["eod"] = 1 - df["eod"].abs()
         results.append(df.iloc[:, 1:])
     results = pd.concat(results)
-    # for each experiment, calculate the mean and std of each metric
-    results_mean = results.groupby(["experiment", "alpha"]).mean()
-    #results_std = results.groupby(["experiment", "alpha"]).std()
-
-    # combine dataframes into one with reorganized columns
-    #results = pd.concat([results_mean, results_std], axis=1)
-    #results.columns = pd.MultiIndex.from_product(
-    #    [["mean", "std"], results_mean.columns]
-    #)
-    #results = results.swaplevel(axis=1)
-    results = results_mean
-    results = results[["acc", "eod"]]
-    results = results.round(3)
-    results = results.reset_index()
-
+    
     # verify which points are not dominated
     dominated = []
     for i, row in results.iterrows():
@@ -274,10 +260,11 @@ def summarize(dataset_name):
                 break
         dominated.append(is_dominated)
     results["dominated"] = dominated
+
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111)
-    for i, model_name in enumerate(results["experiment"].unique()):
-        df = results[results["experiment"] == model_name]
+    for i, model_name in enumerate(results["model"].unique()):
+        df = results[results["model"] == model_name]
         ax.scatter(
             df["acc"], 
             df["eod"], 
@@ -291,7 +278,7 @@ def summarize(dataset_name):
     ax.set_title(dataset_name)
     ax.grid()
     plt.tight_layout()
-    fig.savefig(f"../results/group_experiment/{dataset_name}_plot.jpg")
+    fig.savefig(f"../results/group_experiment_multi/{dataset_name}_plot.jpg")
 
 
     
@@ -305,11 +292,12 @@ def main():
                 "dataset": dataset,
                 "output_dir": f"../results/group_experiment_multi/{dataset}/{model_name}",
                 "model_name": model_name,
-                "n_trials": 100,
+                "n_trials": 25,
             }
             print(f"{dataset} {model_name}")
             group_experiment(args)
 
+    summarize("german")
 
 if __name__ == "__main__":
     main()
