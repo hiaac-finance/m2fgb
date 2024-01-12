@@ -1,0 +1,10 @@
+{'min_child_weight': 0.017915649304135355, 'n_estimators': 114, 'eta': 0.2203371575113628, 'max_depth': 2, 'l2_weight': 60.767949088336046, 'fair_weight': 1.2244577937781393, 'threshold': 0.6111043691635132}
+{'min_child_weight': 339.1040379122028, 'n_estimators': 17, 'eta': 0.19503339074259243, 'max_depth': 2, 'l2_weight': 825.2903658846083, 'fair_weight': 0.10968577730084013, 'threshold': 0.5674772262573242}
+{'min_child_weight': 997.0605180950552, 'n_estimators': 150, 'eta': 0.01274449663218743, 'max_depth': 4, 'l2_weight': 335.7392617403265, 'fair_weight': 0.013339648848364744, 'threshold': inf}
+{'min_child_weight': 0.29351978997397865, 'n_estimators': 289, 'eta': 0.3796047247464496, 'max_depth': 8, 'l2_weight': 226.1267961507406, 'fair_weight': 5.060474337200749, 'threshold': 0.5085498690605164}
+{'min_child_weight': 4.092097178813203, 'n_estimators': 47, 'eta': 0.038196237980408033, 'max_depth': 9, 'l2_weight': 0.9111126242445861, 'fair_weight': 1.7356040661844307, 'threshold': 0.6139863729476929}
+{'min_child_weight': 0.04625601349386834, 'n_estimators': 158, 'eta': 0.37913208288355893, 'max_depth': 5, 'l2_weight': 0.13993550757465106, 'fair_weight': 0.023650108140947937, 'threshold': 0.5821200013160706}
+{'min_child_weight': 597.3227580201918, 'n_estimators': 11, 'eta': 0.035016030784994975, 'max_depth': 3, 'l2_weight': 0.02246211164217434, 'fair_weight': 0.10846375322992499, 'threshold': 0.5587542653083801}
+{'min_child_weight': 0.02890922216893328, 'n_estimators': 452, 'eta': 0.4888803699356745, 'max_depth': 5, 'l2_weight': 13.677219349152395, 'fair_weight': 1.6996416148617008, 'threshold': 0.5950480103492737}
+{'min_child_weight': 216.7315517373545, 'n_estimators': 68, 'eta': 0.014692684757626565, 'max_depth': 8, 'l2_weight': 0.3350549388652054, 'fair_weight': 2.616655445425303, 'threshold': 0.5012323260307312}
+{'min_child_weight': 5.01734598989436, 'n_estimators': 43, 'eta': 0.02898140064821687, 'max_depth': 4, 'l2_weight': 5.4439310768438425, 'fair_weight': 3.7861031275654127, 'threshold': 0.5543552041053772}

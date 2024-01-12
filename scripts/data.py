@@ -50,7 +50,6 @@ NUM_FEATURES = {
         "juv_misd_count",
         "juv_other_count",
         "priors_count",
-        "two_year_recid",
     ],
 }
 
