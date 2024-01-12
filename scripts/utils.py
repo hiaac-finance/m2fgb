@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score, precision_score
+from sklearn.metrics import roc_curve, roc_auc_score, accuracy_score, precision_score, balanced_accuracy_score
 
 
 def get_best_threshold(y_ground, y_pred):
@@ -92,6 +92,8 @@ def get_combined_metrics_scorer(
     def scorer(y_ground, y_pred, A):
         if performance_metric == "acc":
             perf = accuracy_score(y_ground, y_pred)
+        elif performance_metric == "bal_acc":
+            perf = balanced_accuracy_score(y_ground, y_pred)
         elif performance_metric == "roc_auc":
             perf = roc_auc_score(y_ground, y_pred)
 
