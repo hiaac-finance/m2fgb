@@ -75,6 +75,10 @@ def get_group_feature(dataset, X_train, X_val, X_test):
         A_train = X_train.sex.astype(str)
         A_val = X_val.sex.astype(str)
         A_test = X_test.sex.astype(str)
+    elif dataset == "compas":
+        A_train = X_train.race == "Caucasian"
+        A_val = X_val.race == "Caucasian"
+        A_test = X_test.race == "Caucasian"
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
     A_train = A_train.map(sensitive_map)
@@ -294,7 +298,7 @@ def summarize(dataset_name):
 
 
 def main():
-    datasets = ["adult"]
+    datasets = ["compas"]
     model_names = [
         "LGBMClassifier",
         "FairGBMClassifier",
