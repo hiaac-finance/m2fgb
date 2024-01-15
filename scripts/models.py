@@ -11,6 +11,7 @@ from fairlearn.reductions import (
     TruePositiveRateParity,
     EqualizedOdds,
 )
+from sklego.linear_model import DemographicParityClassifier, EqualOpportunityClassifier
 
 PARAM_SPACES = {
     "XtremeFair": {
@@ -70,6 +71,12 @@ PARAM_SPACES = {
         "max_depth": {"type": "int", "low": 2, "high": 10},
         "criterion": {"type": "str", "options": ["gini", "entropy"]},
     },
+    "FairClassifier" : {
+        "covariance_threshold": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "C": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "penalty" : {"type": "str", "options": ["l1", "none"]},
+
+    }
 }
 
 
@@ -807,3 +814,62 @@ class ExponentiatedGradient_Wrap(BaseEstimator, ClassifierMixin):
         check_is_fitted(self)
         X = check_array(X)
         return self.model_.predict_proba(X)
+
+class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
+    def __init__(
+        self,
+        fairness_constraint = "equal_opportunity",
+        covariance_threshold = 0.1,
+        C = 1.0,
+        penalty = "l1",
+        max_iter = 1000,
+        random_state=None,
+    ):
+        assert fairness_constraint in [
+            "equal_opportunity",
+            "demographic_parity",
+        ]
+        self.fairness_constraint = fairness_constraint
+        self.covariance_threshold = covariance_threshold
+        self.C = C
+        self.penalty = penalty
+        self.max_iter = max_iter
+        self.random_state = random_state
+
+    def fit(self, X, y, sensitive_attribute):
+        X, y = check_X_y(X, y)
+        # insert sensitive attribute as first column of the dataframe
+        X = X.copy()
+        X.insert(0, "sensitive_attribute", sensitive_attribute)
+        self.classes_ = np.unique(y)
+        if self.fairness_constraint == "equal_opportunity":
+            self.model_ = EqualOpportunityClassifier(
+                covariance_threshold=self.covariance_threshold,
+                C=self.C,
+                sensitive_cols = ["sensitive_attribute"],
+                penalty=self.penalty,
+                max_iter=self.max_iter,
+                train_sensitive_cols = False,
+            )
+        elif self.fairness_constraint == "demographic_parity":
+            self.model_ = DemographicParityClassifier(
+                covariance_threshold=self.covariance_threshold,
+                C=self.C,
+                sensitive_cols = ["sensitive_attribute"],
+                penalty=self.penalty,
+                max_iter=self.max_iter,
+                train_sensitive_cols = False,
+            )
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self)
+        X = check_array(X)
+        return self.model_.predict(X)
+
+    def predict_proba(self, X):
+        check_is_fitted(self)
+        X = check_array(X)
+        return self.model_.predict_proba(X)
+    
+    

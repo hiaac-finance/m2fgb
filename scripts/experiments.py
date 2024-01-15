@@ -99,6 +99,11 @@ def get_model(model_name, random_state=None):
                 random_state=random_state, **params
             )
 
+    elif model_name == "FairClassifier":
+            
+            def model(**params):
+                return models.FairClassifier(**params)
+            
     return model
 
 
@@ -114,6 +119,8 @@ def get_param_spaces(model_name):
         return models.PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "ExponentiatedGradient":
         return models.PARAM_SPACES["ExponentiatedGradient"]
+    elif model_name == "FairClassifier":
+        return models.PARAM_SPACES["FairClassifier"]
 
 
 def get_group_feature(dataset, X_train, X_val, X_test):
@@ -468,7 +475,7 @@ def main():
         "XtremeFair",
         "XtremeFair_grad",
         "ExponentiatedGradient",  # TODO
-        "EqualOpportunityClassifier",  # TODO
+        "FairClassifier",  # TODO
     ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
