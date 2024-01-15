@@ -14,6 +14,9 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 import sys
 import os
 import glob
+import data
+import models
+import utils
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -22,9 +25,7 @@ from fairgbm import FairGBMClassifier
 from lightgbm import LGBMClassifier
 
 
-import data
-import models
-import utils
+
 
 SEED = 0
 
