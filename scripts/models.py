@@ -3,7 +3,6 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
 from sklearn.tree import DecisionTreeClassifier
-import lightgbm as lgb
 import xgboost as xgb
 from fairlearn.reductions import (
     ExponentiatedGradient,
@@ -13,6 +12,25 @@ from fairlearn.reductions import (
 )
 from sklego.linear_model import DemographicParityClassifier, EqualOpportunityClassifier
 from sklearn.linear_model import LogisticRegression
+
+import logging
+class CustomLogger:
+    def __init__(self):
+        self.logger = logging.getLogger('lightgbm_custom')
+        self.logger.setLevel(logging.ERROR)
+
+    def info(self, message):
+        self.logger.info(message)
+
+    def warning(self, message):
+        # Suppress warnings by not doing anything
+        pass
+
+    def error(self, message):
+        self.logger.error(message)
+import lightgbm as lgb
+lgb.register_logger(CustomLogger())
+
 
 PARAM_SPACES = {
     "XtremeFair": {
@@ -869,7 +887,16 @@ class XtremeFair_LGBM(BaseEstimator, ClassifierMixin):
         dtrain = lgb.Dataset(X, label=y)
 
         params = {
-            "objective": "binary",
+            #"objective": "binary",
+            "objective": dual_obj_1(
+                sensitive_attribute,
+                self.fair_weight,
+                self.group_losses,
+                self.mu_opt_list,
+                self.fairness_constraint,
+                self.dual_learning,
+                self.multiplier_learning_rate,
+            ),
             "learning_rate": self.learning_rate,
             "max_depth": self.max_depth,
             "min_child_weight": self.min_child_weight,
@@ -883,15 +910,7 @@ class XtremeFair_LGBM(BaseEstimator, ClassifierMixin):
             params,
             dtrain,
             num_boost_round=self.n_estimators,
-            fobj=dual_obj_1(
-                sensitive_attribute,
-                self.fair_weight,
-                self.group_losses,
-                self.mu_opt_list,
-                self.fairness_constraint,
-                self.dual_learning,
-                self.multiplier_learning_rate,
-            ),
+            #objective=
         )
         self.group_losses = np.array(self.group_losses)
         self.mu_opt_list = np.array(self.mu_opt_list)
