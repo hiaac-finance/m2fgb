@@ -901,16 +901,16 @@ class XtremeFair_LGBM(BaseEstimator, ClassifierMixin):
         """Predict the labels of the data."""
         check_is_fitted(self)
         X = check_array(X)
-        dtest = xgb.DMatrix(X)
-        preds = self.model_.predict(dtest)
+        log_odds = self.model_.predict(X)
+        preds = 1 / (1 + np.exp(-log_odds))
         return (preds > 0.5).astype(int)
 
     def predict_proba(self, X):
         """Predict the probabilities of the data."""
         check_is_fitted(self)
         X = check_array(X)
-        dtest = xgb.DMatrix(X)
-        preds_pos = self.model_.predict(dtest)
+        log_odds = self.model_.predict(X)
+        preds_pos = 1 / (1 + np.exp(-log_odds))
         preds = np.ones((preds_pos.shape[0], 2))
         preds[:, 1] = preds_pos
         preds[:, 0] -= preds_pos
