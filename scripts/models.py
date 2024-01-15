@@ -74,7 +74,7 @@ PARAM_SPACES = {
     "FairClassifier" : {
         "covariance_threshold": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "C": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "penalty" : {"type": "str", "options": ["l1", "none"]},
+        "penalty" : {"type": "str", "options": ["none"]},
 
     }
 }
@@ -840,13 +840,14 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
         X, y = check_X_y(X, y)
         # insert sensitive attribute as first column of the dataframe
         X = X.copy()
-        X.insert(0, "sensitive_attribute", sensitive_attribute)
+        X = np.insert(X, 0, sensitive_attribute, axis = 1)
         self.classes_ = np.unique(y)
         if self.fairness_constraint == "equal_opportunity":
             self.model_ = EqualOpportunityClassifier(
                 covariance_threshold=self.covariance_threshold,
+                positive_target = 1,
                 C=self.C,
-                sensitive_cols = ["sensitive_attribute"],
+                sensitive_cols = [0],
                 penalty=self.penalty,
                 max_iter=self.max_iter,
                 train_sensitive_cols = False,
@@ -854,22 +855,31 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
         elif self.fairness_constraint == "demographic_parity":
             self.model_ = DemographicParityClassifier(
                 covariance_threshold=self.covariance_threshold,
+                positive_target = 1,
                 C=self.C,
-                sensitive_cols = ["sensitive_attribute"],
+                sensitive_cols = [0],
                 penalty=self.penalty,
                 max_iter=self.max_iter,
                 train_sensitive_cols = False,
             )
+        
+        self.model_.fit(X, y)
         return self
 
     def predict(self, X):
         check_is_fitted(self)
         X = check_array(X)
+        X = X.copy()
+        A = np.ones(X.shape[0])
+        X = np.insert(X, 0, A, axis = 1)
         return self.model_.predict(X)
 
     def predict_proba(self, X):
         check_is_fitted(self)
         X = check_array(X)
+        X = X.copy()
+        A = np.ones(X.shape[0])
+        X = np.insert(X, 0, A, axis = 1)
         return self.model_.predict_proba(X)
     
     

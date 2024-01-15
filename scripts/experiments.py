@@ -102,7 +102,7 @@ def get_model(model_name, random_state=None):
     elif model_name == "FairClassifier":
 
         def model(**params):
-            return models.FairClassifier(**params)
+            return models.FairClassifier_Wrap(**params)
 
     return model
 
