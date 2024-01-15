@@ -720,12 +720,12 @@ def experiment3():
 def experiment4():
     datasets = ["german", "adult"]
     model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "XtremeFair",
+        #"LGBMClassifier",
+        #"FairGBMClassifier",
+        #"XtremeFair",
         "XtremeFair_grad",
     ]
-    alphas = [0.75, 1]
+    alphas = [0.75]#, 1]
     for dataset in datasets:
         for alpha in alphas:
             for model_name in model_names:
@@ -741,12 +741,11 @@ def experiment4():
 
 
 def main():
-    experiment1() # (binary groups)
-    return
+    #experiment1() # (binary groups)
 
-    experiment2() # (4 groups)
+    #experiment2() # (4 groups)
 
-    experiment3() # (fairness goal)
+    #experiment3() # (fairness goal)
 
     experiment4() # (8 groups)
 
