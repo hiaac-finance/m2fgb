@@ -472,14 +472,13 @@ def run_subgroup2_experiment(args):
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
 
-def main():
-    # experiment 1 (binary groups)
-    datasets = ["german"]  # , "adult", "compas"]
+def experiment1():
+    datasets = ["german", "adult", "compas"]
     model_names = [
-        # "LGBMClassifier",
-        # "FairGBMClassifier",
-        # "XtremeFair",
-        # "XtremeFair_grad",
+        "LGBMClassifier",
+        "FairGBMClassifier",
+        "XtremeFair",
+        "XtremeFair_grad",
         # "ExponentiatedGradient",  # TODO
         "FairClassifier",
     ]
@@ -498,8 +497,8 @@ def main():
                 print(f"{dataset} {model_name} {alpha}")
                 run_group_experiment(args)
 
-    return
-    # experiment 2 (4 groups)
+
+def experiment2():
     datasets = ["german", "adult"]
     model_names = [
         "LGBMClassifier",
@@ -521,9 +520,8 @@ def main():
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
 
-    # experiment 3 (fairness goal)
 
-    # experiment 4 (8 groups)
+def experiment4():
     datasets = ["german", "adult"]
     model_names = [
         "LGBMClassifier",
@@ -544,6 +542,19 @@ def main():
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup2_experiment(args)
+
+
+def main():
+    # experiment 1 (binary groups)
+    experiment1()
+
+    # experiment 2 (4 groups)
+    experiment2()
+
+    # experiment 3 (fairness goal)
+
+    # experiment 4 (8 groups)
+    experiment4()
 
     # experiment 5 (EOD)
 
