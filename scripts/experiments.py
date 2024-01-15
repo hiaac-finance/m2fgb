@@ -82,6 +82,18 @@ def get_model(model_name, random_state=None):
                 dual_learning="gradient", random_state=random_state, **params
             )
 
+    elif model_name == "XtremeFair_LGBM":
+
+        def model(**params):
+            return models.XtremeFair_LGBM(random_state=random_state, **params)
+
+    elif model_name == "XtremeFair_LGBM_grad":
+
+        def model(**params):
+            return models.XtremeFair_LGBM(
+                dual_learning="gradient", random_state=random_state, **params
+            )
+
     elif model_name == "LGBMClassifier":
 
         def model(**params):
@@ -113,6 +125,10 @@ def get_param_spaces(model_name):
         return models.PARAM_SPACES["XtremeFair"]
     elif model_name == "XtremeFair_grad":
         return models.PARAM_SPACES["XtremeFair_grad"]
+    elif model_name == "XtremeFair_LGBM":
+        return models.PARAM_SPACES["XtremeFair_LGBM"]
+    elif model_name == "XtremeFair_LGBM_grad":
+        return models.PARAM_SPACES["XtremeFair_LGBM_grad"]
     elif model_name == "LGBMClassifier":
         return models.PARAM_SPACES["LGBMClassifier"]
     elif model_name == "FairGBMClassifier":
@@ -211,6 +227,7 @@ def eval_model(y_true, y_score, y_pred, A):
         "spd": spd,
     }
 
+
 def eval_model_v2(y_true, y_score, y_pred, A):
     """Evaluate model performance and fairness metrics."""
     acc = accuracy_score(y_true, y_pred)
@@ -223,7 +240,7 @@ def eval_model_v2(y_true, y_score, y_pred, A):
     tpr = []
     for g in np.unique(A):
         tpr.append(y_pred[(A == g) & (y_true == 1)].mean())
-    
+
     return {
         "acc": acc,
         "bal_acc": bal_acc,
@@ -231,9 +248,9 @@ def eval_model_v2(y_true, y_score, y_pred, A):
         "eq_loss": eq_loss,
         "eod": eod,
         "spd": spd,
-        "min_tpr" : min(tpr),
-        "max_tpr" : max(tpr),
-        "mean_tpr" : np.mean(tpr)
+        "min_tpr": min(tpr),
+        "max_tpr": max(tpr),
+        "mean_tpr": np.mean(tpr),
     }
 
 
@@ -324,6 +341,7 @@ def run_group_experiment(args):
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
+
 def run_group_experiment_v2(args):
     # create output directory if not exists
     if not os.path.exists(args["output_dir"]):
@@ -368,7 +386,7 @@ def run_group_experiment_v2(args):
         X_train = preprocess.transform(X_train)
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
-        
+
         model = joblib.load(os.path.join(args["output_dir"], f"model_{i}.pkl"))
 
         y_val_score = model.predict_proba(X_val)[:, 1]
@@ -380,7 +398,6 @@ def run_group_experiment_v2(args):
 
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results_v2.csv"))
-
 
 
 def run_subgroup_experiment(args):
@@ -468,6 +485,7 @@ def run_subgroup_experiment(args):
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
+
 def run_fairness_goal_experiment(args):
     # create output directory if not exists
     if not os.path.exists(args["output_dir"]):
@@ -493,9 +511,7 @@ def run_fairness_goal_experiment(args):
     col_trans.set_output(transform="pandas")
 
     scorer = utils.get_fairness_goal_scorer(
-        fairness_goal = args["goal"],
-        performance_metric="bal_acc", 
-        fairness_metric="eod"
+        fairness_goal=args["goal"], performance_metric="bal_acc", fairness_metric="eod"
     )
 
     for i in tqdm(range(10)):
@@ -554,7 +570,6 @@ def run_fairness_goal_experiment(args):
 
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
-
 
 
 def run_subgroup2_experiment(args):
@@ -691,6 +706,7 @@ def experiment2():
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
 
+
 def experiment3():
     datasets = ["german", "compas", "adult"]
     model_names = [
@@ -716,16 +732,15 @@ def experiment3():
                 run_fairness_goal_experiment(args)
 
 
-
 def experiment4():
     datasets = ["german", "adult"]
     model_names = [
-        #"LGBMClassifier",
-        #"FairGBMClassifier",
-        #"XtremeFair",
+        # "LGBMClassifier",
+        # "FairGBMClassifier",
+        # "XtremeFair",
         "XtremeFair_grad",
     ]
-    alphas = [0.75]#, 1]
+    alphas = [0.75]  # , 1]
     for dataset in datasets:
         for alpha in alphas:
             for model_name in model_names:
@@ -741,13 +756,13 @@ def experiment4():
 
 
 def main():
-    #experiment1() # (binary groups)
+    # experiment1() # (binary groups)
 
-    #experiment2() # (4 groups)
+    # experiment2() # (4 groups)
 
-    #experiment3() # (fairness goal)
+    # experiment3() # (fairness goal)
 
-    experiment4() # (8 groups)
+    experiment4()  # (8 groups)
 
     # experiment 5 (EOD)
 

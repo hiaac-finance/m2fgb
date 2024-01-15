@@ -3,7 +3,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
 from sklearn.tree import DecisionTreeClassifier
-from lightgbm import LGBMClassifier
+import lightgbm as lgb
 import xgboost as xgb
 from fairlearn.reductions import (
     ExponentiatedGradient,
@@ -29,6 +29,28 @@ PARAM_SPACES = {
         "eta": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 10},
         "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "fair_weight": {"type": "float", "low": 0.01, "high": 10, "log": True},
+        "multiplier_learning_rate": {
+            "type": "float",
+            "low": 0.005,
+            "high": 0.5,
+            "log": True,
+        },
+    },
+    "XtremeFair_LGBM": {
+        "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "fair_weight": {"type": "float", "low": 0.01, "high": 10, "log": True},
+    },
+    "XtremeFair_LGBM_grad": {
+        "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "fair_weight": {"type": "float", "low": 0.01, "high": 10, "log": True},
         "multiplier_learning_rate": {
             "type": "float",
@@ -76,7 +98,6 @@ PARAM_SPACES = {
         "covariance_threshold": {"type": "float", "low": 0.1, "high": 1, "log": True},
         "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
         "penalty" : {"type": "str", "options": ["none", "l1"]},
-
     }
 }
 
@@ -491,7 +512,8 @@ def dual_obj_1(
 
     def custom_obj(predt, dtrain):
         loss_group = logloss_group(predt, dtrain, subgroup, fairness_constraint)
-        group_losses.append(loss_group)
+        if len(mu_opt_list) > 1:
+            group_losses.append(loss_group)
         if fair_weight > 0:
             if dual_learning == "optim":
                 # dual problem solved analytically
@@ -747,6 +769,153 @@ class XtremeFair_1(BaseEstimator, ClassifierMixin):
             raise ValueError(
                 "Invalid return_type. Choose 'combined', 'performance', or 'fairness'."
             )
+
+class XtremeFair_LGBM(BaseEstimator, ClassifierMixin):
+    """Classifier that modifies XGBoost to incorporate fairness into the loss function.
+    The scoring is performed with a weighted sum between accuracy and a fairness metric.
+    The alpha parameter controls the weight, alpha=1 means only accuracy is considered, alpha=0 means only fairness is considered.
+    It shares many of the parameters with XGBoost to control learning and decision trees.
+    Currently it is only able to incorporate "equalized_loss" as a fairness constraint and "EOD" as a fairness metric.
+
+
+    Parameters
+    ----------
+    fairness_constraint : str, optional
+        Fairness constraint used in learning, currently only supports "equalized_loss", by default "equalized_loss"
+    fair_weight : int, optional
+        Weight for fairness in loss formulation, by default 1
+    dual_learning : str, optional
+        Method used to learn the dual problem, by default "optim"
+    multiplier_learning_rate: float, optional
+        Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
+    n_estimators : int, optional
+        Number of estimators used in XGB, by default 10
+    eta : float, optional
+        Learning rate of XGB, by default 0.3
+    colsample_bytree : float, optional
+        Size of sample of of the columns used in each estimator, by default 1
+    max_depth : int, optional
+        Max depth of decision trees of XGB, by default 6
+    min_child_weight : int, optional
+        Weight used to choose partition of tree nodes, by default 1
+    max_leaves : int, optional
+        Max number of leaves of trees, by default 0
+    l2_weight : int, optional
+        Weight of L2 regularization, by default 1
+    alpha : int, optional
+        Weight used for the score function of the method, by default 1
+    performance_metric : str, optional
+        Performance metric used by model score, supports ["accuracy", "auc"], by default "accuracy"
+    fairness_metric : str, optional
+        Fairness metric used by model score, supports ["SPD", "EOP"] by default "EOP"
+    random_state : int, optional
+        Random seed used in learning, by default None
+    """
+
+    def __init__(
+        self,
+        fairness_constraint="equalized_loss",
+        fair_weight=1,
+        dual_learning="optim",
+        multiplier_learning_rate=0.1,
+        n_estimators=10,
+        learning_rate=0.1,
+        max_depth=6,
+        min_child_weight=1,
+        reg_lambda=1,
+        random_state=None,
+    ):
+        assert fairness_constraint in [
+            "equalized_loss",
+            "equal_opportunity",
+            "demographic_parity",
+        ]
+        assert dual_learning in ["optim", "gradient"]
+
+        self.fairness_constraint = fairness_constraint
+        self.dual_learning = dual_learning
+        self.multiplier_learning_rate = multiplier_learning_rate
+        self.fair_weight = fair_weight
+        self.n_estimators = n_estimators
+        self.learning_rate = learning_rate
+        self.max_depth = max_depth
+        self.min_child_weight = min_child_weight
+        self.reg_lambda = reg_lambda
+        self.random_state = random_state
+        self.group_losses = []
+        self.mu_opt_list = [None]
+
+    def fit(self, X, y, sensitive_attribute=None):
+        """Fit the model to the data.
+
+        Parameters
+        ----------
+        X : pandas.DataFrame
+            Dataframe of shape (n_samples, n_features)
+        y : pandas.Series or numpy.ndarray
+            Labels array-like of shape (n_samples), must be (0 or 1)
+        sensitive_attribute : pandas.Series or numpy.ndarray
+            Sensitive attribute array-like of shape (n_samples)
+
+        Returns
+        -------
+        XtremeFair
+            Fitted model
+        """
+        if sensitive_attribute is None:
+            sensitive_attribute = np.ones(X.shape[0])
+        X, y = check_X_y(X, y)
+        self.classes_ = np.unique(y)
+        dtrain = lgb.Dataset(X, label=y)
+
+        params = {
+            "objective": "binary",
+            "learning_rate": self.learning_rate,
+            "max_depth": self.max_depth,
+            "min_child_weight": self.min_child_weight,
+            "reg_lambda": self.reg_lambda,
+            "verbose": -1,
+        }
+        if self.random_state is not None:
+            params["random_seed"] = self.random_state
+
+        self.model_ = lgb.train(
+            params,
+            dtrain,
+            num_boost_round=self.n_estimators,
+            fobj=dual_obj_1(
+                sensitive_attribute,
+                self.fair_weight,
+                self.group_losses,
+                self.mu_opt_list,
+                self.fairness_constraint,
+                self.dual_learning,
+                self.multiplier_learning_rate,
+            ),
+        )
+        self.group_losses = np.array(self.group_losses)
+        self.mu_opt_list = np.array(self.mu_opt_list)
+        return self
+
+    def predict(self, X):
+        """Predict the labels of the data."""
+        check_is_fitted(self)
+        X = check_array(X)
+        dtest = xgb.DMatrix(X)
+        preds = self.model_.predict(dtest)
+        return (preds > 0.5).astype(int)
+
+    def predict_proba(self, X):
+        """Predict the probabilities of the data."""
+        check_is_fitted(self)
+        X = check_array(X)
+        dtest = xgb.DMatrix(X)
+        preds_pos = self.model_.predict(dtest)
+        preds = np.ones((preds_pos.shape[0], 2))
+        preds[:, 1] = preds_pos
+        preds[:, 0] -= preds_pos
+        return preds
+
 
 
 def ks_threshold(y_true, y_score):
