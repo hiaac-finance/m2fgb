@@ -211,6 +211,31 @@ def eval_model(y_true, y_score, y_pred, A):
         "spd": spd,
     }
 
+def eval_model_v2(y_true, y_score, y_pred, A):
+    """Evaluate model performance and fairness metrics."""
+    acc = accuracy_score(y_true, y_pred)
+    bal_acc = balanced_accuracy_score(y_true, y_pred)
+    roc = roc_auc_score(y_true, y_score)
+    eq_loss = utils.equalized_loss_score(y_true, y_score, A)
+    eod = utils.equal_opportunity_score(y_true, y_pred, A)
+    spd = utils.statistical_parity_score(y_true, y_pred, A)
+    # get tpr of each group
+    tpr = []
+    for g in np.unique(A):
+        tpr.append(y_pred[(A == g) & (y_true == 1)].mean())
+    
+    return {
+        "acc": acc,
+        "bal_acc": bal_acc,
+        "roc": roc,
+        "eq_loss": eq_loss,
+        "eod": eod,
+        "spd": spd,
+        "min_tpr" : min(tpr),
+        "max_tpr" : max(tpr),
+        "mean_tpr" : np.mean(tpr)
+    }
+
 
 def run_group_experiment(args):
     # create output directory if not exists
@@ -298,6 +323,64 @@ def run_group_experiment(args):
 
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
+
+def run_group_experiment_v2(args):
+    # create output directory if not exists
+    if not os.path.exists(args["output_dir"]):
+        os.makedirs(args["output_dir"])
+    # clear best_params.txt if exists
+    if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
+        os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
+    results = []
+
+    col_trans = ColumnTransformer(
+        [
+            ("numeric", StandardScaler(), data.NUM_FEATURES[args["dataset"]]),
+            (
+                "categorical",
+                OneHotEncoder(
+                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
+                ),
+                data.CAT_FEATURES[args["dataset"]],
+            ),
+        ],
+        verbose_feature_names_out=False,
+    )
+    col_trans.set_output(transform="pandas")
+
+    scorer = utils.get_combined_metrics_scorer(
+        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric="eod"
+    )
+
+    for i in tqdm(range(10)):
+        # Load and prepare data
+        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
+            args["dataset"], i, SEED
+        )
+
+        # Define sensitive attribute from gender and age
+        A_train, A_val, A_test = get_group_feature(
+            args["dataset"], X_train, X_val, X_test
+        )
+
+        preprocess = Pipeline([("preprocess", col_trans)])
+        preprocess.fit(X_train)
+        X_train = preprocess.transform(X_train)
+        X_val = preprocess.transform(X_val)
+        X_test = preprocess.transform(X_test)
+        
+        model = joblib.load(os.path.join(args["output_dir"], f"model_{i}.pkl"))
+
+        y_val_score = model.predict_proba(X_val)[:, 1]
+        thresh = utils.get_best_threshold(Y_val, y_val_score)
+        y_test_score = model.predict_proba(X_test)[:, 1]
+        y_test_pred = y_test_score > thresh
+        metrics = eval_model_v2(Y_test, y_test_score, y_test_pred, A_test)
+        results.append(metrics)
+
+    results = pd.DataFrame(results)
+    results.to_csv(os.path.join(args["output_dir"], "results_v2.csv"))
+
 
 
 def run_subgroup_experiment(args):
@@ -583,7 +666,7 @@ def experiment1():
                     "n_trials": 50,
                 }
                 print(f"{dataset} {model_name} {alpha}")
-                run_group_experiment(args)
+                run_group_experiment_v2(args)
 
 
 def experiment2():
