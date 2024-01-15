@@ -100,10 +100,10 @@ def get_model(model_name, random_state=None):
             )
 
     elif model_name == "FairClassifier":
-            
-            def model(**params):
-                return models.FairClassifier(**params)
-            
+
+        def model(**params):
+            return models.FairClassifier(**params)
+
     return model
 
 
@@ -165,6 +165,7 @@ def get_subgroup1_feature(dataset, X_train, X_val, X_test):
 
 def get_subgroup2_feature(dataset, X_train, X_val, X_test):
     """Function to get the sensitive attribute that defines 8 groups."""
+
     def age_cat(age):
         if age < 30:
             return "1"
@@ -174,8 +175,11 @@ def get_subgroup2_feature(dataset, X_train, X_val, X_test):
             return "3"
         else:
             return "4"
+
     if dataset == "german":
-        A_train = X_train.Gender.astype(str) + "_" + X_train.Age.apply(age_cat).astype(str)
+        A_train = (
+            X_train.Gender.astype(str) + "_" + X_train.Age.apply(age_cat).astype(str)
+        )
         A_val = X_val.Gender.astype(str) + "_" + X_val.Age.apply(age_cat).astype(str)
         A_test = X_test.Gender.astype(str) + "_" + X_test.Age.apply(age_cat).astype(str)
     elif dataset == "adult":
@@ -381,6 +385,7 @@ def run_subgroup_experiment(args):
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
+
 def run_subgroup2_experiment(args):
     # create output directory if not exists
     if not os.path.exists(args["output_dir"]):
@@ -466,16 +471,17 @@ def run_subgroup2_experiment(args):
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
+
 def main():
     # experiment 1 (binary groups)
-    datasets = ["german", "adult", "compas"]
+    datasets = ["german"]  # , "adult", "compas"]
     model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "XtremeFair",
-        "XtremeFair_grad",
-        "ExponentiatedGradient",  # TODO
-        "FairClassifier",  # TODO
+        # "LGBMClassifier",
+        # "FairGBMClassifier",
+        # "XtremeFair",
+        # "XtremeFair_grad",
+        # "ExponentiatedGradient",  # TODO
+        "FairClassifier",
     ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
@@ -492,6 +498,7 @@ def main():
                 print(f"{dataset} {model_name} {alpha}")
                 run_group_experiment(args)
 
+    return
     # experiment 2 (4 groups)
     datasets = ["german", "adult"]
     model_names = [
@@ -541,3 +548,7 @@ def main():
     # experiment 5 (EOD)
 
     # experiment 6 (SPD)
+
+
+if __name__ == "__main__":
+    main()
