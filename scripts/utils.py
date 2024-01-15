@@ -135,15 +135,17 @@ def get_fairness_goal_scorer(
     def scorer(y_ground, y_pred, A):
         if performance_metric == "acc":
             perf = accuracy_score(y_ground, y_pred)
+        elif performance_metric == "bal_acc":
+            perf = balanced_accuracy_score(y_ground, y_pred)
         elif performance_metric == "roc_auc":
             perf = roc_auc_score(y_ground, y_pred)
 
         if fairness_metric == "eod":
-            fair = equal_opportunity_score(y_ground, y_pred, A)
+            fair = 1 - abs(equal_opportunity_score(y_ground, y_pred, A))
         elif fairness_metric == "spd":
-            fair = statistical_parity_score(y_ground, y_pred, A)
+            fair = 1 - abs(statistical_parity_score(y_ground, y_pred, A))
 
-        if fair <= fairness_goal:
+        if fair >= fairness_goal:
             return perf
         else:
             return perf - M * abs(fair - fairness_goal)
