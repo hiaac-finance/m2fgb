@@ -342,13 +342,7 @@ def run_group_experiment(args):
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
 
-def run_group_experiment_v2(args):
-    # create output directory if not exists
-    if not os.path.exists(args["output_dir"]):
-        os.makedirs(args["output_dir"])
-    # clear best_params.txt if exists
-    if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
-        os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
+def eval_group_experiment(args):
     results = []
 
     col_trans = ColumnTransformer(
@@ -366,24 +360,19 @@ def run_group_experiment_v2(args):
     )
     col_trans.set_output(transform="pandas")
 
-    scorer = utils.get_combined_metrics_scorer(
-        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric="eod"
-    )
-
     for i in tqdm(range(10)):
         # Load and prepare data
-        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
+        X_train, _, X_val, Y_val, X_test, Y_test = data.get_fold(
             args["dataset"], i, SEED
         )
 
         # Define sensitive attribute from gender and age
-        A_train, A_val, A_test = get_group_feature(
+        A_train, _, A_test = get_group_feature(
             args["dataset"], X_train, X_val, X_test
         )
 
         preprocess = Pipeline([("preprocess", col_trans)])
         preprocess.fit(X_train)
-        X_train = preprocess.transform(X_train)
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
 
@@ -393,11 +382,25 @@ def run_group_experiment_v2(args):
         thresh = utils.get_best_threshold(Y_val, y_val_score)
         y_test_score = model.predict_proba(X_test)[:, 1]
         y_test_pred = y_test_score > thresh
-        metrics = eval_model_v2(Y_test, y_test_score, y_test_pred, A_test)
-        results.append(metrics)
+        # calculate more detailed metrics
+        metrics_ = {}
+        for g in np.unique(A_train):
+            bool_g = A_test == g
+            pr = y_test_pred[bool_g].mean()
+            tpr = y_test_pred[bool_g & (Y_test == 1)].mean()
+            bal_acc = balanced_accuracy_score(Y_test[bool_g], y_test_pred[bool_g])
+            roc = roc_auc_score(Y_test[bool_g], y_test_score[bool_g])
+            metrics_[f"pr_{g}"] = pr
+            metrics_[f"tpr_{g}"] = tpr
+            metrics_[f"bal_acc_{g}"] = bal_acc
+            metrics_[f"roc_{g}"] = roc
+        metrics_["tpr"] = y_test_pred[Y_test == 1].mean()
+        metrics_["bal_acc"] = balanced_accuracy_score(Y_test, y_test_pred)
+        metrics_["roc"] = roc_auc_score(Y_test, y_test_score)
+        results.append(metrics_)
 
     results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results_v2.csv"))
+    results.to_csv(os.path.join(args["output_dir"], "results_longer.csv"))
 
 
 def run_subgroup_experiment(args):
@@ -666,7 +669,7 @@ def experiment1():
         "XtremeFair",
         "XtremeFair_grad",
         # "ExponentiatedGradient",  # TODO
-        "FairClassifier",
+        # "FairClassifier",
     ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
@@ -681,7 +684,7 @@ def experiment1():
                     "n_trials": 50,
                 }
                 print(f"{dataset} {model_name} {alpha}")
-                run_group_experiment_v2(args)
+                eval_group_experiment(args)
 
 
 def experiment2():
@@ -756,13 +759,13 @@ def experiment4():
 
 
 def main():
-    # experiment1() # (binary groups)
+    experiment1() # (binary groups)
 
     # experiment2() # (4 groups)
 
     # experiment3() # (fairness goal)
 
-    experiment4()  # (8 groups)
+    # experiment4()  # (8 groups)
 
     # experiment 5 (EOD)
 
