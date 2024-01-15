@@ -664,12 +664,14 @@ def run_subgroup2_experiment(args):
 def experiment1():
     datasets = ["compas", "german", "adult"]
     model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "XtremeFair",
-        "XtremeFair_grad",
+        # "LGBMClassifier",
+        # "FairGBMClassifier",
+        # "XtremeFair",
+        # "XtremeFair_grad",
         # "ExponentiatedGradient",  # TODO
         # "FairClassifier",
+        "XtremeFair_LGBM",
+        "XtremeFair_LGBM_grad",
     ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
@@ -684,7 +686,9 @@ def experiment1():
                     "n_trials": 50,
                 }
                 print(f"{dataset} {model_name} {alpha}")
-                eval_group_experiment(args)
+                run_group_experiment(args)            
+    
+    eval_group_experiment(args)
 
 
 def experiment2():
