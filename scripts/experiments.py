@@ -644,7 +644,7 @@ def run_subgroup2_experiment(args):
 
 
 def experiment1():
-    datasets = ["german", "adult", "compas"]
+    datasets = ["compas", "german", "adult"]
     model_names = [
         "LGBMClassifier",
         "FairGBMClassifier",
@@ -742,6 +742,7 @@ def experiment4():
 
 def main():
     experiment1() # (binary groups)
+    return
 
     experiment2() # (4 groups)
 
