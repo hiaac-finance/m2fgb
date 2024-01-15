@@ -12,6 +12,7 @@ from fairlearn.reductions import (
     EqualizedOdds,
 )
 from sklego.linear_model import DemographicParityClassifier, EqualOpportunityClassifier
+from sklearn.linear_model import LogisticRegression
 
 PARAM_SPACES = {
     "XtremeFair": {
@@ -72,9 +73,9 @@ PARAM_SPACES = {
         "criterion": {"type": "str", "options": ["gini", "entropy"]},
     },
     "FairClassifier" : {
-        "covariance_threshold": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "C": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "penalty" : {"type": "str", "options": ["none"]},
+        "covariance_threshold": {"type": "float", "low": 0.1, "high": 1, "log": True},
+        "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
+        "penalty" : {"type": "str", "options": ["none", "l1"]},
 
     }
 }
@@ -822,7 +823,7 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
         covariance_threshold = 0.1,
         C = 1.0,
         penalty = "l1",
-        max_iter = 1000,
+        max_iter = 100,
         random_state=None,
     ):
         assert fairness_constraint in [
@@ -847,7 +848,7 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
                 covariance_threshold=self.covariance_threshold,
                 positive_target = 1,
                 C=self.C,
-                sensitive_cols = [0],
+                sensitive_cols = 0,
                 penalty=self.penalty,
                 max_iter=self.max_iter,
                 train_sensitive_cols = False,
@@ -857,13 +858,24 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
                 covariance_threshold=self.covariance_threshold,
                 positive_target = 1,
                 C=self.C,
-                sensitive_cols = [0],
+                sensitive_cols = 0,
                 penalty=self.penalty,
                 max_iter=self.max_iter,
                 train_sensitive_cols = False,
             )
         
-        self.model_.fit(X, y)
+        try:
+            self.model_.fit(X, y)
+        except:
+            print("Error in FairClassifier")
+            self.model_ = LogisticRegression(
+                C=self.C,
+                penalty=self.penalty,
+                max_iter=self.max_iter,
+                random_state=self.random_state,
+                solver = "saga"
+            )
+            self.model_.fit(X, y)
         return self
 
     def predict(self, X):
