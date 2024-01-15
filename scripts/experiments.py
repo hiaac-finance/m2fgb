@@ -158,14 +158,23 @@ def get_subgroup1_feature(dataset, X_train, X_val, X_test):
 
 def get_subgroup2_feature(dataset, X_train, X_val, X_test):
     """Function to get the sensitive attribute that defines 8 groups."""
+    def age_cat(age):
+        if age < 30:
+            return "1"
+        elif age < 40:
+            return "2"
+        elif age < 50:
+            return "3"
+        else:
+            return "4"
     if dataset == "german":
-        A_train = X_train.Gender.astype(str) + "_" + (X_train.Age > 50).astype(str)
-        A_val = X_val.Gender.astype(str) + "_" + (X_val.Age > 50).astype(str)
-        A_test = X_test.Gender.astype(str) + "_" + (X_test.Age > 50).astype(str)
+        A_train = X_train.Gender.astype(str) + "_" + X_train.Age.apply(age_cat).astype(str)
+        A_val = X_val.Gender.astype(str) + "_" + X_val.Age.apply(age_cat).astype(str)
+        A_test = X_test.Gender.astype(str) + "_" + X_test.Age.apply(age_cat).astype(str)
     elif dataset == "adult":
-        A_train = X_train.sex.astype(str) + "_" + (X_train.age > 50).astype(str)
-        A_val = X_val.sex.astype(str) + "_" + (X_val.age > 50).astype(str)
-        A_test = X_test.sex.astype(str) + "_" + (X_test.age > 50).astype(str)
+        A_train = X_train.sex.astype(str) + "_" + X_train.age.apply(age_cat).astype(str)
+        A_val = X_val.sex.astype(str) + "_" + X_val.age.apply(age_cat).astype(str)
+        A_test = X_test.sex.astype(str) + "_" + X_test.age.apply(age_cat).astype(str)
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
     A_train = A_train.map(sensitive_map)
@@ -365,6 +374,90 @@ def run_subgroup_experiment(args):
     results = pd.DataFrame(results)
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
+def run_subgroup2_experiment(args):
+    # create output directory if not exists
+    if not os.path.exists(args["output_dir"]):
+        os.makedirs(args["output_dir"])
+    # clear best_params.txt if exists
+    if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
+        os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
+    results = []
+
+    col_trans = ColumnTransformer(
+        [
+            ("numeric", StandardScaler(), data.NUM_FEATURES[args["dataset"]]),
+            (
+                "categorical",
+                OneHotEncoder(
+                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
+                ),
+                data.CAT_FEATURES[args["dataset"]],
+            ),
+        ],
+        verbose_feature_names_out=False,
+    )
+    col_trans.set_output(transform="pandas")
+
+    scorer = utils.get_combined_metrics_scorer(
+        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric="eod"
+    )
+
+    for i in tqdm(range(10)):
+        # Load and prepare data
+        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
+            args["dataset"], i, SEED
+        )
+
+        # Define sensitive attribute from gender and age
+        A_train, A_val, A_test = get_subgroup2_feature(
+            args["dataset"], X_train, X_val, X_test
+        )
+
+        preprocess = Pipeline([("preprocess", col_trans)])
+        preprocess.fit(X_train)
+        X_train = preprocess.transform(X_train)
+        X_val = preprocess.transform(X_val)
+        X_test = preprocess.transform(X_test)
+
+        model_class = get_model(args["model_name"], random_state=SEED)
+        study = optuna.create_study(direction="maximize")
+        objective = lambda trial: run_trial(
+            trial,
+            scorer,
+            X_train,
+            Y_train,
+            A_train,
+            X_val,
+            Y_val,
+            A_val,
+            model_class,
+            get_param_spaces(args["model_name"]),
+        )
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=7)
+        best_params = study.best_params.copy()
+
+        model = model_class(**study.best_params)
+        if isinstance(model, FairGBMClassifier):
+            model.fit(X_train, Y_train, constraint_group=A_train)
+        elif isinstance(model, LGBMClassifier):
+            model.fit(X_train, Y_train)
+        else:
+            model.fit(X_train, Y_train, A_train)
+        y_val_score = model.predict_proba(X_val)[:, 1]
+        thresh = utils.get_best_threshold(Y_val, y_val_score)
+        y_test_score = model.predict_proba(X_test)[:, 1]
+        y_test_pred = y_test_score > thresh
+        metrics = eval_model(Y_test, y_test_score, y_test_pred, A_test)
+        best_params["threshold"] = thresh
+        joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
+        # save best params
+        with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
+            f.write(str(best_params))
+            f.write("\n")
+        results.append(metrics)
+
+    results = pd.DataFrame(results)
+    results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
 def main():
     # experiment 1 (binary groups)
@@ -436,7 +529,7 @@ def main():
                     "n_trials": 100,
                 }
                 print(f"{dataset} {model_name} {alpha}")
-                run_subgroup_experiment(args)
+                run_subgroup2_experiment(args)
 
     # experiment 5 (EOD)
 
