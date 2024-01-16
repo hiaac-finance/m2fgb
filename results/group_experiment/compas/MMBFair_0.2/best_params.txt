@@ -1,0 +1,10 @@
+{'min_child_weight': 0.33796761069605885, 'n_estimators': 61, 'learning_rate': 0.06589104379523804, 'max_depth': 4, 'reg_lambda': 170.1629364849314, 'fair_weight': 0.24262360233745836, 'threshold': 0.5824088060788626}
+{'min_child_weight': 584.2358236448263, 'n_estimators': 96, 'learning_rate': 0.2841452717597598, 'max_depth': 7, 'reg_lambda': 0.0037364649698896717, 'fair_weight': 0.8035390047575105, 'threshold': 0.670821227856297}
+{'min_child_weight': 0.008817945479359476, 'n_estimators': 13, 'learning_rate': 0.0536513113251326, 'max_depth': 3, 'reg_lambda': 620.3654582052143, 'fair_weight': 0.35213004238182666, 'threshold': 0.5094250835345535}
+{'min_child_weight': 658.2390269635233, 'n_estimators': 21, 'learning_rate': 0.03398742039764733, 'max_depth': 10, 'reg_lambda': 0.2210995787518492, 'fair_weight': 0.016957387307441237, 'threshold': 0.5902419916775272}
+{'min_child_weight': 747.7200392819204, 'n_estimators': 10, 'learning_rate': 0.023662313250408667, 'max_depth': 6, 'reg_lambda': 70.30856386534332, 'fair_weight': 0.7704472419656879, 'threshold': inf}
+{'min_child_weight': 0.370445144240289, 'n_estimators': 24, 'learning_rate': 0.022284571615452428, 'max_depth': 9, 'reg_lambda': 2.3396068910433625, 'fair_weight': 0.21023584008604476, 'threshold': 0.5392976433721968}
+{'min_child_weight': 0.3120115986545102, 'n_estimators': 18, 'learning_rate': 0.0331765347148339, 'max_depth': 7, 'reg_lambda': 909.1741251005786, 'fair_weight': 0.018706548826997214, 'threshold': 0.5498243464708599}
+{'min_child_weight': 493.20798636684077, 'n_estimators': 51, 'learning_rate': 0.31267398026295773, 'max_depth': 3, 'reg_lambda': 0.16480860149032364, 'fair_weight': 2.601135208710111, 'threshold': 0.5695312702707132}
+{'min_child_weight': 0.019117190656988997, 'n_estimators': 10, 'learning_rate': 0.04392647381384594, 'max_depth': 10, 'reg_lambda': 0.002938552822805858, 'fair_weight': 6.811647383619914, 'threshold': 0.5541574824103124}
+{'min_child_weight': 12.067844215044987, 'n_estimators': 66, 'learning_rate': 0.032989681919839184, 'max_depth': 9, 'reg_lambda': 8.342939551839114, 'fair_weight': 3.9503734067992866, 'threshold': 0.5695957144202443}
