@@ -788,7 +788,7 @@ class XtremeFair_1(BaseEstimator, ClassifierMixin):
                 "Invalid return_type. Choose 'combined', 'performance', or 'fairness'."
             )
 
-class MMBfair(BaseEstimator, ClassifierMixin):
+class MMBFair(BaseEstimator, ClassifierMixin):
     """Classifier that modifies LGBM to incorporate min-max fairness optimization.
     It shares many of the parameters with LGBM to control learning and decision trees.
     The fairness metrics impelemented are "equalized_loss", "equal_opportunity", and "demographic_parity".

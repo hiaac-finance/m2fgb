@@ -108,7 +108,7 @@ def get_model(model_name, random_state=None):
     elif model_name == "MMBFair":
 
         def model(**params):
-            return models.MMBfair(random_state=random_state, **params)
+            return models.MMBFair(random_state=random_state, **params)
 
     elif model_name == "MMBFair_grad":
 
@@ -651,7 +651,7 @@ def experiment1():
         "MMBFair_grad",
     ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-    alphas = [0.2, 0.7, 1]
+    alphas = [0.7, 0.9, 0.2]
 
     for dataset in datasets:
         for alpha in alphas:
