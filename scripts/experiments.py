@@ -13,9 +13,11 @@ import optuna
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 import logging
+
+
 class CustomLogger:
     def __init__(self):
-        self.logger = logging.getLogger('lightgbm_custom')
+        self.logger = logging.getLogger("lightgbm_custom")
         self.logger.setLevel(logging.ERROR)
 
     def info(self, message):
@@ -27,7 +29,10 @@ class CustomLogger:
 
     def error(self, message):
         self.logger.error(message)
+
+
 import lightgbm as lgb
+
 lgb.register_logger(CustomLogger())
 
 import sys
@@ -42,9 +47,6 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.metrics import roc_auc_score, accuracy_score, balanced_accuracy_score
 from fairgbm import FairGBMClassifier
 from lightgbm import LGBMClassifier
-
-
-
 
 
 SEED = 0
@@ -103,16 +105,35 @@ def get_model(model_name, random_state=None):
                 dual_learning="gradient", random_state=random_state, **params
             )
 
-    elif model_name == "XtremeFair_LGBM":
+    elif model_name == "MMBFair":
 
         def model(**params):
-            return models.XtremeFair_LGBM(random_state=random_state, **params)
+            return models.MMBfair(random_state=random_state, **params)
 
-    elif model_name == "XtremeFair_LGBM_grad":
+    elif model_name == "MMBFair_grad":
 
         def model(**params):
-            return models.XtremeFair_LGBM(
+            return models.MMBFair(
                 dual_learning="gradient", random_state=random_state, **params
+            )
+
+    elif model_name == "MMBFair_eod":
+
+        def model(**params):
+            return models.MMBFair(
+                fairness_constraint="equal_opportunity",
+                random_state=random_state,
+                **params,
+            )
+
+    elif model_name == "MMBFair_grad_eod":
+
+        def model(**params):
+            return models.MMBFair(
+                dual_learning="gradient",
+                fairness_constraint="equal_opportunity",
+                random_state=random_state,
+                **params,
             )
 
     elif model_name == "LGBMClassifier":
@@ -146,10 +167,10 @@ def get_param_spaces(model_name):
         return models.PARAM_SPACES["XtremeFair"]
     elif model_name == "XtremeFair_grad":
         return models.PARAM_SPACES["XtremeFair_grad"]
-    elif model_name == "XtremeFair_LGBM":
-        return models.PARAM_SPACES["XtremeFair_LGBM"]
-    elif model_name == "XtremeFair_LGBM_grad":
-        return models.PARAM_SPACES["XtremeFair_LGBM_grad"]
+    elif model_name == "MMBFair" or model_name == "MMBFair_eod":
+        return models.PARAM_SPACES["MMBFair"]
+    elif model_name == "MMBFair_grad" or model_name == "MMBFair_grad_eod":
+        return models.PARAM_SPACES["MMBFair_grad"]
     elif model_name == "LGBMClassifier":
         return models.PARAM_SPACES["LGBMClassifier"]
     elif model_name == "FairGBMClassifier":
@@ -388,9 +409,7 @@ def eval_group_experiment(args):
         )
 
         # Define sensitive attribute from gender and age
-        A_train, _, A_test = get_group_feature(
-            args["dataset"], X_train, X_val, X_test
-        )
+        A_train, _, A_test = get_group_feature(args["dataset"], X_train, X_val, X_test)
 
         preprocess = Pipeline([("preprocess", col_trans)])
         preprocess.fit(X_train)
@@ -691,8 +710,8 @@ def experiment1():
         # "XtremeFair_grad",
         # "ExponentiatedGradient",  # TODO
         # "FairClassifier",
-        "XtremeFair_LGBM",
-        "XtremeFair_LGBM_grad",
+        "MMBFair",
+        "MMBFair_grad",
     ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
@@ -707,8 +726,8 @@ def experiment1():
                     "n_trials": 50,
                 }
                 print(f"{dataset} {model_name} {alpha}")
-                run_group_experiment(args)            
-    
+                run_group_experiment(args)
+
     eval_group_experiment(args)
 
 
@@ -784,7 +803,7 @@ def experiment4():
 
 
 def main():
-    experiment1() # (binary groups)
+    experiment1()  # (binary groups)
 
     # experiment2() # (4 groups)
 

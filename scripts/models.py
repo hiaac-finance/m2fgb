@@ -55,7 +55,7 @@ PARAM_SPACES = {
             "log": True,
         },
     },
-    "XtremeFair_LGBM": {
+    "MMBFair": {
         "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
@@ -63,7 +63,7 @@ PARAM_SPACES = {
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "fair_weight": {"type": "float", "low": 0.01, "high": 10, "log": True},
     },
-    "XtremeFair_LGBM_grad": {
+    "MMBFair_grad": {
         "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
@@ -788,44 +788,31 @@ class XtremeFair_1(BaseEstimator, ClassifierMixin):
                 "Invalid return_type. Choose 'combined', 'performance', or 'fairness'."
             )
 
-class XtremeFair_LGBM(BaseEstimator, ClassifierMixin):
-    """Classifier that modifies XGBoost to incorporate fairness into the loss function.
-    The scoring is performed with a weighted sum between accuracy and a fairness metric.
-    The alpha parameter controls the weight, alpha=1 means only accuracy is considered, alpha=0 means only fairness is considered.
-    It shares many of the parameters with XGBoost to control learning and decision trees.
-    Currently it is only able to incorporate "equalized_loss" as a fairness constraint and "EOD" as a fairness metric.
-
-
+class MMBfair(BaseEstimator, ClassifierMixin):
+    """Classifier that modifies LGBM to incorporate min-max fairness optimization.
+    It shares many of the parameters with LGBM to control learning and decision trees.
+    The fairness metrics impelemented are "equalized_loss", "equal_opportunity", and "demographic_parity".
+    
     Parameters
     ----------
     fairness_constraint : str, optional
-        Fairness constraint used in learning, currently only supports "equalized_loss", by default "equalized_loss"
+        Fairness constraint used in learning, must be ["equalized_loss", "equal_opportunity", "demographic_parity"], by default "equalized_loss"
     fair_weight : int, optional
         Weight for fairness in loss formulation, by default 1
     dual_learning : str, optional
-        Method used to learn the dual problem, by default "optim"
+        Method used to learn the dual problem, must be ["optim", "grad"], by default "optim"
     multiplier_learning_rate: float, optional
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     n_estimators : int, optional
         Number of estimators used in XGB, by default 10
-    eta : float, optional
-        Learning rate of XGB, by default 0.3
-    colsample_bytree : float, optional
-        Size of sample of of the columns used in each estimator, by default 1
+    learning_rate : float, optional
+        Learning rate of ensambles, by default 0.1
     max_depth : int, optional
-        Max depth of decision trees of XGB, by default 6
+        Max depth of decision trees, by default 6
     min_child_weight : int, optional
         Weight used to choose partition of tree nodes, by default 1
-    max_leaves : int, optional
-        Max number of leaves of trees, by default 0
-    l2_weight : int, optional
+    reg_lambda : int, optional
         Weight of L2 regularization, by default 1
-    alpha : int, optional
-        Weight used for the score function of the method, by default 1
-    performance_metric : str, optional
-        Performance metric used by model score, supports ["accuracy", "auc"], by default "accuracy"
-    fairness_metric : str, optional
-        Fairness metric used by model score, supports ["SPD", "EOP"] by default "EOP"
     random_state : int, optional
         Random seed used in learning, by default None
     """
@@ -863,7 +850,7 @@ class XtremeFair_LGBM(BaseEstimator, ClassifierMixin):
         self.group_losses = []
         self.mu_opt_list = [None]
 
-    def fit(self, X, y, sensitive_attribute=None):
+    def fit(self, X, y, sensitive_attribute):
         """Fit the model to the data.
 
         Parameters
@@ -880,14 +867,11 @@ class XtremeFair_LGBM(BaseEstimator, ClassifierMixin):
         XtremeFair
             Fitted model
         """
-        if sensitive_attribute is None:
-            sensitive_attribute = np.ones(X.shape[0])
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
         dtrain = lgb.Dataset(X, label=y)
 
         params = {
-            #"objective": "binary",
             "objective": dual_obj_1(
                 sensitive_attribute,
                 self.fair_weight,
@@ -910,7 +894,6 @@ class XtremeFair_LGBM(BaseEstimator, ClassifierMixin):
             params,
             dtrain,
             num_boost_round=self.n_estimators,
-            #objective=
         )
         self.group_losses = np.array(self.group_losses)
         self.mu_opt_list = np.array(self.mu_opt_list)
