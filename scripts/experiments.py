@@ -439,7 +439,7 @@ def run_subgroup_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=7)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=11)
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
@@ -463,7 +463,7 @@ def run_subgroup_experiment(args):
         results.append(metrics)
 
     results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results.csv"))
+    results.to_csv(os.path.join(args["output_dir"], "results.csv"), index=False)
 
 
 def run_fairness_goal_experiment(args):
@@ -611,7 +611,7 @@ def run_subgroup2_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=7)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=11)
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
@@ -635,7 +635,7 @@ def run_subgroup2_experiment(args):
         results.append(metrics)
 
     results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results.csv"))
+    results.to_csv(os.path.join(args["output_dir"], "results.csv"), index=False)
 
 
 def experiment1():
@@ -672,8 +672,8 @@ def experiment2():
     model_names = [
         "LGBMClassifier",
         "FairGBMClassifier",
-        "XtremeFair",
-        "XtremeFair_grad",
+        "MMBFair",
+        "MMBFair_grad",
     ]
     alphas = [0.75, 1]
     for dataset in datasets:
@@ -718,12 +718,12 @@ def experiment3():
 def experiment4():
     datasets = ["german", "adult"]
     model_names = [
-        # "LGBMClassifier",
-        # "FairGBMClassifier",
-        # "XtremeFair",
-        "XtremeFair_grad",
+        "LGBMClassifier",
+        "FairGBMClassifier",
+        "MMBFair",
+        "MMBFair_grad",
     ]
-    alphas = [0.75]  # , 1]
+    alphas = [0.75, 1]
     for dataset in datasets:
         for alpha in alphas:
             for model_name in model_names:
@@ -739,13 +739,13 @@ def experiment4():
 
 
 def main():
-    experiment1()  # (binary groups)
+    # experiment1()  # (binary groups)
 
-    # experiment2() # (4 groups)
+    experiment2() # (4 groups)
 
     # experiment3() # (fairness goal)
 
-    # experiment4()  # (8 groups)
+    experiment4()  # (8 groups)
 
     # experiment 5 (EOD)
 
