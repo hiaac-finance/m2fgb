@@ -639,7 +639,7 @@ def run_subgroup2_experiment(args):
 
 
 def experiment1():
-    datasets = ["compas", "german", "adult"]
+    datasets = ["german", "compas", "adult"]
     model_names = [
         "LGBMClassifier",
         "FairGBMClassifier",
