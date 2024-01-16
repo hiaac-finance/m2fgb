@@ -260,7 +260,7 @@ def eval_model(y_true, y_score, y_pred, A):
     eq_loss = utils.equalized_loss_score(y_true, y_score, A)
     eod = utils.equal_opportunity_score(y_true, y_pred, A)
     spd = utils.statistical_parity_score(y_true, y_pred, A)
-    return {
+    metrics = {
         "acc": acc,
         "bal_acc": bal_acc,
         "roc": roc,
@@ -269,31 +269,27 @@ def eval_model(y_true, y_score, y_pred, A):
         "spd": spd,
     }
 
+    pr_list = []
+    tpr_list = []
+    bal_acc_list = []
 
-def eval_model_v2(y_true, y_score, y_pred, A):
-    """Evaluate model performance and fairness metrics."""
-    acc = accuracy_score(y_true, y_pred)
-    bal_acc = balanced_accuracy_score(y_true, y_pred)
-    roc = roc_auc_score(y_true, y_score)
-    eq_loss = utils.equalized_loss_score(y_true, y_score, A)
-    eod = utils.equal_opportunity_score(y_true, y_pred, A)
-    spd = utils.statistical_parity_score(y_true, y_pred, A)
-    # get tpr of each group
-    tpr = []
     for g in np.unique(A):
-        tpr.append(y_pred[(A == g) & (y_true == 1)].mean())
+        bool_g = A == g
+        pr_list.append(y_pred[bool_g].mean())
+        tpr_list.append(y_pred[bool_g & (y_true == 1)].mean())
+        bal_acc_list.append(balanced_accuracy_score(y_true[bool_g], y_pred[bool_g]))
 
-    return {
-        "acc": acc,
-        "bal_acc": bal_acc,
-        "roc": roc,
-        "eq_loss": eq_loss,
-        "eod": eod,
-        "spd": spd,
-        "min_tpr": min(tpr),
-        "max_tpr": max(tpr),
-        "mean_tpr": np.mean(tpr),
-    }
+    metrics["tpr_min"] = min(tpr_list)
+    metrics["tpr_max"] = max(tpr_list)
+    metrics["tpr_mean"] = np.mean(tpr_list)
+    metrics["pr_min"] = min(pr_list)
+    metrics["pr_max"] = max(pr_list)
+    metrics["pr_mean"] = np.mean(pr_list)
+    metrics["bal_acc_min"] = min(bal_acc_list)
+    metrics["bal_acc_max"] = max(bal_acc_list)
+    metrics["bal_acc_mean"] = np.mean(bal_acc_list)
+
+    return metrics
 
 
 def run_group_experiment(args):
@@ -381,66 +377,7 @@ def run_group_experiment(args):
         results.append(metrics)
 
     results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results.csv"))
-
-
-def eval_group_experiment(args):
-    results = []
-
-    col_trans = ColumnTransformer(
-        [
-            ("numeric", StandardScaler(), data.NUM_FEATURES[args["dataset"]]),
-            (
-                "categorical",
-                OneHotEncoder(
-                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
-                ),
-                data.CAT_FEATURES[args["dataset"]],
-            ),
-        ],
-        verbose_feature_names_out=False,
-    )
-    col_trans.set_output(transform="pandas")
-
-    for i in tqdm(range(10)):
-        # Load and prepare data
-        X_train, _, X_val, Y_val, X_test, Y_test = data.get_fold(
-            args["dataset"], i, SEED
-        )
-
-        # Define sensitive attribute from gender and age
-        A_train, _, A_test = get_group_feature(args["dataset"], X_train, X_val, X_test)
-
-        preprocess = Pipeline([("preprocess", col_trans)])
-        preprocess.fit(X_train)
-        X_val = preprocess.transform(X_val)
-        X_test = preprocess.transform(X_test)
-
-        model = joblib.load(os.path.join(args["output_dir"], f"model_{i}.pkl"))
-
-        y_val_score = model.predict_proba(X_val)[:, 1]
-        thresh = utils.get_best_threshold(Y_val, y_val_score)
-        y_test_score = model.predict_proba(X_test)[:, 1]
-        y_test_pred = y_test_score > thresh
-        # calculate more detailed metrics
-        metrics_ = {}
-        for g in np.unique(A_train):
-            bool_g = A_test == g
-            pr = y_test_pred[bool_g].mean()
-            tpr = y_test_pred[bool_g & (Y_test == 1)].mean()
-            bal_acc = balanced_accuracy_score(Y_test[bool_g], y_test_pred[bool_g])
-            roc = roc_auc_score(Y_test[bool_g], y_test_score[bool_g])
-            metrics_[f"pr_{g}"] = pr
-            metrics_[f"tpr_{g}"] = tpr
-            metrics_[f"bal_acc_{g}"] = bal_acc
-            metrics_[f"roc_{g}"] = roc
-        metrics_["tpr"] = y_test_pred[Y_test == 1].mean()
-        metrics_["bal_acc"] = balanced_accuracy_score(Y_test, y_test_pred)
-        metrics_["roc"] = roc_auc_score(Y_test, y_test_score)
-        results.append(metrics_)
-
-    results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results_longer.csv"))
+    results.to_csv(os.path.join(args["output_dir"], "results.csv"), index=False)
 
 
 def run_subgroup_experiment(args):
@@ -704,16 +641,17 @@ def run_subgroup2_experiment(args):
 def experiment1():
     datasets = ["compas", "german", "adult"]
     model_names = [
-        # "LGBMClassifier",
-        # "FairGBMClassifier",
+        "LGBMClassifier",
+        "FairGBMClassifier",
         # "XtremeFair",
         # "XtremeFair_grad",
         # "ExponentiatedGradient",  # TODO
-        # "FairClassifier",
+        "FairClassifier",
         "MMBFair",
         "MMBFair_grad",
     ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    alphas = [0.2, 0.7, 1]
 
     for dataset in datasets:
         for alpha in alphas:
@@ -727,8 +665,6 @@ def experiment1():
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_group_experiment(args)
-
-    eval_group_experiment(args)
 
 
 def experiment2():
