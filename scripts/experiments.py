@@ -641,14 +641,14 @@ def run_subgroup2_experiment(args):
 def experiment1():
     datasets = ["german", "compas", "adult"]
     model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        # "XtremeFair",
-        # "XtremeFair_grad",
+        #"LGBMClassifier",
+        #"FairGBMClassifier",
         # "ExponentiatedGradient",  # TODO
-        "FairClassifier",
-        "MMBFair",
-        "MMBFair_grad",
+        # "FairClassifier",
+        # "MMBFair",
+        #"MMBFair_grad",
+        "MMBFair_eod",
+        "MMBFair_grad_eod",
     ]
     alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     alphas = [0.7, 0.9, 0.2]
@@ -739,13 +739,13 @@ def experiment4():
 
 
 def main():
-    # experiment1()  # (binary groups)
+    experiment1()  # (binary groups)
 
-    experiment2() # (4 groups)
+    #experiment2() # (4 groups)
 
     # experiment3() # (fairness goal)
 
-    experiment4()  # (8 groups)
+    #experiment4()  # (8 groups)
 
     # experiment 5 (EOD)
 
