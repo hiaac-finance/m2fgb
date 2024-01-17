@@ -146,6 +146,13 @@ def get_model(model_name, random_state=None):
         def model(**params):
             return FairGBMClassifier(random_state=random_state, **params)
 
+    elif model_name == "FairGBMClassifier_eod":
+
+        def model(**params):
+            return FairGBMClassifier(
+                constraint_type="FNR", random_state=random_state, **params
+            )
+
     elif model_name == "ExponentiatedGradient":
 
         def model(**params):
@@ -173,7 +180,7 @@ def get_param_spaces(model_name):
         return models.PARAM_SPACES["MMBFair_grad"]
     elif model_name == "LGBMClassifier":
         return models.PARAM_SPACES["LGBMClassifier"]
-    elif model_name == "FairGBMClassifier":
+    elif model_name == "FairGBMClassifier" or model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "ExponentiatedGradient":
         return models.PARAM_SPACES["ExponentiatedGradient"]
@@ -209,6 +216,28 @@ def get_subgroup1_feature(dataset, X_train, X_val, X_test):
         A_train = X_train.Gender.astype(str) + "_" + (X_train.Age > 50).astype(str)
         A_val = X_val.Gender.astype(str) + "_" + (X_val.Age > 50).astype(str)
         A_test = X_test.Gender.astype(str) + "_" + (X_test.Age > 50).astype(str)
+    elif dataset == "compas":
+        A_train = (
+            (X_train.race == "Caucasian").astype(str)
+            + "_"
+            + (
+                (X_train.age_cat == "25 - 45") | (X_train.age_cat == "Less than 25")
+            ).astype(str)
+        )
+        A_val = (
+            (X_val.race == "Caucasian").astype(str)
+            + "_"
+            + ((X_val.age_cat == "25 - 45") | (X_val.age_cat == "Less than 25")).astype(
+                str
+            )
+        )
+        A_test = (
+            (X_test.race == "Caucasian").astype(str)
+            + "_"
+            + (
+                (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
+            ).astype(str)
+        )
     elif dataset == "adult":
         A_train = X_train.sex.astype(str) + "_" + (X_train.age > 50).astype(str)
         A_val = X_val.sex.astype(str) + "_" + (X_val.age > 50).astype(str)
@@ -234,6 +263,16 @@ def get_subgroup2_feature(dataset, X_train, X_val, X_test):
         else:
             return "4"
 
+    def race_cat(race):
+        if race == "African-American" or race == "Hispanic":
+            return "1"
+        elif race == "Caucasian":
+            return "2"
+        elif race == "Asian":
+            return "3"
+        else:
+            return "4"
+
     if dataset == "german":
         A_train = (
             X_train.Gender.astype(str) + "_" + X_train.Age.apply(age_cat).astype(str)
@@ -244,6 +283,28 @@ def get_subgroup2_feature(dataset, X_train, X_val, X_test):
         A_train = X_train.sex.astype(str) + "_" + X_train.age.apply(age_cat).astype(str)
         A_val = X_val.sex.astype(str) + "_" + X_val.age.apply(age_cat).astype(str)
         A_test = X_test.sex.astype(str) + "_" + X_test.age.apply(age_cat).astype(str)
+    elif dataset == "compas":
+        A_train = (
+            X_train.race.apply(race_cat)
+            + "_"
+            + (
+                (X_train.age_cat == "25 - 45") | (X_train.age_cat == "Less than 25")
+            ).astype(str)
+        )
+        A_val = (
+            X_val.race.apply(race_cat)
+            + "_"
+            + ((X_val.age_cat == "25 - 45") | (X_val.age_cat == "Less than 25")).astype(
+                str
+            )
+        )
+        A_test = (
+            X_test.race.apply(race_cat)
+            + "_"
+            + (
+                (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
+            ).astype(str)
+        )
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
     A_train = A_train.map(sensitive_map)
@@ -641,12 +702,12 @@ def run_subgroup2_experiment(args):
 def experiment1():
     datasets = ["german", "compas", "adult"]
     model_names = [
-        #"LGBMClassifier",
-        #"FairGBMClassifier",
+        # "LGBMClassifier",
+        # "FairGBMClassifier",
         # "ExponentiatedGradient",  # TODO
         # "FairClassifier",
         # "MMBFair",
-        #"MMBFair_grad",
+        # "MMBFair_grad",
         "MMBFair_eod",
         "MMBFair_grad_eod",
     ]
@@ -668,14 +729,17 @@ def experiment1():
 
 
 def experiment2():
-    datasets = ["german", "adult"]
+    datasets = ["german", "compas", "adult"]
     model_names = [
         "LGBMClassifier",
         "FairGBMClassifier",
+        "FairGBMClassifier_eod",
         "MMBFair",
         "MMBFair_grad",
+        "MMBFair_eod",
+        "MMBFair_grad_eod",
     ]
-    alphas = [0.75, 1]
+    alphas = [0.75]
     for dataset in datasets:
         for alpha in alphas:
             for model_name in model_names:
@@ -688,6 +752,32 @@ def experiment2():
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
+
+
+def experiment3():
+    datasets = ["german", "compas", "adult"]
+    model_names = [
+        "LGBMClassifier",
+        "FairGBMClassifier",
+        "FairGBMClassifier_eod",
+        "MMBFair",
+        "MMBFair_grad",
+        "MMBFair_eod",
+        "MMBFair_grad_eod",
+    ]
+    alphas = [0.75]
+    for dataset in datasets:
+        for alpha in alphas:
+            for model_name in model_names:
+                args = {
+                    "dataset": dataset,
+                    "alpha": alpha,
+                    "output_dir": f"../results/subgroup2_experiment/{dataset}/{model_name}_{alpha}",
+                    "model_name": model_name,
+                    "n_trials": 100,
+                }
+                print(f"{dataset} {model_name} {alpha}")
+                run_subgroup2_experiment(args)
 
 
 def experiment3():
@@ -715,37 +805,14 @@ def experiment3():
                 run_fairness_goal_experiment(args)
 
 
-def experiment4():
-    datasets = ["german", "adult"]
-    model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "MMBFair",
-        "MMBFair_grad",
-    ]
-    alphas = [0.75, 1]
-    for dataset in datasets:
-        for alpha in alphas:
-            for model_name in model_names:
-                args = {
-                    "dataset": dataset,
-                    "alpha": alpha,
-                    "output_dir": f"../results/subgroup2_experiment/{dataset}/{model_name}_{alpha}",
-                    "model_name": model_name,
-                    "n_trials": 100,
-                }
-                print(f"{dataset} {model_name} {alpha}")
-                run_subgroup2_experiment(args)
-
-
 def main():
-    experiment1()  # (binary groups)
+    # experiment1()  # (binary groups)
 
-    #experiment2() # (4 groups)
+    experiment2()  # (4 groups)
+
+    experiment3()  # (8 groups)
 
     # experiment3() # (fairness goal)
-
-    #experiment4()  # (8 groups)
 
     # experiment 5 (EOD)
 
