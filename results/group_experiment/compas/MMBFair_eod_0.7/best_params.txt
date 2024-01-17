@@ -1,0 +1,1 @@
+{'min_child_weight': 0.5027020288725661, 'n_estimators': 35, 'learning_rate': 0.4363347871816606, 'max_depth': 2, 'reg_lambda': 2.900538986676167, 'fair_weight': 0.014203649507948625, 'threshold': 0.5378614874557242}
