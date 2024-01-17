@@ -1,0 +1,1 @@
+{'num_leaves': 16, 'n_estimators': 225, 'min_child_samples': 9, 'max_depth': 7, 'reg_lambda': 0.0034133541958906418, 'learning_rate': 0.09440586223580605, 'threshold': 0.241031479390669}
