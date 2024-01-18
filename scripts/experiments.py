@@ -780,15 +780,18 @@ def experiment3():
                 run_subgroup2_experiment(args)
 
 
-def experiment3():
+def experiment4():
     datasets = ["german", "compas", "adult"]
     model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "XtremeFair",
-        "XtremeFair_grad",
-        # "ExponentiatedGradient",  # TODO
+        #"LGBMClassifier",
+        #"FairGBMClassifier",
+        "MMBFair",
+        "MMBFair_grad",
         "FairClassifier",
+        "FairGBMClassifier_eod",
+        "MMBFair_eod",
+        # "ExponentiatedGradient",  # TODO
+        "MMBFair_grad_eod",
     ]
     goals = [0.95]
     for dataset in datasets:
@@ -808,11 +811,11 @@ def experiment3():
 def main():
     # experiment1()  # (binary groups)
 
-    experiment2()  # (4 groups)
+    #experiment2()  # (4 groups)
 
     experiment3()  # (8 groups)
 
-    # experiment3() # (fairness goal)
+    experiment4() # (fairness goal)
 
     # experiment 5 (EOD)
 
