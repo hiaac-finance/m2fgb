@@ -755,15 +755,15 @@ def experiment2():
 
 
 def experiment3():
-    datasets = ["german", "compas", "adult"]
+    datasets = ["compas", "adult"]
     model_names = [
         "LGBMClassifier",
         "FairGBMClassifier",
-        "FairGBMClassifier_eod",
+        #"FairGBMClassifier_eod",
         "MMBFair",
         "MMBFair_grad",
-        "MMBFair_eod",
-        "MMBFair_grad_eod",
+        #"MMBFair_eod",
+        #"MMBFair_grad_eod",
     ]
     alphas = [0.75]
     for dataset in datasets:
