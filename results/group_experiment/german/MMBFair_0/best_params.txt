@@ -1,0 +1,10 @@
+{'min_child_weight': 102.3054892495889, 'n_estimators': 18, 'learning_rate': 0.07712358601040777, 'max_depth': 6, 'reg_lambda': 0.0535704136450397, 'fair_weight': 0.1946211094534718, 'threshold': inf}
+{'min_child_weight': 59.69957592498896, 'n_estimators': 11, 'learning_rate': 0.038040436121567926, 'max_depth': 10, 'reg_lambda': 26.405625664042475, 'fair_weight': 0.06150945641874209, 'threshold': 0.6015028867129342}
+{'min_child_weight': 231.6856160789739, 'n_estimators': 153, 'learning_rate': 0.15474294601703853, 'max_depth': 4, 'reg_lambda': 98.1074755511208, 'fair_weight': 0.0022025075365778956, 'threshold': inf}
+{'min_child_weight': 118.03841897418083, 'n_estimators': 16, 'learning_rate': 0.14282947402514973, 'max_depth': 5, 'reg_lambda': 2.6516756739851592, 'fair_weight': 0.19124545225910633, 'threshold': inf}
+{'min_child_weight': 350.4802658000729, 'n_estimators': 41, 'learning_rate': 0.15441039391472355, 'max_depth': 8, 'reg_lambda': 0.4233187790250803, 'fair_weight': 0.6845030885316222, 'threshold': inf}
+{'min_child_weight': 97.60300289205688, 'n_estimators': 57, 'learning_rate': 0.02335042918972716, 'max_depth': 2, 'reg_lambda': 40.453298874142185, 'fair_weight': 6.858058040523245, 'threshold': inf}
+{'min_child_weight': 413.2975454295983, 'n_estimators': 33, 'learning_rate': 0.0275757609967196, 'max_depth': 3, 'reg_lambda': 0.20443770052634289, 'fair_weight': 0.02923797759800418, 'threshold': inf}
+{'min_child_weight': 267.93745328787116, 'n_estimators': 37, 'learning_rate': 0.19876330790505303, 'max_depth': 8, 'reg_lambda': 5.872258577508421, 'fair_weight': 0.0014311504948884143, 'threshold': inf}
+{'min_child_weight': 136.10420957470356, 'n_estimators': 25, 'learning_rate': 0.09917860863227902, 'max_depth': 8, 'reg_lambda': 27.54719676261743, 'fair_weight': 0.001513323246437562, 'threshold': inf}
+{'min_child_weight': 91.07380315903549, 'n_estimators': 34, 'learning_rate': 0.13597099895633652, 'max_depth': 5, 'reg_lambda': 301.79415273467714, 'fair_weight': 0.5528803506715763, 'threshold': inf}
