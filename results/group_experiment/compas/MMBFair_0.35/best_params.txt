@@ -1,0 +1,10 @@
+{'min_child_weight': 29.307480174944903, 'n_estimators': 25, 'learning_rate': 0.21763470285074948, 'max_depth': 7, 'reg_lambda': 0.7074974727449701, 'fair_weight': 0.039972439086822874, 'threshold': 0.5884020242885457}
+{'min_child_weight': 893.4577946145, 'n_estimators': 382, 'learning_rate': 0.09608687074957979, 'max_depth': 4, 'reg_lambda': 0.004479769921960033, 'fair_weight': 2.4117573023927177, 'threshold': inf}
+{'min_child_weight': 0.1051449703670181, 'n_estimators': 14, 'learning_rate': 0.019673739936614025, 'max_depth': 6, 'reg_lambda': 533.694457546143, 'fair_weight': 0.09247041944271517, 'threshold': 0.5041924032384107}
+{'min_child_weight': 2.2550332883271227, 'n_estimators': 10, 'learning_rate': 0.04450168843684784, 'max_depth': 3, 'reg_lambda': 0.09897414355213023, 'fair_weight': 1.3973187767634045, 'threshold': 0.4949416480409262}
+{'min_child_weight': 0.1065606513349195, 'n_estimators': 116, 'learning_rate': 0.17315370040001793, 'max_depth': 8, 'reg_lambda': 0.022135070800832855, 'fair_weight': 1.2276039633714897, 'threshold': 0.6285438600153809}
+{'min_child_weight': 3.4224582452216175, 'n_estimators': 435, 'learning_rate': 0.032271261401871136, 'max_depth': 5, 'reg_lambda': 0.27028523967278817, 'fair_weight': 0.003584968438555739, 'threshold': 0.6521021343586435}
+{'min_child_weight': 355.15238030950803, 'n_estimators': 29, 'learning_rate': 0.048276869410580736, 'max_depth': 3, 'reg_lambda': 545.5128545679169, 'fair_weight': 9.113090951878537, 'threshold': 0.566514727609088}
+{'min_child_weight': 12.983864591036458, 'n_estimators': 18, 'learning_rate': 0.05151187683567508, 'max_depth': 9, 'reg_lambda': 0.11648833377457297, 'fair_weight': 0.1729584745083581, 'threshold': 0.5640703737532743}
+{'min_child_weight': 0.0011535636676264114, 'n_estimators': 102, 'learning_rate': 0.021459700230023394, 'max_depth': 5, 'reg_lambda': 4.734909840324912, 'fair_weight': 1.676851921673987, 'threshold': 0.6222531034417801}
+{'min_child_weight': 0.003128389123777935, 'n_estimators': 23, 'learning_rate': 0.23032920580340022, 'max_depth': 2, 'reg_lambda': 0.7308275122658102, 'fair_weight': 0.002857472830659315, 'threshold': 0.5749114128644894}

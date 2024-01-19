@@ -412,7 +412,7 @@ def run_group_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=11)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=10)
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
@@ -702,17 +702,16 @@ def run_subgroup2_experiment(args):
 def experiment1():
     datasets = ["german", "compas", "adult"]
     model_names = [
-        # "LGBMClassifier",
-        # "FairGBMClassifier",
+        "LGBMClassifier",
+        "FairGBMClassifier",
         # "ExponentiatedGradient",  # TODO
-        # "FairClassifier",
-        # "MMBFair",
-        # "MMBFair_grad",
-        "MMBFair_eod",
-        "MMBFair_grad_eod",
+        "FairClassifier",
+        "MMBFair",
+        "MMBFair_grad",
+        #"MMBFair_eod",
+        #"MMBFair_grad_eod",
     ]
-    alphas = [0, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-    alphas = [0.7, 0.9, 0.2]
+    alphas = [0.05, 0.1, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
 
     for dataset in datasets:
         for alpha in alphas:
@@ -809,13 +808,13 @@ def experiment4():
 
 
 def main():
-    # experiment1()  # (binary groups)
+    experiment1()  # (binary groups)
 
     #experiment2()  # (4 groups)
 
-    experiment3()  # (8 groups)
+    #experiment3()  # (8 groups)
 
-    experiment4() # (fairness goal)
+    #experiment4() # (fairness goal)
 
     # experiment 5 (EOD)
 
