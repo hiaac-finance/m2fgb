@@ -1,0 +1,10 @@
+{'min_child_weight': 18.358526491940705, 'n_estimators': 67, 'learning_rate': 0.06915757335398301, 'max_depth': 8, 'reg_lambda': 0.20743545871759556, 'fair_weight': 0.8033317640615509, 'threshold': 0.5795744537650602}
+{'min_child_weight': 729.3501509914173, 'n_estimators': 176, 'learning_rate': 0.03492254989813322, 'max_depth': 5, 'reg_lambda': 19.3982391232562, 'fair_weight': 1.1236230650245533, 'threshold': inf}
+{'min_child_weight': 914.9211280645052, 'n_estimators': 253, 'learning_rate': 0.03287538713467907, 'max_depth': 6, 'reg_lambda': 276.48052466683373, 'fair_weight': 9.975622441292035, 'threshold': inf}
+{'min_child_weight': 779.6398331702712, 'n_estimators': 20, 'learning_rate': 0.3634433643559666, 'max_depth': 4, 'reg_lambda': 7.2089089210997725, 'fair_weight': 1.7263564535096936, 'threshold': inf}
+{'min_child_weight': 0.57282909735958, 'n_estimators': 278, 'learning_rate': 0.18649742379757972, 'max_depth': 10, 'reg_lambda': 0.00222020972979496, 'fair_weight': 1.2980065064643835, 'threshold': 0.6413044431608269}
+{'min_child_weight': 859.2905868489759, 'n_estimators': 223, 'learning_rate': 0.010072306469685445, 'max_depth': 7, 'reg_lambda': 0.0010653475545203083, 'fair_weight': 0.10256941838338199, 'threshold': inf}
+{'min_child_weight': 985.5752029956216, 'n_estimators': 40, 'learning_rate': 0.017809396950173216, 'max_depth': 9, 'reg_lambda': 0.01031477927782252, 'fair_weight': 0.006075519115972151, 'threshold': inf}
+{'min_child_weight': 26.61145468285568, 'n_estimators': 202, 'learning_rate': 0.4856227434297199, 'max_depth': 9, 'reg_lambda': 7.952615068323004, 'fair_weight': 0.089992770425708, 'threshold': 0.5947402403725639}
+{'min_child_weight': 300.23205637259065, 'n_estimators': 18, 'learning_rate': 0.17133233136050705, 'max_depth': 10, 'reg_lambda': 363.7019283629469, 'fair_weight': 0.04571027586242285, 'threshold': 0.5927381383824425}
+{'min_child_weight': 0.6738044303836788, 'n_estimators': 87, 'learning_rate': 0.18560223790663313, 'max_depth': 4, 'reg_lambda': 0.11382003441029898, 'fair_weight': 0.18199240840763925, 'threshold': 0.6043601659975322}
