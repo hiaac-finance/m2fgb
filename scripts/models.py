@@ -1027,7 +1027,6 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
         elif self.fairness_constraint == "demographic_parity":
             self.model_ = DemographicParityClassifier(
                 covariance_threshold=self.covariance_threshold,
-                positive_target = 1,
                 C=self.C,
                 sensitive_cols = 0,
                 penalty=self.penalty,
