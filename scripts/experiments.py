@@ -29,9 +29,7 @@ import lightgbm as lgb
 
 lgb.register_logger(CustomLogger())
 
-import sys
 import os
-import glob
 import data
 import models
 import utils
@@ -87,62 +85,50 @@ def run_trial(
 
 def get_model(model_name, random_state=None):
     """Helper function to get model class from model name."""
-    if model_name == "XtremeFair":
+    if model_name == "M2FGB":
 
         def model(**params):
-            return models.XtremeFair(random_state=random_state, **params)
+            return models.M2FGB(random_state=random_state, **params)
 
-    elif model_name == "XtremeFair_grad":
+    elif model_name == "M2FGB_grad":
 
         def model(**params):
-            return models.XtremeFair(
+            return models.M2FGB(
                 dual_learning="gradient", random_state=random_state, **params
             )
 
-    elif model_name == "MMBFair":
+    elif model_name == "M2FGB_eod":
 
         def model(**params):
-            return models.MMBFair(random_state=random_state, **params)
-
-    elif model_name == "MMBFair_grad":
-
-        def model(**params):
-            return models.MMBFair(
-                dual_learning="gradient", random_state=random_state, **params
-            )
-
-    elif model_name == "MMBFair_eod":
-
-        def model(**params):
-            return models.MMBFair(
+            return models.M2FGB(
                 fairness_constraint="equal_opportunity",
                 random_state=random_state,
                 **params,
             )
 
-    elif model_name == "MMBFair_grad_eod":
+    elif model_name == "M2FGB_grad_eod":
 
         def model(**params):
-            return models.MMBFair(
+            return models.M2FGB(
                 dual_learning="gradient",
                 fairness_constraint="equal_opportunity",
                 random_state=random_state,
                 **params,
             )
-        
-    elif model_name == "MMBFair_spd":
+
+    elif model_name == "M2FGB_spd":
 
         def model(**params):
-            return models.MMBFair(
+            return models.M2FGB(
                 fairness_constraint="demographic_parity",
                 random_state=random_state,
                 **params,
             )
 
-    elif model_name == "MMBFair_grad_spd":
+    elif model_name == "M2FGB_grad_spd":
 
         def model(**params):
-            return models.MMBFair(
+            return models.M2FGB(
                 dual_learning="gradient",
                 fairness_constraint="demographic_parity",
                 random_state=random_state,
@@ -181,23 +167,33 @@ def get_model(model_name, random_state=None):
     elif model_name == "FairClassifier_spd":
 
         def model(**params):
-            return models.FairClassifier_Wrap(fairness_constraint = "demographic_parity", **params)
+            return models.FairClassifier_Wrap(
+                fairness_constraint="demographic_parity", **params
+            )
 
     return model
 
 
 def get_param_spaces(model_name):
     """Helper function to get parameter space from model name."""
-    if model_name not in ["MMBFair_eod", "MMBFair_spd", "MMBFair_grad_eod", "MMBFair_grad_spd", "FairGBMClassifier_eod", "FairClassifier_spd"]:
+    if model_name not in [
+        "M2FGB_eod",
+        "M2FGB_spd",
+        "M2FGB_grad_eod",
+        "M2FGB_grad_spd",
+        "FairGBMClassifier_eod",
+        "FairClassifier_spd",
+    ]:
         return models.PARAM_SPACES[model_name]
-    elif model_name == "MMBFair_eod" or model_name == "MMBFair_spd":
-        return models.PARAM_SPACES["MMBFair"]
-    elif model_name == "MMBFair_grad_eod" or model_name == "MMBFair_grad_spd":
-        return models.PARAM_SPACES["MMBFair_grad"]
+    elif model_name == "M2FGB_eod" or model_name == "M2FGB_spd":
+        return models.PARAM_SPACES["M2FGB"]
+    elif model_name == "M2FGB_grad_eod" or model_name == "M2FGB_grad_spd":
+        return models.PARAM_SPACES["M2FGB_grad"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "FairClassifier_spd":
         return models.PARAM_SPACES["FairClassifier"]
+
 
 def get_group_feature(dataset, X_train, X_val, X_test):
     """Function to get the sensitive attribute that defines binary group."""
@@ -511,7 +507,7 @@ def run_subgroup_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=11)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
@@ -563,7 +559,10 @@ def run_fairness_goal_experiment(args):
     col_trans.set_output(transform="pandas")
 
     scorer = utils.get_fairness_goal_scorer(
-        fairness_goal=args["goal"], M = 1000, performance_metric="bal_acc", fairness_metric="eod"
+        fairness_goal=args["goal"],
+        M=1000,
+        performance_metric="bal_acc",
+        fairness_metric="eod",
     )
 
     for i in tqdm(range(10)):
@@ -597,7 +596,7 @@ def run_fairness_goal_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=7)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
@@ -683,7 +682,7 @@ def run_subgroup2_experiment(args):
             model_class,
             get_param_spaces(args["model_name"]),
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=11)
+        study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
@@ -711,22 +710,23 @@ def run_subgroup2_experiment(args):
 
 
 def experiment1():
-    datasets = ["adult"]
+    datasets = ["german", "compas", "adult"]
     model_names = [
         "LGBMClassifier",
         "FairGBMClassifier",
-        # "ExponentiatedGradient",  # TODO
-        #"FairClassifier",
-        "MMBFair",
-        "MMBFair_grad",
-        #"MMBFair_eod",
-        #"MMBFair_grad_eod",
+        "FairClassifier",
+        "M2FGB",
+        "M2FGB_grad",
     ]
     alphas = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     alphas += [0.05, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
+    alphas_adult = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
     for dataset in datasets:
         for alpha in alphas:
+            if dataset == "adult" and not alpha in alphas_adult:
+                continue
+
             for model_name in model_names:
                 args = {
                     "dataset": dataset,
@@ -745,10 +745,10 @@ def experiment2():
         "LGBMClassifier",
         "FairGBMClassifier",
         "FairGBMClassifier_eod",
-        "MMBFair",
-        "MMBFair_grad",
-        "MMBFair_eod",
-        "MMBFair_grad_eod",
+        "M2FGB",
+        "M2FGB_grad",
+        "M2FGB_eod",
+        "M2FGB_grad_eod",
     ]
     alphas = [0.75]
     for dataset in datasets:
@@ -766,15 +766,15 @@ def experiment2():
 
 
 def experiment3():
-    datasets = ["compas", "adult"]
+    datasets = ["german", "compas", "adult"]
     model_names = [
         "LGBMClassifier",
         "FairGBMClassifier",
-        #"FairGBMClassifier_eod",
-        "MMBFair",
-        "MMBFair_grad",
-        #"MMBFair_eod",
-        #"MMBFair_grad_eod",
+        "FairGBMClassifier_eod",
+        "M2FGB",
+        "M2FGB_grad",
+        "M2FGB_eod",
+        "M2FGB_grad_eod",
     ]
     alphas = [0.75]
     for dataset in datasets:
@@ -792,17 +792,16 @@ def experiment3():
 
 
 def experiment4():
-    datasets = ["adult"]
+    datasets = ["german", "compas", "adult"]
     model_names = [
-        #"LGBMClassifier",
-        #"FairGBMClassifier",
-        #"MMBFair",
-        #"MMBFair_grad",
-        "FairClassifier",
+        "LGBMClassifier",
+        "FairGBMClassifier",
         "FairGBMClassifier_eod",
-        "MMBFair_eod",
-        "MMBFair_grad_eod",
-        # "ExponentiatedGradient",  # TODO
+        "FairClassifier",
+        "M2FGB",
+        "M2FGB_grad",
+        "M2FGB_eod",
+        "M2FGB_grad_eod",
     ]
     goals = [0.95]
     for dataset in datasets:
@@ -842,16 +841,17 @@ def experiment5():
                 print(f"{dataset} {model_name} {alpha}")
                 run_group_experiment(args)
 
+
 def main():
     experiment1()  # (binary groups)
 
-    #experiment2()  # (4 groups)
+    experiment2()  # (4 groups)
 
-    #experiment3()  # (8 groups)
+    experiment3()  # (8 groups)
 
-    #experiment4() # (fairness goal)
-
-    #experiment5() # (SPD)
+    experiment4() # (fairness goal)
+    
+    experiment5() # (SPD)
 
 
 if __name__ == "__main__":
