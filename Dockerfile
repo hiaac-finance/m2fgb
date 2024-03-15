@@ -42,4 +42,22 @@ RUN pip install numpy \
     tqdm \
     lightgbm
 
+# Install jupyter
+RUN pip install jupyter \
+    jupyterlab  \
+    notebook
+
+# docker build -t m2fgb:$USER -f Dockerfile --build-arg OUTSIDE_GROUP=`/usr/bin/id -ng $USER` --build-arg OUTSIDE_GID=`/usr/bin/id -g $USER` --build-arg OUTSIDE_USER=$USER --build-arg OUTSIDE_UID=$UID .
+
+# Without jupyter:
+# docker run -it --userns=host --name m2fgb -v /work/$USER:/work/$USER m2fgb:$USER  /bin/bash
+
+# With jupyter:
+# docker run -it --userns=host --name m2fgb -v /work/$USER:/work/$USER -p 30001:30001 m2fgb:$USER  /bin/bash
+
+# To enter the container as non-root:
+# docker exec -ti -u $USER m2fgb bash
+
+# To run jupyter:
+# docker exec -ti -u $USER m2fgb bash -c "jupyter-lab --port 30001 --ip 0.0.0.0"
 
