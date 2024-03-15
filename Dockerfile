@@ -61,3 +61,5 @@ RUN pip install jupyter \
 # To run jupyter:
 # docker exec -ti -u $USER m2fgb bash -c "jupyter-lab --port 30001 --ip 0.0.0.0"
 
+#testando 
+
