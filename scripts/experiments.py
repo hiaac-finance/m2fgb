@@ -479,8 +479,8 @@ def run_fairness_goal_experiment(args):
         )
 
         # Define sensitive attribute from gender and age
-        A_train, A_val, A_test = get_group_feature(
-            args["dataset"], X_train, X_val, X_test
+        A_train, A_val, A_test = get_subgroup_feature(
+            args["dataset"], X_train, X_val, X_test, args["n_groups"]
         )
 
         preprocess = Pipeline([("preprocess", col_trans)])
