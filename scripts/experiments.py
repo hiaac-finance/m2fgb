@@ -195,123 +195,118 @@ def get_param_spaces(model_name):
         return models.PARAM_SPACES["FairClassifier"]
 
 
-def get_group_feature(dataset, X_train, X_val, X_test):
-    """Function to get the sensitive attribute that defines binary group."""
-    if dataset == "german":
-        A_train = X_train.Gender.astype(str)
-        A_val = X_val.Gender.astype(str)
-        A_test = X_test.Gender.astype(str)
-    elif dataset == "adult":
-        A_train = X_train.sex.astype(str)
-        A_val = X_val.sex.astype(str)
-        A_test = X_test.sex.astype(str)
-    elif dataset == "compas":
-        A_train = X_train.race == "Caucasian"
-        A_val = X_val.race == "Caucasian"
-        A_test = X_test.race == "Caucasian"
+def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
+    assert n_groups in [2, 4, 8]
+    if n_groups == 2:
+        if dataset == "german":
+            A_train = X_train.Gender.astype(str)
+            A_val = X_val.Gender.astype(str)
+            A_test = X_test.Gender.astype(str)
+        elif dataset == "adult":
+            A_train = X_train.sex.astype(str)
+            A_val = X_val.sex.astype(str)
+            A_test = X_test.sex.astype(str)
+        elif dataset == "compas":
+            A_train = X_train.race == "Caucasian"
+            A_val = X_val.race == "Caucasian"
+            A_test = X_test.race == "Caucasian"
 
-    sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
-    A_train = A_train.map(sensitive_map)
-    A_val = A_val.map(sensitive_map)
-    A_test = A_test.map(sensitive_map)
-    return A_train, A_val, A_test
-
-
-def get_subgroup1_feature(dataset, X_train, X_val, X_test):
-    """Function to get the sensitive attribute that defines 4 groups."""
-    if dataset == "german":
-        A_train = X_train.Gender.astype(str) + "_" + (X_train.Age > 50).astype(str)
-        A_val = X_val.Gender.astype(str) + "_" + (X_val.Age > 50).astype(str)
-        A_test = X_test.Gender.astype(str) + "_" + (X_test.Age > 50).astype(str)
-    elif dataset == "compas":
-        A_train = (
-            (X_train.race == "Caucasian").astype(str)
-            + "_"
-            + (
-                (X_train.age_cat == "25 - 45") | (X_train.age_cat == "Less than 25")
-            ).astype(str)
-        )
-        A_val = (
-            (X_val.race == "Caucasian").astype(str)
-            + "_"
-            + ((X_val.age_cat == "25 - 45") | (X_val.age_cat == "Less than 25")).astype(
-                str
+    elif n_groups == 4:
+        if dataset == "german":
+            A_train = X_train.Gender.astype(str) + "_" + (X_train.Age > 50).astype(str)
+            A_val = X_val.Gender.astype(str) + "_" + (X_val.Age > 50).astype(str)
+            A_test = X_test.Gender.astype(str) + "_" + (X_test.Age > 50).astype(str)
+        elif dataset == "compas":
+            A_train = (
+                (X_train.race == "Caucasian").astype(str)
+                + "_"
+                + (
+                    (X_train.age_cat == "25 - 45") | (X_train.age_cat == "Less than 25")
+                ).astype(str)
             )
-        )
-        A_test = (
-            (X_test.race == "Caucasian").astype(str)
-            + "_"
-            + (
-                (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
-            ).astype(str)
-        )
-    elif dataset == "adult":
-        A_train = X_train.sex.astype(str) + "_" + (X_train.age > 50).astype(str)
-        A_val = X_val.sex.astype(str) + "_" + (X_val.age > 50).astype(str)
-        A_test = X_test.sex.astype(str) + "_" + (X_test.age > 50).astype(str)
-
-    sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
-    A_train = A_train.map(sensitive_map)
-    A_val = A_val.map(sensitive_map)
-    A_test = A_test.map(sensitive_map)
-    return A_train, A_val, A_test
-
-
-def get_subgroup2_feature(dataset, X_train, X_val, X_test):
-    """Function to get the sensitive attribute that defines 8 groups."""
-
-    def age_cat(age):
-        if age < 30:
-            return "1"
-        elif age < 40:
-            return "2"
-        elif age < 50:
-            return "3"
-        else:
-            return "4"
-
-    def race_cat(race):
-        if race == "African-American" or race == "Hispanic":
-            return "1"
-        elif race == "Caucasian":
-            return "2"
-        elif race == "Asian":
-            return "3"
-        else:
-            return "4"
-
-    if dataset == "german":
-        A_train = (
-            X_train.Gender.astype(str) + "_" + X_train.Age.apply(age_cat).astype(str)
-        )
-        A_val = X_val.Gender.astype(str) + "_" + X_val.Age.apply(age_cat).astype(str)
-        A_test = X_test.Gender.astype(str) + "_" + X_test.Age.apply(age_cat).astype(str)
-    elif dataset == "adult":
-        A_train = X_train.sex.astype(str) + "_" + X_train.age.apply(age_cat).astype(str)
-        A_val = X_val.sex.astype(str) + "_" + X_val.age.apply(age_cat).astype(str)
-        A_test = X_test.sex.astype(str) + "_" + X_test.age.apply(age_cat).astype(str)
-    elif dataset == "compas":
-        A_train = (
-            X_train.race.apply(race_cat)
-            + "_"
-            + (
-                (X_train.age_cat == "25 - 45") | (X_train.age_cat == "Less than 25")
-            ).astype(str)
-        )
-        A_val = (
-            X_val.race.apply(race_cat)
-            + "_"
-            + ((X_val.age_cat == "25 - 45") | (X_val.age_cat == "Less than 25")).astype(
-                str
+            A_val = (
+                (X_val.race == "Caucasian").astype(str)
+                + "_"
+                + (
+                    (X_val.age_cat == "25 - 45") | (X_val.age_cat == "Less than 25")
+                ).astype(str)
             )
-        )
-        A_test = (
-            X_test.race.apply(race_cat)
-            + "_"
-            + (
-                (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
-            ).astype(str)
-        )
+            A_test = (
+                (X_test.race == "Caucasian").astype(str)
+                + "_"
+                + (
+                    (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
+                ).astype(str)
+            )
+        elif dataset == "adult":
+            A_train = X_train.sex.astype(str) + "_" + (X_train.age > 50).astype(str)
+            A_val = X_val.sex.astype(str) + "_" + (X_val.age > 50).astype(str)
+            A_test = X_test.sex.astype(str) + "_" + (X_test.age > 50).astype(str)
+
+    elif n_groups == 8:
+
+        def age_cat(age):
+            if age < 30:
+                return "1"
+            elif age < 40:
+                return "2"
+            elif age < 50:
+                return "3"
+            else:
+                return "4"
+
+        def race_cat(race):
+            if race == "African-American" or race == "Hispanic":
+                return "1"
+            elif race == "Caucasian":
+                return "2"
+            elif race == "Asian":
+                return "3"
+            else:
+                return "4"
+
+        if dataset == "german":
+            A_train = (
+                X_train.Gender.astype(str)
+                + "_"
+                + X_train.Age.apply(age_cat).astype(str)
+            )
+            A_val = (
+                X_val.Gender.astype(str) + "_" + X_val.Age.apply(age_cat).astype(str)
+            )
+            A_test = (
+                X_test.Gender.astype(str) + "_" + X_test.Age.apply(age_cat).astype(str)
+            )
+        elif dataset == "adult":
+            A_train = (
+                X_train.sex.astype(str) + "_" + X_train.age.apply(age_cat).astype(str)
+            )
+            A_val = X_val.sex.astype(str) + "_" + X_val.age.apply(age_cat).astype(str)
+            A_test = (
+                X_test.sex.astype(str) + "_" + X_test.age.apply(age_cat).astype(str)
+            )
+        elif dataset == "compas":
+            A_train = (
+                X_train.race.apply(race_cat)
+                + "_"
+                + (
+                    (X_train.age_cat == "25 - 45") | (X_train.age_cat == "Less than 25")
+                ).astype(str)
+            )
+            A_val = (
+                X_val.race.apply(race_cat)
+                + "_"
+                + (
+                    (X_val.age_cat == "25 - 45") | (X_val.age_cat == "Less than 25")
+                ).astype(str)
+            )
+            A_test = (
+                X_test.race.apply(race_cat)
+                + "_"
+                + (
+                    (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
+                ).astype(str)
+            )
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
     A_train = A_train.map(sensitive_map)
@@ -360,94 +355,6 @@ def eval_model(y_true, y_score, y_pred, A):
     return metrics
 
 
-def run_group_experiment(args):
-    # create output directory if not exists
-    if not os.path.exists(args["output_dir"]):
-        os.makedirs(args["output_dir"])
-    # clear best_params.txt if exists
-    if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
-        os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
-    results = []
-
-    col_trans = ColumnTransformer(
-        [
-            ("numeric", StandardScaler(), data.NUM_FEATURES[args["dataset"]]),
-            (
-                "categorical",
-                OneHotEncoder(
-                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
-                ),
-                data.CAT_FEATURES[args["dataset"]],
-            ),
-        ],
-        verbose_feature_names_out=False,
-    )
-    col_trans.set_output(transform="pandas")
-
-    scorer = utils.get_combined_metrics_scorer(
-        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric="eod"
-    )
-
-    for i in tqdm(range(10)):
-        # Load and prepare data
-        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
-            args["dataset"], i, SEED
-        )
-
-        # Define sensitive attribute from gender and age
-        A_train, A_val, A_test = get_group_feature(
-            args["dataset"], X_train, X_val, X_test
-        )
-
-        preprocess = Pipeline([("preprocess", col_trans)])
-        preprocess.fit(X_train)
-        X_train = preprocess.transform(X_train)
-        X_val = preprocess.transform(X_val)
-        X_test = preprocess.transform(X_test)
-
-        model_class = get_model(args["model_name"], random_state=SEED)
-        study = optuna.create_study(direction="maximize")
-        objective = lambda trial: run_trial(
-            trial,
-            scorer,
-            X_train,
-            Y_train,
-            A_train,
-            X_val,
-            Y_val,
-            A_val,
-            model_class,
-            get_param_spaces(args["model_name"]),
-        )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
-        best_params = study.best_params.copy()
-
-        model = model_class(**study.best_params)
-        if isinstance(model, FairGBMClassifier):
-            model.fit(X_train, Y_train, constraint_group=A_train)
-        elif isinstance(model, LGBMClassifier):
-            model.fit(X_train, Y_train)
-        else:
-            model.fit(X_train, Y_train, A_train)
-
-        y_val_score = model.predict_proba(X_val)[:, 1]
-        thresh = utils.get_best_threshold(Y_val, y_val_score)
-        y_test_score = model.predict_proba(X_test)[:, 1]
-        y_test_pred = y_test_score > thresh
-        metrics = eval_model(Y_test, y_test_score, y_test_pred, A_test)
-
-        best_params["threshold"] = thresh
-        # save results of fold
-        joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
-        with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
-            f.write(str(best_params))
-            f.write("\n")
-        results.append(metrics)
-
-    results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results.csv"), index=False)
-
-
 def run_subgroup_experiment(args):
     # create output directory if not exists
     if not os.path.exists(args["output_dir"]):
@@ -483,8 +390,8 @@ def run_subgroup_experiment(args):
         )
 
         # Define sensitive attribute from gender and age
-        A_train, A_val, A_test = get_subgroup1_feature(
-            args["dataset"], X_train, X_val, X_test
+        A_train, A_val, A_test = get_subgroup_feature(
+            args["dataset"], X_train, X_val, X_test, args["n_groups"]
         )
 
         preprocess = Pipeline([("preprocess", col_trans)])
@@ -623,92 +530,6 @@ def run_fairness_goal_experiment(args):
     results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
 
-def run_subgroup2_experiment(args):
-    # create output directory if not exists
-    if not os.path.exists(args["output_dir"]):
-        os.makedirs(args["output_dir"])
-    # clear best_params.txt if exists
-    if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
-        os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
-    results = []
-
-    col_trans = ColumnTransformer(
-        [
-            ("numeric", StandardScaler(), data.NUM_FEATURES[args["dataset"]]),
-            (
-                "categorical",
-                OneHotEncoder(
-                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
-                ),
-                data.CAT_FEATURES[args["dataset"]],
-            ),
-        ],
-        verbose_feature_names_out=False,
-    )
-    col_trans.set_output(transform="pandas")
-
-    scorer = utils.get_combined_metrics_scorer(
-        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric="eod"
-    )
-
-    for i in tqdm(range(10)):
-        # Load and prepare data
-        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
-            args["dataset"], i, SEED
-        )
-
-        # Define sensitive attribute from gender and age
-        A_train, A_val, A_test = get_subgroup2_feature(
-            args["dataset"], X_train, X_val, X_test
-        )
-
-        preprocess = Pipeline([("preprocess", col_trans)])
-        preprocess.fit(X_train)
-        X_train = preprocess.transform(X_train)
-        X_val = preprocess.transform(X_val)
-        X_test = preprocess.transform(X_test)
-
-        model_class = get_model(args["model_name"], random_state=SEED)
-        study = optuna.create_study(direction="maximize")
-        objective = lambda trial: run_trial(
-            trial,
-            scorer,
-            X_train,
-            Y_train,
-            A_train,
-            X_val,
-            Y_val,
-            A_val,
-            model_class,
-            get_param_spaces(args["model_name"]),
-        )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
-        best_params = study.best_params.copy()
-
-        model = model_class(**study.best_params)
-        if isinstance(model, FairGBMClassifier):
-            model.fit(X_train, Y_train, constraint_group=A_train)
-        elif isinstance(model, LGBMClassifier):
-            model.fit(X_train, Y_train)
-        else:
-            model.fit(X_train, Y_train, A_train)
-        y_val_score = model.predict_proba(X_val)[:, 1]
-        thresh = utils.get_best_threshold(Y_val, y_val_score)
-        y_test_score = model.predict_proba(X_test)[:, 1]
-        y_test_pred = y_test_score > thresh
-        metrics = eval_model(Y_test, y_test_score, y_test_pred, A_test)
-        best_params["threshold"] = thresh
-        joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
-        # save best params
-        with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
-            f.write(str(best_params))
-            f.write("\n")
-        results.append(metrics)
-
-    results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results.csv"), index=False)
-
-
 def experiment1():
     datasets = ["german", "compas", "adult"]
     model_names = [
@@ -734,9 +555,10 @@ def experiment1():
                     "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
                     "model_name": model_name,
                     "n_trials": 50,
+                    "n_groups": 2,
                 }
                 print(f"{dataset} {model_name} {alpha}")
-                run_group_experiment(args)
+                run_subgroup_experiment(args)
 
 
 def experiment2():
@@ -760,6 +582,7 @@ def experiment2():
                     "output_dir": f"../results/subgroup_experiment/{dataset}/{model_name}_{alpha}",
                     "model_name": model_name,
                     "n_trials": 100,
+                    "n_groups" : 4,
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
@@ -786,9 +609,10 @@ def experiment3():
                     "output_dir": f"../results/subgroup2_experiment/{dataset}/{model_name}_{alpha}",
                     "model_name": model_name,
                     "n_trials": 100,
+                    "n_groups" : 8,
                 }
                 print(f"{dataset} {model_name} {alpha}")
-                run_subgroup2_experiment(args)
+                run_subgroup_experiment(args)
 
 
 def experiment4():
@@ -813,6 +637,7 @@ def experiment4():
                     "output_dir": f"../results/fairness_goal_experiment2/{dataset}/{model_name}_{goal}",
                     "model_name": model_name,
                     "n_trials": 100,
+                    "n_groups" : 2
                 }
                 print(f"{dataset} {model_name} {goal}")
                 run_fairness_goal_experiment(args)
@@ -823,8 +648,8 @@ def experiment5():
     model_names = [
         "LGBMClassifier",
         "FairClassifier_spd",
-        "MMBFair_spd",
-        "MMBFair_grad_spd",
+        "M2FGB_spd",
+        "M2FGB_grad_spd",
     ]
     alphas = [0.7]
 
@@ -837,9 +662,10 @@ def experiment5():
                     "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
                     "model_name": model_name,
                     "n_trials": 50,
+                    "n_groups" : 2,
                 }
                 print(f"{dataset} {model_name} {alpha}")
-                run_group_experiment(args)
+                run_subgroup_experiment(args)
 
 
 def main():
@@ -849,9 +675,9 @@ def main():
 
     experiment3()  # (8 groups)
 
-    experiment4() # (fairness goal)
-    
-    experiment5() # (SPD)
+    experiment4()  # (fairness goal)
+
+    experiment5()  # (SPD)
 
 
 if __name__ == "__main__":

@@ -380,7 +380,7 @@ class M2FGB_XGB(BaseEstimator, ClassifierMixin):
 
         Returns
         -------
-        XtremeFair
+        M2FGB
             Fitted model
         """
         if sensitive_attribute is None:
@@ -601,7 +601,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
 
         Returns
         -------
-        XtremeFair
+        M2FGB
             Fitted model
         """
         X, y = check_X_y(X, y)
