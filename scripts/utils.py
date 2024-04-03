@@ -63,6 +63,32 @@ def equal_opportunity_score(y_ground, y_pred, A):
     )
 
 
+def min_equal_opportunity_score(y_ground, y_pred, A):
+    """Calculate the minimum true positive rate of the groups.
+    Return 1 - tpr so that the lowest the better.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        Equal opportunity score score
+    """
+    min_tpr = np.inf
+    for a in np.unique(A):
+        tpr = np.mean(y_pred[(A == a) & (y_ground == 1)])
+        min_tpr = min(min_tpr, tpr)
+    return 1 - min_tpr
+
+
 def statistical_parity_score(y_ground, y_pred, A):
     """Calculate the difference between probability of true outcome of the groups.
     If A has two values, it must be 0 and 1, and it can also be applied to more than two groups (the result is the difference between the max value and min value).
@@ -91,6 +117,56 @@ def statistical_parity_score(y_ground, y_pred, A):
 
     return np.mean(y_pred[A == 1]) - np.mean(y_pred[A == 0])
 
+def min_statistical_parity_score(y_ground, y_pred, A):
+    """Calculate the minimum probability of true outcome of the groups.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        Statistical parity score
+    """
+    min_pr = np.inf
+    
+    for a in np.unique(A):
+        pr = np.mean(y_pred[A == a])
+        min_pr = min(min_pr, pr)
+    return 1 - min_pr
+
+
+def min_roc_auc_score(y_ground, y_pred, A):
+    """Calculate the minimum roc auc score of the groups.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        roc auc score
+    """
+    min_roc_auc = np.inf
+    for a in np.unique(A):
+        roc_auc = roc_auc_score(y_ground[A == a], y_pred[A == a])
+        min_roc_auc = min(min_roc_auc, roc_auc)
+    return 1 - min_roc_auc
+
 
 def get_combined_metrics_scorer(
     alpha=1, performance_metric="acc", fairness_metric="eod"
@@ -107,6 +183,10 @@ def get_combined_metrics_scorer(
             fair = equal_opportunity_score(y_ground, y_pred, A)
         elif fairness_metric == "spd":
             fair = statistical_parity_score(y_ground, y_pred, A)
+        elif fairness_metric == "min_eod":
+            fair = min_equal_opportunity_score(y_ground, y_pred, A)
+        elif fairness_metric == "min_spd":
+            fair = min_statistical_parity_score(y_ground, y_pred, A)
 
         return alpha * perf + (1 - alpha) * (1 - abs(fair))
 
@@ -187,4 +267,3 @@ def equalized_loss_score(y_ground, y_prob, A):
 
 def logloss_score(y_ground, y_pred):
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
-

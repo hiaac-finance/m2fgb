@@ -55,6 +55,7 @@ def run_trial(
     A_val,
     model_class,
     param_space,
+    args,
 ):
     """Function to run a single trial of optuna."""
     params = {}
@@ -78,7 +79,10 @@ def run_trial(
         model.fit(X_train, Y_train, A_train)
 
     Y_val_score = model.predict_proba(X_val)[:, 1]
-    thresh = utils.get_best_threshold(Y_val, Y_val_score)
+    if args["thresh"] == "ks":
+        thresh = utils.get_best_threshold(Y_val, Y_val_score)
+    else:
+        thresh = 0.5
     Y_val_pred = Y_val_score > thresh
     return scorer(Y_val, Y_val_pred, A_val)
 
@@ -413,6 +417,7 @@ def run_subgroup_experiment(args):
             A_val,
             model_class,
             get_param_spaces(args["model_name"]),
+            args,
         )
         study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
         best_params = study.best_params.copy()
@@ -502,6 +507,7 @@ def run_fairness_goal_experiment(args):
             A_val,
             model_class,
             get_param_spaces(args["model_name"]),
+            args,
         )
         study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
         best_params = study.best_params.copy()
@@ -582,7 +588,7 @@ def experiment2():
                     "output_dir": f"../results/subgroup_experiment/{dataset}/{model_name}_{alpha}",
                     "model_name": model_name,
                     "n_trials": 100,
-                    "n_groups" : 4,
+                    "n_groups": 4,
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
@@ -609,7 +615,7 @@ def experiment3():
                     "output_dir": f"../results/subgroup2_experiment/{dataset}/{model_name}_{alpha}",
                     "model_name": model_name,
                     "n_trials": 100,
-                    "n_groups" : 8,
+                    "n_groups": 8,
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
@@ -637,7 +643,7 @@ def experiment4():
                     "output_dir": f"../results/fairness_goal_experiment2/{dataset}/{model_name}_{goal}",
                     "model_name": model_name,
                     "n_trials": 100,
-                    "n_groups" : 2
+                    "n_groups": 2,
                 }
                 print(f"{dataset} {model_name} {goal}")
                 run_fairness_goal_experiment(args)
@@ -662,7 +668,7 @@ def experiment5():
                     "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
                     "model_name": model_name,
                     "n_trials": 50,
-                    "n_groups" : 2,
+                    "n_groups": 2,
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
