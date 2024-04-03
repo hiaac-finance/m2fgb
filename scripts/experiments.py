@@ -430,7 +430,10 @@ def run_subgroup_experiment(args):
         else:
             model.fit(X_train, Y_train, A_train)
         y_val_score = model.predict_proba(X_val)[:, 1]
-        thresh = utils.get_best_threshold(Y_val, y_val_score)
+        if args["thresh"] == "ks":
+            thresh = utils.get_best_threshold(Y_val, y_val_score)
+        else:
+            thresh = 0.5
         y_test_score = model.predict_proba(X_test)[:, 1]
         y_test_pred = y_test_score > thresh
         metrics = eval_model(Y_test, y_test_score, y_test_pred, A_test)
@@ -520,7 +523,10 @@ def run_fairness_goal_experiment(args):
         else:
             model.fit(X_train, Y_train, A_train)
         y_val_score = model.predict_proba(X_val)[:, 1]
-        thresh = utils.get_best_threshold(Y_val, y_val_score)
+        if args["thresh"] == "ks":
+            thresh = utils.get_best_threshold(Y_val, y_val_score)
+        else:
+            thresh = 0.5
         y_test_score = model.predict_proba(X_test)[:, 1]
         y_test_pred = y_test_score > thresh
         metrics = eval_model(Y_test, y_test_score, y_test_pred, A_test)
