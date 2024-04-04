@@ -143,8 +143,9 @@ def min_statistical_parity_score(y_ground, y_pred, A):
     return 1 - min_pr
 
 
-def min_roc_auc_score(y_ground, y_pred, A):
-    """Calculate the minimum roc auc score of the groups.
+def min_balanced_accuracy(y_ground, y_pred, A):
+    """Calculate the minimum balanced accuracy among groups.
+    It will return 1 - bal_acc so that values close to 0 are better.
     It work with multiple groups.
 
     Parameters
@@ -152,20 +153,20 @@ def min_roc_auc_score(y_ground, y_pred, A):
     y_ground : ndarray
         Ground truth labels in {0, 1}
     y_prob : ndarray
-        Predicted probabilities of the positive class
+        Predicted class
     A : ndarray
         Group labels
 
     Returns
     -------
     float
-        roc auc score
+        1 - Minimum balanced accuracy
     """
-    min_roc_auc = np.inf
+    min_bal_acc = np.inf
     for a in np.unique(A):
-        roc_auc = roc_auc_score(y_ground[A == a], y_pred[A == a])
-        min_roc_auc = min(min_roc_auc, roc_auc)
-    return 1 - min_roc_auc
+        bal_acc = balanced_accuracy_score(y_ground[A == a], y_pred[A == a])
+        min_bal_acc = min(min_bal_acc, bal_acc)
+    return 1 - min_bal_acc
 
 
 def get_combined_metrics_scorer(
@@ -187,6 +188,8 @@ def get_combined_metrics_scorer(
             fair = min_equal_opportunity_score(y_ground, y_pred, A)
         elif fairness_metric == "min_spd":
             fair = min_statistical_parity_score(y_ground, y_pred, A)
+        elif fairness_metric == "min_bal_acc":
+            fair = min_balanced_accuracy(y_ground, y_pred, A)
 
         return alpha * perf + (1 - alpha) * (1 - abs(fair))
 

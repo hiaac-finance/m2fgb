@@ -384,7 +384,7 @@ def run_subgroup_experiment(args):
     col_trans.set_output(transform="pandas")
 
     scorer = utils.get_combined_metrics_scorer(
-        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric="eod"
+        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric=args["fairness_metric"]
     )
 
     for i in tqdm(range(10)):
@@ -568,6 +568,7 @@ def experiment1():
                     "model_name": model_name,
                     "n_trials": 50,
                     "n_groups": 2,
+                    "fairness_metric" : "eod"
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
@@ -595,6 +596,7 @@ def experiment2():
                     "model_name": model_name,
                     "n_trials": 100,
                     "n_groups": 4,
+                    "fairness_metric" : "eod",
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
@@ -622,6 +624,7 @@ def experiment3():
                     "model_name": model_name,
                     "n_trials": 100,
                     "n_groups": 8,
+                    "fairness_metric" : "eod",
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
@@ -650,6 +653,7 @@ def experiment4():
                     "model_name": model_name,
                     "n_trials": 100,
                     "n_groups": 2,
+                    "fairness_metric" : "eod",
                 }
                 print(f"{dataset} {model_name} {goal}")
                 run_fairness_goal_experiment(args)
@@ -675,6 +679,7 @@ def experiment5():
                     "model_name": model_name,
                     "n_trials": 50,
                     "n_groups": 2,
+                    "fairness_metric" : "eod",
                 }
                 print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
