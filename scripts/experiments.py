@@ -366,7 +366,10 @@ def run_subgroup_experiment(args):
     # clear best_params.txt if exists
     if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
         os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
-    results = []
+    results_train = []
+    results_val = []
+    results_test = []
+    
 
     col_trans = ColumnTransformer(
         [
@@ -387,10 +390,10 @@ def run_subgroup_experiment(args):
         alpha=args["alpha"], performance_metric="bal_acc", fairness_metric=args["fairness_metric"]
     )
 
-    for i in tqdm(range(10)):
+    for i in tqdm(range(args["n_folds"])):
         # Load and prepare data
         X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
-            args["dataset"], i, SEED
+            args["dataset"], i, args["n_folds"], SEED
         )
 
         # Define sensitive attribute from gender and age
@@ -429,24 +432,40 @@ def run_subgroup_experiment(args):
             model.fit(X_train, Y_train)
         else:
             model.fit(X_train, Y_train, A_train)
+
+        y_train_score = model.predict_proba(X_train)[:, 1]
         y_val_score = model.predict_proba(X_val)[:, 1]
+        y_test_score = model.predict_proba(X_test)[:, 1]
         if args["thresh"] == "ks":
             thresh = utils.get_best_threshold(Y_val, y_val_score)
         else:
             thresh = 0.5
-        y_test_score = model.predict_proba(X_test)[:, 1]
+        
+        y_train_pred = y_train_score > thresh
+        y_val_pred = y_val_score > thresh
         y_test_pred = y_test_score > thresh
-        metrics = eval_model(Y_test, y_test_score, y_test_pred, A_test)
+
         best_params["threshold"] = thresh
         joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
-        # save best params
         with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
             f.write(str(best_params))
             f.write("\n")
-        results.append(metrics)
 
-    results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results.csv"), index=False)
+        metrics_train = eval_model(Y_train, y_train_score, y_train_pred, A_train)
+        metrics_val = eval_model(Y_val, y_val_score, y_val_pred, A_val)
+        metrics_test = eval_model(Y_test, y_test_score, y_test_pred, A_test)
+        
+        results_train.append(metrics_train)
+        results_val.append(metrics_val)
+        results_test.append(metrics_test)
+        
+        
+    results_train = pd.DataFrame(results_train)
+    results_val = pd.DataFrame(results_val)
+    results_test = pd.DataFrame(results_test)
+    results_train.to_csv(os.path.join(args["output_dir"], "results_train.csv"), index=False)
+    results_val.to_csv(os.path.join(args["output_dir"], "results_val.csv"), index=False)
+    results_test.to_csv(os.path.join(args["output_dir"], "results.csv"), index=False)
 
 
 def run_fairness_goal_experiment(args):

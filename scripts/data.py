@@ -102,14 +102,14 @@ def load_dataset(dataset):
         raise ValueError(f"Unknown dataset {dataset}")
 
 
-def get_fold(dataset, fold, random_state=None):
+def get_fold(dataset, fold, n_folds = 10, random_state=None):
     X, Y = load_dataset(dataset)
-    kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=random_state)
+    kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
     for i, (train_index, test_index) in enumerate(kf.split(X, Y)):
         if i == fold:
             X_train, Y_train = X.iloc[train_index], Y.iloc[train_index]
             X_train, X_val, Y_train, Y_val = train_test_split(
-                X_train, Y_train, test_size=1 / 9, random_state=random_state
+                X_train, Y_train, test_size=1 / (n_folds - 1), random_state=random_state
             )
             X_test, Y_test = X.iloc[test_index], Y.iloc[test_index]
             return X_train, Y_train, X_val, Y_val, X_test, Y_test
