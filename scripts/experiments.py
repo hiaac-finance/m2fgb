@@ -313,6 +313,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             )
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
+    print(sensitive_map)
     A_train = A_train.map(sensitive_map)
     A_val = A_val.map(sensitive_map)
     A_test = A_test.map(sensitive_map)

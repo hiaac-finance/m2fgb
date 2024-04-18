@@ -149,6 +149,8 @@ def logloss_group(predt, dtrain, subgroup, fairness_constraint):
         loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
         loss[y == 0] = 0  # only consider the loss of the positive class
 
+    # loss = np.array([np.mean(loss[subgroup == g]) for g in np.unique(subgroup)])
+    # return loss
     groups = np.unique(subgroup)
 
     loss_matrix = np.zeros((len(y), len(groups)))
@@ -584,8 +586,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         self.min_child_weight = min_child_weight
         self.reg_lambda = reg_lambda
         self.random_state = random_state
-        self.group_losses = []
-        self.mu_opt_list = [None]
+        
 
     def fit(self, X, y, sensitive_attribute):
         """Fit the model to the data.
@@ -606,6 +607,8 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         """
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
+        self.group_losses = []
+        self.mu_opt_list = [None]
         dtrain = lgb.Dataset(X, label=y)
 
         params = {
