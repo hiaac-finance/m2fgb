@@ -9,6 +9,26 @@ from sklearn.metrics import (
     balanced_accuracy_score,
 )
 
+import logging
+
+
+class CustomLogger(logging.Logger):
+    """Custom logger to suppress warnings from LightGBM (due to a bug, verbose does not supress)"""
+
+    def __init__(self):
+        self.logger = logging.getLogger("lightgbm_custom")
+        self.logger.setLevel(logging.ERROR)
+
+    def info(self, message):
+        self.logger.info(message)
+
+    def warning(self, message):
+        # Suppress warnings by not doing anything
+        pass
+
+    def error(self, message):
+        self.logger.error(message)
+
 
 def get_best_threshold(y_ground, y_pred):
     """Calculates the threshold according to the KS statistic"""
@@ -117,6 +137,7 @@ def statistical_parity_score(y_ground, y_pred, A):
 
     return np.mean(y_pred[A == 1]) - np.mean(y_pred[A == 0])
 
+
 def min_statistical_parity_score(y_ground, y_pred, A):
     """Calculate the minimum probability of true outcome of the groups.
     It work with multiple groups.
@@ -136,7 +157,7 @@ def min_statistical_parity_score(y_ground, y_pred, A):
         Statistical parity score
     """
     min_pr = np.inf
-    
+
     for a in np.unique(A):
         pr = np.mean(y_pred[A == a])
         min_pr = min(min_pr, pr)

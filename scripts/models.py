@@ -13,24 +13,12 @@ from fairlearn.reductions import (
 from sklego.linear_model import DemographicParityClassifier, EqualOpportunityClassifier
 from sklearn.linear_model import LogisticRegression
 
-import logging
-class CustomLogger:
-    def __init__(self):
-        self.logger = logging.getLogger('lightgbm_custom')
-        self.logger.setLevel(logging.ERROR)
-
-    def info(self, message):
-        self.logger.info(message)
-
-    def warning(self, message):
-        # Suppress warnings by not doing anything
-        pass
-
-    def error(self, message):
-        self.logger.error(message)
+import utils
 import lightgbm as lgb
-lgb.register_logger(CustomLogger())
+import fairgbm
 
+lgb.register_logger(utils.CustomLogger())
+fairgbm.register_logger(utils.CustomLogger())
 
 PARAM_SPACES = {
     "M2FGB_XGB": {
@@ -112,11 +100,11 @@ PARAM_SPACES = {
         "max_depth": {"type": "int", "low": 2, "high": 10},
         "criterion": {"type": "str", "options": ["gini", "entropy"]},
     },
-    "FairClassifier" : {
+    "FairClassifier": {
         "covariance_threshold": {"type": "float", "low": 0.1, "high": 1, "log": True},
         "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
-        "penalty" : {"type": "str", "options": ["none", "l1"]},
-    }
+        "penalty": {"type": "str", "options": ["none", "l1"]},
+    },
 }
 
 
@@ -531,7 +519,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
     """Classifier that modifies LGBM to incorporate min-max fairness optimization.
     It shares many of the parameters with LGBM to control learning and decision trees.
     The fairness metrics impelemented are "equalized_loss", "equal_opportunity", and "demographic_parity".
-    
+
     Parameters
     ----------
     fairness_constraint : str, optional
@@ -586,7 +574,6 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         self.min_child_weight = min_child_weight
         self.reg_lambda = reg_lambda
         self.random_state = random_state
-        
 
     def fit(self, X, y, sensitive_attribute):
         """Fit the model to the data.
@@ -659,7 +646,6 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         return preds
 
 
-
 class ExponentiatedGradient_Wrap(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
@@ -720,14 +706,15 @@ class ExponentiatedGradient_Wrap(BaseEstimator, ClassifierMixin):
         X = check_array(X)
         return self.model_.predict_proba(X)
 
+
 class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
-        fairness_constraint = "equal_opportunity",
-        covariance_threshold = 0.1,
-        C = 1.0,
-        penalty = "l1",
-        max_iter = 100,
+        fairness_constraint="equal_opportunity",
+        covariance_threshold=0.1,
+        C=1.0,
+        penalty="l1",
+        max_iter=100,
         random_state=None,
     ):
         assert fairness_constraint in [
@@ -745,28 +732,28 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
         X, y = check_X_y(X, y)
         # insert sensitive attribute as first column of the dataframe
         X = X.copy()
-        X = np.insert(X, 0, sensitive_attribute, axis = 1)
+        X = np.insert(X, 0, sensitive_attribute, axis=1)
         self.classes_ = np.unique(y)
         if self.fairness_constraint == "equal_opportunity":
             self.model_ = EqualOpportunityClassifier(
                 covariance_threshold=self.covariance_threshold,
-                positive_target = 1,
+                positive_target=1,
                 C=self.C,
-                sensitive_cols = 0,
+                sensitive_cols=0,
                 penalty=self.penalty,
                 max_iter=self.max_iter,
-                train_sensitive_cols = False,
+                train_sensitive_cols=False,
             )
         elif self.fairness_constraint == "demographic_parity":
             self.model_ = DemographicParityClassifier(
                 covariance_threshold=self.covariance_threshold,
                 C=self.C,
-                sensitive_cols = 0,
+                sensitive_cols=0,
                 penalty=self.penalty,
                 max_iter=self.max_iter,
-                train_sensitive_cols = False,
+                train_sensitive_cols=False,
             )
-        
+
         try:
             self.model_.fit(X, y)
         except:
@@ -776,7 +763,7 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
                 penalty=self.penalty,
                 max_iter=self.max_iter,
                 random_state=self.random_state,
-                solver = "saga"
+                solver="saga",
             )
             self.model_.fit(X, y)
         return self
@@ -786,7 +773,7 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
         X = check_array(X)
         X = X.copy()
         A = np.ones(X.shape[0])
-        X = np.insert(X, 0, A, axis = 1)
+        X = np.insert(X, 0, A, axis=1)
         return self.model_.predict(X)
 
     def predict_proba(self, X):
@@ -794,7 +781,17 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
         X = check_array(X)
         X = X.copy()
         A = np.ones(X.shape[0])
-        X = np.insert(X, 0, A, axis = 1)
+        X = np.insert(X, 0, A, axis=1)
         return self.model_.predict_proba(X)
-    
-    
+
+
+class LGBMClassifier(lgb.LGBMClassifier):
+    def fit(self, X, Y, A):
+        super().fit(X, Y)
+        return self
+
+
+class FairGBMClassifier(fairgbm.FairGBMClassifier):
+    def fit(self, X, Y, A):
+        super().fit(X, Y, constraint_group=A)
+        return self

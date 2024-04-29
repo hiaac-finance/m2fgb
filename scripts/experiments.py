@@ -6,29 +6,6 @@ import optuna
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-import logging
-
-
-class CustomLogger:
-    def __init__(self):
-        self.logger = logging.getLogger("lightgbm_custom")
-        self.logger.setLevel(logging.ERROR)
-
-    def info(self, message):
-        self.logger.info(message)
-
-    def warning(self, message):
-        # Suppress warnings by not doing anything
-        pass
-
-    def error(self, message):
-        self.logger.error(message)
-
-
-import lightgbm as lgb
-
-lgb.register_logger(CustomLogger())
-
 import os
 import data
 import models
@@ -37,8 +14,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.metrics import roc_auc_score, accuracy_score, balanced_accuracy_score
-from fairgbm import FairGBMClassifier
-from lightgbm import LGBMClassifier
 
 
 SEED = 0
@@ -71,12 +46,7 @@ def run_trial(
             params[name] = trial.suggest_float(name, **values_cp)
 
     model = model_class(**params)
-    if isinstance(model, FairGBMClassifier):
-        model.fit(X_train, Y_train, constraint_group=A_train)
-    elif isinstance(model, LGBMClassifier):
-        model.fit(X_train, Y_train)
-    else:
-        model.fit(X_train, Y_train, A_train)
+    model.fit(X_train, Y_train, A_train)
 
     Y_val_score = model.predict_proba(X_val)[:, 1]
     if args["thresh"] == "ks":
@@ -142,17 +112,17 @@ def get_model(model_name, random_state=None):
     elif model_name == "LGBMClassifier":
 
         def model(**params):
-            return LGBMClassifier(random_state=random_state, verbose=-1, **params)
+            return models.LGBMClassifier(random_state=random_state, verbose=-1, **params)
 
     elif model_name == "FairGBMClassifier":
 
         def model(**params):
-            return FairGBMClassifier(random_state=random_state, **params)
+            return models.FairGBMClassifier(random_state=random_state, **params)
 
     elif model_name == "FairGBMClassifier_eod":
 
         def model(**params):
-            return FairGBMClassifier(
+            return models.FairGBMClassifier(
                 constraint_type="FNR", random_state=random_state, **params
             )
 
@@ -427,12 +397,7 @@ def run_subgroup_experiment(args):
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
-        if isinstance(model, FairGBMClassifier):
-            model.fit(X_train, Y_train, constraint_group=A_train)
-        elif isinstance(model, LGBMClassifier):
-            model.fit(X_train, Y_train)
-        else:
-            model.fit(X_train, Y_train, A_train)
+        model.fit(X_train, Y_train, A_train)
 
         y_train_score = model.predict_proba(X_train)[:, 1]
         y_val_score = model.predict_proba(X_val)[:, 1]
@@ -536,12 +501,7 @@ def run_fairness_goal_experiment(args):
         best_params = study.best_params.copy()
 
         model = model_class(**study.best_params)
-        if isinstance(model, FairGBMClassifier):
-            model.fit(X_train, Y_train, constraint_group=A_train)
-        elif isinstance(model, LGBMClassifier):
-            model.fit(X_train, Y_train)
-        else:
-            model.fit(X_train, Y_train, A_train)
+        model.fit(X_train, Y_train, A_train)
         y_val_score = model.predict_proba(X_val)[:, 1]
         if args["thresh"] == "ks":
             thresh = utils.get_best_threshold(Y_val, y_val_score)
