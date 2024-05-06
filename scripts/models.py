@@ -44,18 +44,18 @@ PARAM_SPACES = {
         },
     },
     "M2FGB": {
-        "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
-        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "max_depth": {"type": "int", "low": 2, "high": 7},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "fair_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
     },
     "M2FGB_grad": {
-        "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
-        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "max_depth": {"type": "int", "low": 2, "high": 7},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "fair_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
         "multiplier_learning_rate": {
@@ -66,9 +66,9 @@ PARAM_SPACES = {
         },
     },
     "FairGBMClassifier": {
-        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
-        "min_child_samples": {"type": "int", "low": 5, "high": 500, "log": True},
-        "max_depth": {"type": "int", "low": 2, "high": 10},
+        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
+        "min_child_samples": {"type": "int", "low": 5, "high": 250, "log": True},
+        "max_depth": {"type": "int", "low": 2, "high": 7},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "multiplier_learning_rate": {
