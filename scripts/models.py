@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
+from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve, log_loss
 from sklearn.tree import DecisionTreeClassifier
 import xgboost as xgb
 from fairlearn.reductions import (
@@ -16,6 +16,10 @@ from sklearn.linear_model import LogisticRegression
 import utils
 import lightgbm as lgb
 import fairgbm
+
+import sys
+sys.path.append("../minimax-fair/src")
+import minmaxML as mmml
 
 lgb.register_logger(utils.CustomLogger())
 fairgbm.register_logger(utils.CustomLogger())
@@ -57,7 +61,7 @@ PARAM_SPACES = {
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 7},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
+        "fair_weight": {"type": "float", "low": 1e-2, "high": 1},
         "multiplier_learning_rate": {
             "type": "float",
             "low": 0.005,
@@ -105,15 +109,23 @@ PARAM_SPACES = {
         "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
         "penalty": {"type": "str", "options": ["none", "l1"]},
     },
+    "MinMaxFair": {
+        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
+        "gamma": {"type": "float", "low": 0, "high": 1},
+        "penalty": {"type": "str", "options": ["none", "l1"]},
+        "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
+        "a": {"type": "float", "low": 0.1, "high": 1},
+        "b": {"type": "float", "low": 1e-2, "high": 1},
+    },
 }
 
 
-def projection_to_simplex(mu, z = 1):
+def projection_to_simplex(mu, z=1):
     sorted_mu = mu[np.argsort(mu)]
     n = len(mu)
-    t =  np.mean(mu) - z / n
+    t = np.mean(mu) - z / n
     for i in range(len(mu) - 2, -1, -1):
-        t_i = np.mean(sorted_mu[(i+1):]) - z / (n - i - 1)
+        t_i = np.mean(sorted_mu[(i + 1) :]) - z / (n - i - 1)
         if t_i >= sorted_mu[i]:
             t = t_i
             break
@@ -121,6 +133,7 @@ def projection_to_simplex(mu, z = 1):
     x = mu - t
     x = np.where(x > 0, x, 0)
     return x
+
 
 def logloss_grad(predt, dtrain):
     """Compute the gradient for cross entropy log loss."""
@@ -183,7 +196,7 @@ def logloss_group_hess(predt, dtrain, fairness_constraint):
     ):
         hess = predt * (1 - predt)
         hess[y == 0] = 0  # only consider the loss of the positive class
-    
+
     return hess
 
 
@@ -423,6 +436,7 @@ class M2FGB_XGB(BaseEstimator, ClassifierMixin):
         preds[:, 0] -= preds_pos
         return preds
 
+
 def get_subgroup_indicator_test(subgroup):
     groups = np.unique(subgroup)
     n = len(subgroup)
@@ -431,10 +445,11 @@ def get_subgroup_indicator_test(subgroup):
     for i, g in enumerate(groups):
         n_g = np.sum(subgroup == g)
         n_g_max = max(n_g_max, n_g)
-        I[subgroup == g, i] = 1 / np.sum(subgroup == g)   
-    
+        I[subgroup == g, i] = 1 / np.sum(subgroup == g)
+
     I = I * n
     return I
+
 
 def dual_obj_1(
     subgroup,
@@ -469,7 +484,7 @@ def dual_obj_1(
     def custom_obj(predt, dtrain):
         loss_group = logloss_group(predt, dtrain, subgroup, fairness_constraint)
         group_losses.append(loss_group)
-        
+
         if dual_learning == "optim":
             # dual problem solved analytically
             idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
@@ -490,7 +505,7 @@ def dual_obj_1(
                 mu_opt = np.ones(loss_group.shape[0])
             else:
                 mu_opt = mu_opt_list[-1].copy()
-            
+
             mu_opt += multiplier_learning_rate * fair_weight * loss_group
             mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
 
@@ -498,8 +513,6 @@ def dual_obj_1(
             mu_opt_list[0] = mu_opt
         else:
             mu_opt_list.append(mu_opt)
-            
-
 
         grad_fair = logloss_group_grad(predt, dtrain, fairness_constraint)
         grad_fair = I * grad_fair.reshape(-1, 1) @ mu_opt
@@ -511,8 +524,8 @@ def dual_obj_1(
         hess = logloss_hessian(predt, dtrain)
 
         # It is not necessary to multiply fairness gradient by fair_weight because it is already included on mu
-        #grad = (1 - fair_weight) * grad + fair_weight * grad_fair
-        #hess = (1 - fair_weight) * hess + fair_weight * hess_fair
+        # grad = (1 - fair_weight) * grad + fair_weight * grad_fair
+        # hess = (1 - fair_weight) * hess + fair_weight * hess_fair
 
         grad = (1 - fair_weight) * grad + grad_fair
         hess = (1 - fair_weight) * hess + hess_fair
@@ -804,3 +817,129 @@ class FairGBMClassifier(fairgbm.FairGBMClassifier):
     def fit(self, X, Y, A):
         super().fit(X, Y, constraint_group=A)
         return self
+
+
+class MinMaxFair(BaseEstimator, ClassifierMixin):
+    def __init__(
+        self,
+        n_estimators=100,
+        a=1,
+        b=0.5,
+        gamma=0.0,
+        relaxed=False,
+        penalty=None,
+        C=1.0,
+    ):
+        self.n_estimators = n_estimators
+        self.a = a
+        self.b = b
+        self.gamma = gamma
+        self.relaxed = relaxed
+        self.penalty = penalty
+        self.C = C
+
+    def fit(self, X, y, sensitive_attribute):
+        X, y = check_X_y(X, y)
+        self.classes_ = np.unique(y)
+
+        # train a logistic model to get min and max logloss
+        model = LogisticRegression(
+            penalty=self.penalty,
+            C=1 if self.penalty == "none" else self.C,
+            solver="saga",
+        )
+        model.fit(X, y)
+        y_pred = model.predict_proba(X)[:, 1]
+        min_logloss = np.inf
+        max_logloss = -np.inf
+        for g in np.unique(sensitive_attribute):
+            idx = sensitive_attribute == g
+            logloss = log_loss(y[idx], y_pred[idx])
+            min_logloss = min(min_logloss, logloss)
+            max_logloss = max(max_logloss, logloss)
+
+        gamma_hat = min_logloss + self.gamma * (max_logloss - min_logloss)
+
+        (
+            group_error,
+            high_gamma,
+            first_poperr,
+            agg_grouperrs,
+            agg_poperrs,
+            _,
+            pop_error_type,
+            total_steps,
+            modelhats,
+            _,
+            _,
+            _,
+            _,
+            _,
+        ) = mmml.do_learning(
+            X=X,
+            y=y,
+            grouplabels=sensitive_attribute,
+            group_names=(),
+            # minmax fairness parameters
+            numsteps=self.n_estimators,
+            a=self.a,
+            b=self.b,
+            convergence_threshold=1e-15,
+            scale_eta_by_label_range=True,
+            equal_error=False,
+            gamma=gamma_hat,
+            relaxed=True,
+            error_type="Log-Loss",
+            extra_error_types=set(),
+            pop_error_type="Log-Loss",
+            # data transform
+            rescale_features=False,
+            test_size=0.0,
+            random_split_seed=0,
+            # model selection
+            model_type="LogisticRegression",
+            # parameters related to LR model
+            max_logi_iters=1000,
+            tol=1e-8,
+            fit_intercept=True,
+            logistic_solver="lbfgs",
+            penalty=self.penalty,
+            C=self.C,
+            # parameters related to MLP
+            lr=0.01,
+            momentum=0.9,
+            weight_decay=0,
+            n_epochs=10000,
+            hidden_sizes=(2 / 3,),
+            # parameters related to output
+            display_plots=False,
+            verbose=False,
+            use_input_commands=False,
+            show_legend=False,
+            save_models=False,
+            save_plots=False,
+            dirname="",
+            data_name="",
+            # not used
+            group_types=(),
+        )
+
+        self.model = modelhats
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self)
+        X = check_array(X)
+        predictions = self.predict_proba(X)[:, 1]
+        return (predictions > 0.5).astype(int)
+
+    def predict_proba(self, X):
+        check_is_fitted(self)
+        X = check_array(X)
+        # random select a model for each line of X
+        predictions = np.zeros((X.shape[0], 2))
+        for i in range(X.shape[0]):
+            predictions[i] = self.model[np.random.choice(len(self.model))].predict_proba(
+                X[i].reshape(1, -1)
+            )
+        return predictions

@@ -374,6 +374,8 @@ def eval_model(
             eq_loss = utils.equalized_loss_score(Y_val, y_val_score, A_val)
             eod = utils.equal_opportunity_score(Y_val, y_val_pred, A_val)
             spd = utils.statistical_parity_score(Y_val, y_val_pred, A_val)
+            min_tpr = 1 - utils.min_equal_opportunity_score(Y_val, y_val_pred, A_val)
+            min_bal_acc = 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val)
 
             results_val.append(
                 {
@@ -386,6 +388,8 @@ def eval_model(
                     "eod": eod,
                     "spd": spd,
                     "model": m,
+                    "min_tpr" : min_tpr,
+                    "min_bal_acc" : min_bal_acc,
                 }
             )
 
@@ -396,6 +400,8 @@ def eval_model(
             eq_loss = utils.equalized_loss_score(Y_test, y_test_score, A_test)
             eod = utils.equal_opportunity_score(Y_test, y_test_pred, A_test)
             spd = utils.statistical_parity_score(Y_test, y_test_pred, A_test)
+            min_tpr = 1 - utils.min_equal_opportunity_score(Y_test, y_test_pred, A_test)
+            min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
 
             results_test.append(
                 {
@@ -408,6 +414,8 @@ def eval_model(
                     "eod": eod,
                     "spd": spd,
                     "model": m,
+                    "min_tpr" : min_tpr,
+                    "min_bal_acc" : min_bal_acc,
                 }
             )
 
@@ -522,29 +530,32 @@ def run_subgroup_experiment(args):
 
 
 def main():
-    dataset = "german"
-    alpha_list = [i/10 for i in range(0, 11)]
-    model_name = "M2FGB_grad"
     n_folds = 10
-    n_groups = 4
-    n_jobs = 10
-    fair_metric = "min_bal_acc"
     thresh = "ks"
-    n_params = 100
-    output_dir =  f"../results/new_experiment/{dataset}/{model_name}"
-    args = {
-        "dataset": dataset,
-        "alpha_list": alpha_list,
-        "output_dir": output_dir,
-        "model_name": model_name,
-        "n_folds" : n_folds,
-        "n_groups" : n_groups,
-        "n_params" : n_params,
-        "fair_metric" : fair_metric,
-        "n_jobs" : n_jobs,
-        "thresh" : thresh,
-    }
-    run_subgroup_experiment(args)
+    alpha_list = [i/20 for i in range(0, 21)]
+    n_jobs = 10
+
+
+    # experiment 1
+    dataset = "german"
+    n_groups = 4
+    fair_metric = "min_bal_acc"
+    n_params = 500
+    for model_name in ["M2FGB_grad", "FairGBMClassifier"]:
+        output_dir =  f"../results/experiment_4_groups/{dataset}/{model_name}"
+        args = {
+            "dataset": dataset,
+            "alpha_list": alpha_list,
+            "output_dir": output_dir,
+            "model_name": model_name,
+            "n_folds" : n_folds,
+            "n_groups" : n_groups,
+            "n_params" : n_params,
+            "fair_metric" : fair_metric,
+            "n_jobs" : n_jobs,
+            "thresh" : thresh,
+        }
+        run_subgroup_experiment(args)
 
 
 if __name__ == "__main__":
