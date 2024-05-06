@@ -108,6 +108,20 @@ PARAM_SPACES = {
 }
 
 
+def projection_to_simplex(mu, z = 1):
+    sorted_mu = mu[np.argsort(mu)]
+    n = len(mu)
+    t =  np.mean(mu) - z / n
+    for i in range(len(mu) - 2, -1, -1):
+        t_i = np.mean(sorted_mu[(i+1):]) - z / (n - i - 1)
+        if t_i >= sorted_mu[i]:
+            t = t_i
+            break
+
+    x = mu - t
+    x = np.where(x > 0, x, 0)
+    return x
+
 def logloss_grad(predt, dtrain):
     """Compute the gradient for cross entropy log loss."""
     y = dtrain.get_label()
@@ -137,20 +151,12 @@ def logloss_group(predt, dtrain, subgroup, fairness_constraint):
         loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
         loss[y == 0] = 0  # only consider the loss of the positive class
 
-    # loss = np.array([np.mean(loss[subgroup == g]) for g in np.unique(subgroup)])
-    # return loss
-    groups = np.unique(subgroup)
-
-    loss_matrix = np.zeros((len(y), len(groups)))
-    for i, group in enumerate(groups):
-        loss_matrix[:, i] = loss  # copy the column
-        loss_matrix[subgroup != group, i] = np.nan  # and set nan for other groups
-
-    return np.nanmean(loss_matrix, axis=0)
+    loss = np.array([np.mean(loss[subgroup == g]) for g in np.unique(subgroup)])
+    return loss
 
 
-def logloss_group_grad(predt, dtrain, subgroup, fairness_constraint):
-    """Create a matrix with the gradient for each subgroup in each column."""
+def logloss_group_grad(predt, dtrain, fairness_constraint):
+    """Create an array with the gradient of fairness metrics."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
     if fairness_constraint == "equalized_loss":
@@ -162,16 +168,11 @@ def logloss_group_grad(predt, dtrain, subgroup, fairness_constraint):
         grad = -(y - predt)
         grad[y == 0] = 0  # only consider the loss of the positive class
 
-    groups = np.unique(subgroup)
-    grad_matrix = np.zeros((len(y), len(groups)))
-    for i, group in enumerate(groups):
-        grad_matrix[:, i] = grad  # copy the column
-        grad_matrix[subgroup != group, i] = 0
-    return grad_matrix
+    return grad
 
 
-def logloss_group_hess(predt, dtrain, subgroup, fairness_constraint):
-    """Create a matrix with the hessian for each subgroup in each column."""
+def logloss_group_hess(predt, dtrain, fairness_constraint):
+    """Create an array with the hessian of fairness metrics."""
     y = dtrain.get_label()
     predt = 1 / (1 + np.exp(-predt))
     if fairness_constraint == "equalized_loss":
@@ -182,13 +183,8 @@ def logloss_group_hess(predt, dtrain, subgroup, fairness_constraint):
     ):
         hess = predt * (1 - predt)
         hess[y == 0] = 0  # only consider the loss of the positive class
-
-    groups = np.unique(subgroup)
-    hess_matrix = np.zeros((len(y), len(groups)))
-    for i, group in enumerate(groups):
-        hess_matrix[:, i] = hess  # copy the column
-        hess_matrix[subgroup != group, i] = 0
-    return hess_matrix
+    
+    return hess
 
 
 def get_subgroup_indicator(subgroup):
@@ -427,6 +423,18 @@ class M2FGB_XGB(BaseEstimator, ClassifierMixin):
         preds[:, 0] -= preds_pos
         return preds
 
+def get_subgroup_indicator_test(subgroup):
+    groups = np.unique(subgroup)
+    n = len(subgroup)
+    I = np.zeros((subgroup.shape[0], len(groups)))
+    n_g_max = -np.inf
+    for i, g in enumerate(groups):
+        n_g = np.sum(subgroup == g)
+        n_g_max = max(n_g_max, n_g)
+        I[subgroup == g, i] = 1 / np.sum(subgroup == g)   
+    
+    I = I * n
+    return I
 
 def dual_obj_1(
     subgroup,
@@ -456,60 +464,59 @@ def dual_obj_1(
     multiplier_learning_rate: float, optional
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
-    n = len(subgroup)
-    n_g = get_subgroup_indicator(subgroup)
+    I = get_subgroup_indicator_test(subgroup)
 
     def custom_obj(predt, dtrain):
         loss_group = logloss_group(predt, dtrain, subgroup, fairness_constraint)
-        if len(mu_opt_list) > 1:
-            group_losses.append(loss_group)
-        if fair_weight > 0:
-            if dual_learning == "optim":
-                # dual problem solved analytically
-                idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
-                # if is more than one, randomly choose one
-                idx_biggest_loss = np.random.choice(idx_biggest_loss)
-                mu_opt = np.zeros(loss_group.shape[0])
-                mu_opt[idx_biggest_loss] = fair_weight
-                if mu_opt_list[0] is None:
-                    mu_opt_list[0] = mu_opt
-                else:
-                    mu_opt_list.append(mu_opt)
+        group_losses.append(loss_group)
+        
+        if dual_learning == "optim":
+            # dual problem solved analytically
+            idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
+            # if is more than one, randomly choose one
+            idx_biggest_loss = np.random.choice(idx_biggest_loss)
+            mu_opt = np.zeros(loss_group.shape[0])
+            mu_opt[idx_biggest_loss] = fair_weight
 
-            elif dual_learning == "gradient":
-                if mu_opt_list[0] is None:
-                    mu_opt = np.zeros(loss_group.shape[0])
-                    mu_opt_list[0] = mu_opt
-
-                else:
-                    mu_opt = mu_opt_list[-1].copy()
-                    mu_opt += multiplier_learning_rate * fair_weight * loss_group
-                    mu_opt_list.append(mu_opt)
-
-        else:
-            mu_opt = np.zeros(len(np.unique(subgroup)))
+        elif dual_learning == "gradient":
             if mu_opt_list[0] is None:
-                mu_opt_list[0] = mu_opt
+                mu_opt = np.zeros(loss_group.shape[0])
             else:
-                mu_opt_list.append(mu_opt)
+                mu_opt = mu_opt_list[-1].copy()
+            mu_opt += multiplier_learning_rate * fair_weight * loss_group
 
-        grad = logloss_grad(predt, dtrain) / n
-        hess = logloss_hessian(predt, dtrain) / n
+        elif dual_learning == "gradient_norm":
+            if mu_opt_list[0] is None:
+                mu_opt = np.ones(loss_group.shape[0])
+            else:
+                mu_opt = mu_opt_list[-1].copy()
+            
+            mu_opt += multiplier_learning_rate * fair_weight * loss_group
+            mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
 
-        if fair_weight > 0:
-            grad += (
-                logloss_group_grad(predt, dtrain, subgroup, fairness_constraint)
-                * n_g
-                @ mu_opt
-            )
-            hess += (
-                logloss_group_hess(predt, dtrain, subgroup, fairness_constraint)
-                * n_g
-                @ mu_opt
-            )
+        if mu_opt_list[0] is None:
+            mu_opt_list[0] = mu_opt
+        else:
+            mu_opt_list.append(mu_opt)
+            
 
-        grad *= n / (1 + fair_weight)
-        hess *= n / (1 + fair_weight)
+
+        grad_fair = logloss_group_grad(predt, dtrain, fairness_constraint)
+        grad_fair = I * grad_fair.reshape(-1, 1) @ mu_opt
+
+        hess_fair = logloss_group_hess(predt, dtrain, fairness_constraint)
+        hess_fair = I * hess_fair.reshape(-1, 1) @ mu_opt
+
+        grad = logloss_grad(predt, dtrain)
+        hess = logloss_hessian(predt, dtrain)
+
+        # It is not necessary to multiply fairness gradient by fair_weight because it is already included on mu
+        #grad = (1 - fair_weight) * grad + fair_weight * grad_fair
+        #hess = (1 - fair_weight) * hess + fair_weight * hess_fair
+
+        grad = (1 - fair_weight) * grad + grad_fair
+        hess = (1 - fair_weight) * hess + hess_fair
+
         return grad, hess
 
     return custom_obj
@@ -547,7 +554,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
         fairness_constraint="equalized_loss",
-        fair_weight=1,
+        fair_weight=0.5,
         dual_learning="optim",
         multiplier_learning_rate=0.1,
         n_estimators=10,
@@ -562,7 +569,9 @@ class M2FGB(BaseEstimator, ClassifierMixin):
             "equal_opportunity",
             "demographic_parity",
         ]
-        assert dual_learning in ["optim", "gradient"]
+        assert dual_learning in ["optim", "gradient", "gradient_norm"]
+
+        assert fair_weight >= 0 and fair_weight <= 1
 
         self.fairness_constraint = fairness_constraint
         self.dual_learning = dual_learning
