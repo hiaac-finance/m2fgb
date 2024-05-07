@@ -18,8 +18,8 @@ import lightgbm as lgb
 import fairgbm
 
 import sys
-sys.path.append("../minimax-fair/src")
-import minmaxML as mmml
+sys.path.append("../minimax-fair")
+import src.minmaxML as mmml
 
 lgb.register_logger(utils.CustomLogger())
 fairgbm.register_logger(utils.CustomLogger())

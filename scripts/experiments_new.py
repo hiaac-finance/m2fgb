@@ -538,24 +538,24 @@ def main():
 
     # experiment 1
     dataset = "german"
-    n_groups = 4
     fair_metric = "min_bal_acc"
     n_params = 500
-    for model_name in ["M2FGB_grad", "FairGBMClassifier"]:
-        output_dir =  f"../results/experiment_4_groups/{dataset}/{model_name}"
-        args = {
-            "dataset": dataset,
-            "alpha_list": alpha_list,
-            "output_dir": output_dir,
-            "model_name": model_name,
-            "n_folds" : n_folds,
-            "n_groups" : n_groups,
-            "n_params" : n_params,
-            "fair_metric" : fair_metric,
-            "n_jobs" : n_jobs,
-            "thresh" : thresh,
-        }
-        run_subgroup_experiment(args)
+    for n_groups in [2, 8]:
+        for model_name in ["M2FGB_grad", "FairGBMClassifier"]:
+            output_dir =  f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
+            args = {
+                "dataset": dataset,
+                "alpha_list": alpha_list,
+                "output_dir": output_dir,
+                "model_name": model_name,
+                "n_folds" : n_folds,
+                "n_groups" : n_groups,
+                "n_params" : n_params,
+                "fair_metric" : fair_metric,
+                "n_jobs" : n_jobs,
+                "thresh" : thresh,
+            }
+            run_subgroup_experiment(args)
 
 
 if __name__ == "__main__":
