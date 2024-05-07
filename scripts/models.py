@@ -112,7 +112,7 @@ PARAM_SPACES = {
     "MinMaxFair": {
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "gamma": {"type": "float", "low": 0, "high": 1},
-        "penalty": {"type": "str", "options": ["none", "l1"]},
+        "penalty": {"type": "str", "options": ["none", "l2"]},
         "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
         "a": {"type": "float", "low": 0.1, "high": 1},
         "b": {"type": "float", "low": 1e-2, "high": 1},
@@ -506,8 +506,17 @@ def dual_obj_1(
             else:
                 mu_opt = mu_opt_list[-1].copy()
 
-            mu_opt += multiplier_learning_rate * fair_weight * loss_group
+            mu_opt += multiplier_learning_rate * loss_group
             mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
+
+        elif dual_learning == "gradient_norm2":
+            if mu_opt_list[0] is None:
+                mu_opt = np.ones(loss_group.shape[0])
+            else:
+                mu_opt = mu_opt_list[-1].copy()
+
+            mu_opt += multiplier_learning_rate * loss_group
+            mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
 
         if mu_opt_list[0] is None:
             mu_opt_list[0] = mu_opt
@@ -582,7 +591,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
             "equal_opportunity",
             "demographic_parity",
         ]
-        assert dual_learning in ["optim", "gradient", "gradient_norm"]
+        assert dual_learning in ["optim", "gradient", "gradient_norm", "gradient_norm2"]
 
         assert fair_weight >= 0 and fair_weight <= 1
 
@@ -846,6 +855,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         model = LogisticRegression(
             penalty=self.penalty,
             C=1 if self.penalty == "none" else self.C,
+            max_iter=1000,
             solver="saga",
         )
         model.fit(X, y)
@@ -899,10 +909,10 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
             # model selection
             model_type="LogisticRegression",
             # parameters related to LR model
-            max_logi_iters=1000,
+            max_logi_iters=100,
             tol=1e-8,
             fit_intercept=True,
-            logistic_solver="lbfgs",
+            logistic_solver="saga",
             penalty=self.penalty,
             C=self.C,
             # parameters related to MLP
