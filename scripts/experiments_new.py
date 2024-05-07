@@ -14,7 +14,7 @@ import utils
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.metrics import roc_auc_score, accuracy_score, balanced_accuracy_score
+from sklearn.metrics import roc_auc_score, accuracy_score, balanced_accuracy_score, precision_score
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -111,7 +111,10 @@ def get_model(model_name, random_state=None):
             return models.FairClassifier_Wrap(
                 fairness_constraint="demographic_parity", **params
             )
-
+    elif model_name == "MinMaxFair":
+        
+        def model(**params):
+            return models.MinMaxFair(**params)
     return model
 
 
@@ -356,7 +359,7 @@ def eval_model(
     ]
     results_val = []
     results_test = []
-    for m, model in enumerate(model_list):
+    for m, model in tqdm(enumerate(model_list), total=len(model_list)):
         y_val_score = model.predict_proba(X_val)[:, 1]
         if thresh == "ks":
             thresh = utils.get_best_threshold(Y_val, y_val_score)
@@ -366,22 +369,26 @@ def eval_model(
         y_val_pred = y_val_score > thresh
         y_test_score = model.predict_proba(X_test)[:, 1]
         y_test_pred = y_test_score > thresh
+
+        bal_acc = balanced_accuracy_score(Y_val, y_val_pred)
+        prec = precision_score(Y_val, y_val_pred)
+        acc = accuracy_score(Y_val, y_val_pred)
+        roc = roc_auc_score(Y_val, y_val_score)
+        eq_loss = utils.equalized_loss_score(Y_val, y_val_score, A_val)
+        eod = utils.equal_opportunity_score(Y_val, y_val_pred, A_val)
+        spd = utils.statistical_parity_score(Y_val, y_val_pred, A_val)
+        min_tpr = 1 - utils.min_equal_opportunity_score(Y_val, y_val_pred, A_val)
+        min_bal_acc = 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val)
+
         for i, alpha in enumerate(alpha_list):
             score = scorer_list[i](Y_val, y_val_pred, A_val)
-            bal_acc = balanced_accuracy_score(Y_val, y_val_pred)
-            acc = accuracy_score(Y_val, y_val_pred)
-            roc = roc_auc_score(Y_val, y_val_score)
-            eq_loss = utils.equalized_loss_score(Y_val, y_val_score, A_val)
-            eod = utils.equal_opportunity_score(Y_val, y_val_pred, A_val)
-            spd = utils.statistical_parity_score(Y_val, y_val_pred, A_val)
-            min_tpr = 1 - utils.min_equal_opportunity_score(Y_val, y_val_pred, A_val)
-            min_bal_acc = 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val)
 
             results_val.append(
                 {
                     "alpha": alpha,
                     "score": score,
                     "bal_acc": bal_acc,
+                    "prec": prec,
                     "acc": acc,
                     "roc": roc,
                     "eq_loss": eq_loss,
@@ -393,21 +400,26 @@ def eval_model(
                 }
             )
 
+            
+        bal_acc = balanced_accuracy_score(Y_test, y_test_pred)
+        acc = accuracy_score(Y_test, y_test_pred)
+        roc = roc_auc_score(Y_test, y_test_score)
+        eq_loss = utils.equalized_loss_score(Y_test, y_test_score, A_test)
+        eod = utils.equal_opportunity_score(Y_test, y_test_pred, A_test)
+        spd = utils.statistical_parity_score(Y_test, y_test_pred, A_test)
+        min_tpr = 1 - utils.min_equal_opportunity_score(Y_test, y_test_pred, A_test)
+        min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
+
+
+        for i, alpha in enumerate(alpha_list):
             score = scorer_list[i](Y_test, y_test_pred, A_test)
-            bal_acc = balanced_accuracy_score(Y_test, y_test_pred)
-            acc = accuracy_score(Y_test, y_test_pred)
-            roc = roc_auc_score(Y_test, y_test_score)
-            eq_loss = utils.equalized_loss_score(Y_test, y_test_score, A_test)
-            eod = utils.equal_opportunity_score(Y_test, y_test_pred, A_test)
-            spd = utils.statistical_parity_score(Y_test, y_test_pred, A_test)
-            min_tpr = 1 - utils.min_equal_opportunity_score(Y_test, y_test_pred, A_test)
-            min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
 
             results_test.append(
                 {
                     "alpha": alpha,
                     "score": score,
                     "bal_acc": bal_acc,
+                    "prec" : prec,
                     "acc": acc,
                     "roc": roc,
                     "eq_loss": eq_loss,
@@ -504,7 +516,9 @@ def run_subgroup_experiment(args):
             model_list,
         )
         study.optimize(objective, n_trials = args["n_params"], n_jobs = args["n_jobs"], show_progress_bar = True)
-        param_list = pd.DataFrame([trial.params for trial in study.trials])
+        trials_df = study.trials_dataframe(attrs = ("number", "duration", "params"))
+        trials_df.to_csv(os.path.join(args["output_dir"], f"trials_fold_{i}.csv"), index = False)
+        
 
 
         results_val, results_test = eval_model(
@@ -520,9 +534,6 @@ def run_subgroup_experiment(args):
             A_test,
         )
 
-        # save param list
-        param_list.to_json(os.path.join(args["output_dir"], f"param_list_fold_{i}.json"), orient = "records")
-
         # save results of fold
         results_val.to_csv(os.path.join(args["output_dir"], f"validation_fold_{i}.csv"), index = False)
         results_test.to_csv(os.path.join(args["output_dir"], f"test_fold_{i}.csv"), index = False)
@@ -530,6 +541,11 @@ def run_subgroup_experiment(args):
 
 
 def main():
+    import lightgbm as lgb
+    import fairgbm
+    lgb.register_logger(utils.CustomLogger())
+    fairgbm.register_logger(utils.CustomLogger())
+
     n_folds = 10
     thresh = "ks"
     alpha_list = [i/20 for i in range(0, 21)]
@@ -537,11 +553,15 @@ def main():
 
 
     # experiment 1
-    dataset = "german"
+    dataset = "compas"
     fair_metric = "min_bal_acc"
     n_params = 500
-    for n_groups in [2, 8]:
-        for model_name in ["M2FGB_grad", "FairGBMClassifier"]:
+    for n_groups in [2, 4, 8]:
+        for model_name in [
+            "M2FGB_grad", 
+            "FairGBMClassifier",
+            #"MinMaxFair"
+            ]:
             output_dir =  f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
             args = {
                 "dataset": dataset,
