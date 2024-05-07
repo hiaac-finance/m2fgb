@@ -9,6 +9,26 @@ from sklearn.metrics import (
     balanced_accuracy_score,
 )
 
+import logging
+
+
+class CustomLogger(logging.Logger):
+    """Custom logger to suppress warnings from LightGBM (due to a bug, verbose does not supress)"""
+
+    def __init__(self):
+        self.logger = logging.getLogger("lightgbm_custom")
+        self.logger.setLevel(logging.ERROR)
+
+    def info(self, message):
+        self.logger.info(message)
+
+    def warning(self, message):
+        # Suppress warnings by not doing anything
+        pass
+
+    def error(self, message):
+        self.logger.error(message)
+
 
 def get_best_threshold(y_ground, y_pred):
     """Calculates the threshold according to the KS statistic"""
@@ -63,6 +83,32 @@ def equal_opportunity_score(y_ground, y_pred, A):
     )
 
 
+def min_equal_opportunity_score(y_ground, y_pred, A):
+    """Calculate the minimum true positive rate of the groups.
+    Return 1 - tpr so that the lowest the better.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        Equal opportunity score score
+    """
+    min_tpr = np.inf
+    for a in np.unique(A):
+        tpr = np.mean(y_pred[(A == a) & (y_ground == 1)])
+        min_tpr = min(min_tpr, tpr)
+    return 1 - min_tpr
+
+
 def statistical_parity_score(y_ground, y_pred, A):
     """Calculate the difference between probability of true outcome of the groups.
     If A has two values, it must be 0 and 1, and it can also be applied to more than two groups (the result is the difference between the max value and min value).
@@ -92,6 +138,58 @@ def statistical_parity_score(y_ground, y_pred, A):
     return np.mean(y_pred[A == 1]) - np.mean(y_pred[A == 0])
 
 
+def min_statistical_parity_score(y_ground, y_pred, A):
+    """Calculate the minimum probability of true outcome of the groups.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        Statistical parity score
+    """
+    min_pr = np.inf
+
+    for a in np.unique(A):
+        pr = np.mean(y_pred[A == a])
+        min_pr = min(min_pr, pr)
+    return 1 - min_pr
+
+
+def min_balanced_accuracy(y_ground, y_pred, A):
+    """Calculate the minimum balanced accuracy among groups.
+    It will return 1 - bal_acc so that values close to 0 are better.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        1 - Minimum balanced accuracy
+    """
+    min_bal_acc = np.inf
+    for a in np.unique(A):
+        bal_acc = balanced_accuracy_score(y_ground[A == a], y_pred[A == a])
+        min_bal_acc = min(min_bal_acc, bal_acc)
+    return 1 - min_bal_acc
+
+
 def get_combined_metrics_scorer(
     alpha=1, performance_metric="acc", fairness_metric="eod"
 ):
@@ -107,6 +205,12 @@ def get_combined_metrics_scorer(
             fair = equal_opportunity_score(y_ground, y_pred, A)
         elif fairness_metric == "spd":
             fair = statistical_parity_score(y_ground, y_pred, A)
+        elif fairness_metric == "min_eod":
+            fair = min_equal_opportunity_score(y_ground, y_pred, A)
+        elif fairness_metric == "min_spd":
+            fair = min_statistical_parity_score(y_ground, y_pred, A)
+        elif fairness_metric == "min_bal_acc":
+            fair = min_balanced_accuracy(y_ground, y_pred, A)
 
         return alpha * perf + (1 - alpha) * (1 - abs(fair))
 
@@ -187,117 +291,3 @@ def equalized_loss_score(y_ground, y_prob, A):
 
 def logloss_score(y_ground, y_pred):
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
-
-
-def eval_model_data(y_ground, y_pred, p=None, name=""):
-    roc = roc_auc_score(y_ground, y_pred)
-    if p is None:
-        p = get_best_threshold(y_ground, y_pred)
-    logloss = logloss_score(y_ground, y_pred)
-    fnr = fnr_score(y_ground, y_pred > p)
-    tpr = tpr_score(y_ground, y_pred > p)
-    acc = accuracy_score(y_ground, y_pred > p)
-    precision = precision_score(y_ground, y_pred > p)
-    return [
-        {
-            "roc": roc,
-            "tpr": tpr,
-            "fnr": fnr,
-            "logloss": logloss,
-            "threshold": p,
-            "accuracy": acc,
-            "precision": precision,
-            "name": name,
-        }
-    ]
-
-
-def eval_model_subgroups(y_ground, y_pred, subgroup, p=None, name=""):
-    g_ = np.unique(subgroup)
-    results = []
-    for g in g_:
-        results += eval_model_data(
-            y_ground[subgroup == g], y_pred[subgroup == g], p, f"{name}_g{g}"
-        )
-    return results
-
-
-def eval_model_train_test(
-    model, X_train, Y_train, subgroup_train, X_test, Y_test, subgroup_test, p=None
-):
-    results = []
-    Y_train_pred = model.predict_proba(X_train)[:, 1]
-    if p is None:
-        p = get_best_threshold(Y_train, Y_train_pred)
-    results += eval_model_subgroups(Y_train, Y_train_pred, subgroup_train, p, "train")
-    Y_test_pred = model.predict_proba(X_test)[:, 1]
-    results += eval_model_subgroups(Y_test, Y_test_pred, subgroup_test, p, "test")
-    return pd.DataFrame(results)
-
-
-def plot_metric_lambda(results, metric, axs=None):
-    if axs is None:
-        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(12, 3), sharey=True)
-
-    for i, ds in enumerate(["train", "test"]):
-        results_ = results[results.name.str.contains(ds)]
-        results_0 = results_[results_.name.str.contains("0")]
-        results_1 = results_[results_.name.str.contains("1")]
-        axs[i].plot(results_0["lambda"], results_0[metric], label=f"{ds}_0")
-        axs[i].plot(results_1["lambda"], results_1[metric], label=f"{ds}_1")
-        axs[i].set_xlabel("Fairness weight")
-        axs[i].set_ylabel(metric)
-        axs[i].legend()
-        axs[i].set_xscale("symlog", linthresh=0.01)
-        axs[i].set_title("Performance in " + ds)
-        axs[i].grid(True)
-    return
-
-
-def plot_metric_diff_lambda(results, metric, axs=None):
-    if axs is None:
-        fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(12, 3))
-
-    color_map = {"train": "b", "test": "r"}
-    for i, ds in enumerate(["train", "test"]):
-        results_ = results[results.name.str.contains(ds)]
-        results_0 = results_[results_.name.str.contains("0")]
-        results_1 = results_[results_.name.str.contains("1")]
-        axs.set_xscale("symlog", linthresh=0.01)
-        axs.plot(
-            results_0["lambda"],
-            results_0[metric].values - results_1[metric].values,
-            label=f"{ds}",
-            color=color_map[ds],
-            lw=2,
-        )
-        axs.set_xlabel("Fairness weight")
-        axs.set_ylabel(metric + " difference")
-        axs.legend()
-        axs.grid(True)
-
-    # plot the zero line
-    axs.plot(
-        results_0["lambda"],
-        np.zeros(results_0["lambda"].shape),
-        color="k",
-        ls="--",
-        lw=1,
-    )
-    return
-
-
-def comparison_subgrous_metrics_lambda(results):
-    fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(10, 10), sharey="row")
-    plot_metric_lambda(results, "logloss", axs[0])
-    plot_metric_lambda(results, "accuracy", axs[1])
-    plot_metric_lambda(results, "tpr", axs[2])
-
-    plt.tight_layout()
-    plt.show()
-
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(10, 3), sharey="row")
-    plot_metric_diff_lambda(results, "logloss", axs[0])
-    plot_metric_diff_lambda(results, "accuracy", axs[1])
-    plot_metric_diff_lambda(results, "tpr", axs[2])
-    plt.show()
