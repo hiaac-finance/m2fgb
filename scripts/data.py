@@ -32,6 +32,7 @@ CAT_FEATURES = {
         "age_cat",
         "race",
     ],
+    "acsincome": ["COW", "SCHL", "MAR", "RELP", "RAC1P", "SEX"],
 }
 
 NUM_FEATURES = {
@@ -51,6 +52,7 @@ NUM_FEATURES = {
         "juv_other_count",
         "priors_count",
     ],
+    "acsincome": ["AGEP", "WKHP"],
 }
 
 
@@ -91,6 +93,18 @@ def load_compas():
     return X, Y
 
 
+def load_acsincome():
+    df = pd.read_csv("../data/acsincome_preprocessed.csv")
+    Y = df["PINCP"]
+    X = df.drop(columns=["PINCP"])
+    for col in X.columns:
+        if col in CAT_FEATURES["acsincome"]:
+            X[col] = X[col].astype("category")
+        else:
+            X[col] = X[col].astype(float)
+    return X, Y
+
+
 def load_dataset(dataset):
     if dataset == "german":
         return load_german()
@@ -98,11 +112,13 @@ def load_dataset(dataset):
         return load_adult()
     elif dataset == "compas":
         return load_compas()
+    elif dataset == "acsincome":
+        return load_acsincome()
     else:
         raise ValueError(f"Unknown dataset {dataset}")
 
 
-def get_fold(dataset, fold, n_folds = 10, random_state=None):
+def get_fold(dataset, fold, n_folds=10, random_state=None):
     X, Y = load_dataset(dataset)
     kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
     for i, (train_index, test_index) in enumerate(kf.split(X, Y)):
