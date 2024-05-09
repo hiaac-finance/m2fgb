@@ -3,6 +3,7 @@ import pandas as pd
 from tqdm import tqdm
 from multiprocessing import Pool
 import joblib
+import datetime
 
 import optuna
 from optuna.samplers import RandomSampler
@@ -220,6 +221,15 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
 
     elif n_groups == 8:
         if dataset == "german":
+            def age_cat(age):
+                if age < 30:
+                    return "1"
+                elif age < 40:
+                    return "2"
+                elif age < 50:
+                    return "3"
+                else:
+                    return "4"
             A_train = (
                 X_train.Gender.astype(str)
                 + "_"
@@ -620,10 +630,14 @@ def experiment1():
         #"FairClassifier"
     ]
 
-    n_params = 100
+    n_params = 500
     for dataset in datasets:
+        if dataset == "acsincome":
+            n_params = 250
         for n_groups in n_groups_list:
             for model_name in model_name_list:
+                if model_name == "MinMaxFair":
+                    n_params = 100
                 output_dir = (
                     f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
                 )
@@ -642,7 +656,8 @@ def experiment1():
                 run_subgroup_experiment(args)
 
                 with open("log.txt", "a+") as f:
-                    f.write(f"Finished: {dataset}, {n_groups}, {model_name}\n")
+                    now = datetime.datetime.now()
+                    f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
 def main():
