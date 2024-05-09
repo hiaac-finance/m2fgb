@@ -610,7 +610,7 @@ def main():
     dataset = "acsincome"
     fair_metric = "min_bal_acc"
     n_params = 250
-    for n_groups in [2, 4, 8]:
+    for n_groups in [4, 8]:
         for model_name in [
             "M2FGB_grad",
             "FairGBMClassifier",
