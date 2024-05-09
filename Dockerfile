@@ -42,7 +42,8 @@ RUN pip install numpy \
     fairgbm \
     tqdm \
     lightgbm \
-    folktables
+    folktables \
+    torch
 
 # Install jupyter
 RUN pip install jupyter \

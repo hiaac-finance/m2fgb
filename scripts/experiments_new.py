@@ -594,6 +594,57 @@ def run_subgroup_experiment(args):
         )
 
 
+def experiment1():
+    n_folds = 10
+    thresh = "ks"
+    alpha_list = [i / 20 for i in range(0, 21)]
+    n_jobs = 10
+    fair_metric = "min_bal_acc"
+    
+    datasets = [
+        "german",
+        "compas",
+        #"adult",
+        "acsincome"
+    ]
+    n_groups_list = [
+        2, 
+        4, 
+        8
+    ]
+    model_name_list = [
+        #"M2FGB_grad",
+        #"FairGBMClassifier",
+        "MinMaxFair",
+        #"LGBMClassifier",
+        #"FairClassifier"
+    ]
+
+    n_params = 100
+    for dataset in datasets:
+        for n_groups in n_groups_list:
+            for model_name in model_name_list:
+                output_dir = (
+                    f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
+                )
+                args = {
+                    "dataset": dataset,
+                    "alpha_list": alpha_list,
+                    "output_dir": output_dir,
+                    "model_name": model_name,
+                    "n_folds": n_folds,
+                    "n_groups": n_groups,
+                    "n_params": n_params,
+                    "fair_metric": fair_metric,
+                    "n_jobs": n_jobs,
+                    "thresh": thresh,
+                }
+                run_subgroup_experiment(args)
+
+                with open("log.txt", "a+") as f:
+                    f.write(f"Finished: {dataset}, {n_groups}, {model_name}\n")
+
+
 def main():
     import lightgbm as lgb
     import fairgbm
@@ -601,37 +652,7 @@ def main():
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
-    n_folds = 10
-    thresh = "ks"
-    alpha_list = [i / 20 for i in range(0, 21)]
-    n_jobs = 10
-
-    # experiment 1
-    dataset = "acsincome"
-    fair_metric = "min_bal_acc"
-    n_params = 250
-    for n_groups in [4, 8]:
-        for model_name in [
-            "M2FGB_grad",
-            "FairGBMClassifier",
-            #"MinMaxFair"
-        ]:
-            output_dir = (
-                f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
-            )
-            args = {
-                "dataset": dataset,
-                "alpha_list": alpha_list,
-                "output_dir": output_dir,
-                "model_name": model_name,
-                "n_folds": n_folds,
-                "n_groups": n_groups,
-                "n_params": n_params,
-                "fair_metric": fair_metric,
-                "n_jobs": n_jobs,
-                "thresh": thresh,
-            }
-            run_subgroup_experiment(args)
+    experiment1()
 
 
 if __name__ == "__main__":
