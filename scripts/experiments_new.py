@@ -300,9 +300,9 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                 else:
                     return "4"
             
-            A_train = X_train.RAC1P.apply(race_cat) + "_" + X_train.SEX
-            A_val = X_val.RAC1P.apply(race_cat) + "_" + X_val.SEX
-            A_test = X_test.RAC1P.apply(race_cat) + "_" + X_test.SEX
+            A_train = X_train.RAC1P.apply(race_cat) + "_" + X_train.SEX.astype(str)
+            A_val = X_val.RAC1P.apply(race_cat) + "_" + X_val.SEX.astype(str)
+            A_test = X_test.RAC1P.apply(race_cat) + "_" + X_test.SEX.astype(str)
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
     print(sensitive_map)
@@ -638,6 +638,11 @@ def experiment1():
             for model_name in model_name_list:
                 if model_name == "MinMaxFair":
                     n_params = 100
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+                
                 output_dir = (
                     f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
                 )
