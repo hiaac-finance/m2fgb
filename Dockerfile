@@ -41,7 +41,8 @@ RUN pip install numpy \
     fairlearn \
     fairgbm \
     tqdm \
-    lightgbm
+    lightgbm \
+    folktables
 
 # Install jupyter
 RUN pip install jupyter \

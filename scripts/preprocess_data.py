@@ -1,3 +1,5 @@
+import os
+from copy import deepcopy
 import pandas as pd
 
 
@@ -145,7 +147,122 @@ def preprocess_compas():
         if df[col].dtype == "object":
             df[col] = pd.Categorical(df[col])
 
-    df = df.to_csv("data/compas_preprocessed.csv", index=False)
+    df.to_csv("data/compas_preprocessed.csv", index=False)
+
+
+def preprocess_ACSIncome():
+    from folktables import ACSDataSource, ACSIncome
+
+    # Dir path
+    data_dir = "data/ACSIncome/"
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    state_list = [
+        "AL",
+        "AK",
+        "AZ",
+        "AR",
+        "CA",
+        "CO",
+        "CT",
+        "DE",
+        "FL",
+        "GA",
+        "HI",
+        "ID",
+        "IL",
+        "IN",
+        "IA",
+        "KS",
+        "KY",
+        "LA",
+        "ME",
+        "MD",
+        "MA",
+        "MI",
+        "MN",
+        "MS",
+        "MO",
+        "MT",
+        "NE",
+        "NV",
+        "NH",
+        "NJ",
+        "NM",
+        "NY",
+        "NC",
+        "ND",
+        "OH",
+        "OK",
+        "OR",
+        "PA",
+        "RI",
+        "SC",
+        "SD",
+        "TN",
+        "TX",
+        "UT",
+        "VT",
+        "VA",
+        "WA",
+        "WV",
+        "WI",
+        "WY",
+    ]
+
+    data_source = ACSDataSource(
+        survey_year="2018", horizon="1-Year", survey="person", root_dir=str(data_dir)
+    )
+    data = data_source.get_data(states=state_list, download=True)
+    dataset_details = deepcopy(ACSIncome)
+    dataset_details.features.append("ST")
+
+    features, labels, _ = dataset_details.df_to_numpy(data)
+    df = pd.DataFrame(data=features, columns=dataset_details.features)
+    df[dataset_details.target] = labels
+
+    # reorder columns
+    sensitive_col = "SEX"
+    state_col = "ST"
+    cols_order = [dataset_details.target, sensitive_col] + list(
+        set(dataset_details.features) - {sensitive_col, state_col}
+    )
+    df = df[cols_order]
+
+    mapping = {
+        1: "white",
+        2: "african_america",
+        3: "american_indian",
+        4: "alaska_native",
+        5: "american_indian_or_alaska_native",
+        6: "asian",
+        7: "native_hawaiian",
+        8: "other_race",
+        9: "two_or_more"
+    }
+    df["RAC1P"] = df["RAC1P"].apply(lambda x: mapping[x])
+
+    mapping = {
+        1 : "male",
+        2 : "female"
+    }
+    df["SEX"] = df["SEX"].apply(lambda x: mapping[x])
+
+
+    df["PINCP"] = df["PINCP"].apply(
+        lambda x: 1 if x is True else 0 if x is False else x
+    )
+
+    # drop columns with many cateogies
+    df = df.drop(columns=["OCCP", "POBP"])
+
+    categorical_columns = ["COW", "SCHL", "MAR", "RELP", "RAC1P", "SEX"]
+    for col in df.columns:
+        if col in categorical_columns:
+            df[col] = pd.Categorical(df[col])
+
+    df.to_csv("data/acsincome_preprocessed.csv", index=False)
 
 
 def download_data():

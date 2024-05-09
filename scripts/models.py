@@ -855,7 +855,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         model = LogisticRegression(
             penalty=self.penalty,
             C=1 if self.penalty == "none" else self.C,
-            max_iter=1000,
+            max_iter=100,
             solver="saga",
         )
         model.fit(X, y)

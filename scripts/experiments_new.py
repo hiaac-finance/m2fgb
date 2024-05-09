@@ -14,9 +14,21 @@ import utils
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.metrics import roc_auc_score, accuracy_score, balanced_accuracy_score, precision_score
+from sklearn.metrics import (
+    roc_auc_score,
+    accuracy_score,
+    balanced_accuracy_score,
+    precision_score,
+)
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+import sys
+import warnings
+
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+    os.environ["PYTHONWARNINGS"] = "ignore"
 
 
 SEED = 0
@@ -111,10 +123,12 @@ def get_model(model_name, random_state=None):
             return models.FairClassifier_Wrap(
                 fairness_constraint="demographic_parity", **params
             )
+
     elif model_name == "MinMaxFair":
-        
+
         def model(**params):
             return models.MinMaxFair(**params)
+
     return model
 
 
@@ -154,6 +168,10 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             A_train = X_train.race == "Caucasian"
             A_val = X_val.race == "Caucasian"
             A_test = X_test.race == "Caucasian"
+        elif dataset == "acsincome":
+            A_train = X_train.SEX
+            A_val = X_val.SEX
+            A_test = X_test.SEX
 
     elif n_groups == 4:
         if dataset == "german":
@@ -186,29 +204,21 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             A_train = X_train.sex.astype(str) + "_" + (X_train.age > 50).astype(str)
             A_val = X_val.sex.astype(str) + "_" + (X_val.age > 50).astype(str)
             A_test = X_test.sex.astype(str) + "_" + (X_test.age > 50).astype(str)
+        elif dataset == "acsincome":
+            def race_cat(race):
+                if race == "white":
+                    return "1"
+                elif race == "african_american":
+                    return "2"
+                elif race == "asian":
+                    return "3"
+                else:
+                    return "4"
+            A_train = X_train.RAC1P.apply(race_cat)
+            A_val = X_val.RAC1P.apply(race_cat)
+            A_test = X_test.RAC1P.apply(race_cat)
 
     elif n_groups == 8:
-
-        def age_cat(age):
-            if age < 30:
-                return "1"
-            elif age < 40:
-                return "2"
-            elif age < 50:
-                return "3"
-            else:
-                return "4"
-
-        def race_cat(race):
-            if race == "African-American" or race == "Hispanic":
-                return "1"
-            elif race == "Caucasian":
-                return "2"
-            elif race == "Asian":
-                return "3"
-            else:
-                return "4"
-
         if dataset == "german":
             A_train = (
                 X_train.Gender.astype(str)
@@ -222,6 +232,15 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                 X_test.Gender.astype(str) + "_" + X_test.Age.apply(age_cat).astype(str)
             )
         elif dataset == "adult":
+            def age_cat(age):
+                if age < 30:
+                    return "1"
+                elif age < 40:
+                    return "2"
+                elif age < 50:
+                    return "3"
+                else:
+                    return "4"
             A_train = (
                 X_train.sex.astype(str) + "_" + X_train.age.apply(age_cat).astype(str)
             )
@@ -230,6 +249,15 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                 X_test.sex.astype(str) + "_" + X_test.age.apply(age_cat).astype(str)
             )
         elif dataset == "compas":
+            def race_cat(race):
+                if race == "African-American" or race == "Hispanic":
+                    return "1"
+                elif race == "Caucasian":
+                    return "2"
+                elif race == "Asian":
+                    return "3"
+                else:
+                    return "4"
             A_train = (
                 X_train.race.apply(race_cat)
                 + "_"
@@ -251,6 +279,20 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                     (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
                 ).astype(str)
             )
+        elif dataset == "acsincome":
+            def race_cat(race):
+                if race == "white":
+                    return "1"
+                elif race == "african_american":
+                    return "2"
+                elif race == "asian":
+                    return "3"
+                else:
+                    return "4"
+            
+            A_train = X_train.RAC1P.apply(race_cat) + "_" + X_train.SEX
+            A_val = X_val.RAC1P.apply(race_cat) + "_" + X_val.SEX
+            A_test = X_test.RAC1P.apply(race_cat) + "_" + X_test.SEX
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
     print(sensitive_map)
@@ -305,6 +347,7 @@ def get_param_list(model_name, n_params):
 
 from functools import partial
 
+
 def fit_model(model_name, params, X_train, Y_train, A_train):
     model_class = get_model(model_name, random_state=SEED)
     model = model_class(**params)
@@ -323,9 +366,20 @@ def train_models(
     """Function to train a list of models based on a list of parameters"""
     if n_jobs > 1:
         pool = Pool(n_jobs)
-        fit_model_partial = partial(fit_model, model_name, X_train=X_train, Y_train=Y_train.values, A_train=A_train.values)
-        model_list = list(tqdm(pool.imap_unordered(fit_model_partial, param_list), total=len(param_list)))
-        #model_list = pool.map(fit_model_partial, param_list)
+        fit_model_partial = partial(
+            fit_model,
+            model_name,
+            X_train=X_train,
+            Y_train=Y_train.values,
+            A_train=A_train.values,
+        )
+        model_list = list(
+            tqdm(
+                pool.imap_unordered(fit_model_partial, param_list),
+                total=len(param_list),
+            )
+        )
+        # model_list = pool.map(fit_model_partial, param_list)
         pool.close()
     else:
         model_list = []
@@ -395,12 +449,11 @@ def eval_model(
                     "eod": eod,
                     "spd": spd,
                     "model": m,
-                    "min_tpr" : min_tpr,
-                    "min_bal_acc" : min_bal_acc,
+                    "min_tpr": min_tpr,
+                    "min_bal_acc": min_bal_acc,
                 }
             )
 
-            
         bal_acc = balanced_accuracy_score(Y_test, y_test_pred)
         acc = accuracy_score(Y_test, y_test_pred)
         roc = roc_auc_score(Y_test, y_test_score)
@@ -410,7 +463,6 @@ def eval_model(
         min_tpr = 1 - utils.min_equal_opportunity_score(Y_test, y_test_pred, A_test)
         min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
 
-
         for i, alpha in enumerate(alpha_list):
             score = scorer_list[i](Y_test, y_test_pred, A_test)
 
@@ -419,15 +471,15 @@ def eval_model(
                     "alpha": alpha,
                     "score": score,
                     "bal_acc": bal_acc,
-                    "prec" : prec,
+                    "prec": prec,
                     "acc": acc,
                     "roc": roc,
                     "eq_loss": eq_loss,
                     "eod": eod,
                     "spd": spd,
                     "model": m,
-                    "min_tpr" : min_tpr,
-                    "min_bal_acc" : min_bal_acc,
+                    "min_tpr": min_tpr,
+                    "min_bal_acc": min_bal_acc,
                 }
             )
 
@@ -435,15 +487,8 @@ def eval_model(
     results_test = pd.DataFrame(results_test)
     return results_val, results_test
 
-def run_trial(
-    trial,
-    X_train,
-    Y_train,
-    A_train,
-    model_class,
-    param_space,
-    model_list
-):
+
+def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_list):
     """Function to run a single trial of optuna."""
     params = {}
     for name, values in param_space.items():
@@ -461,7 +506,6 @@ def run_trial(
     model.fit(X_train, Y_train, A_train)
     model_list.append(model)
     return 0.5
-
 
 
 def run_subgroup_experiment(args):
@@ -504,22 +548,29 @@ def run_subgroup_experiment(args):
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
 
-        study = optuna.create_study(direction = "maximize", sampler = RandomSampler(seed = SEED))
+        study = optuna.create_study(
+            direction="maximize", sampler=RandomSampler(seed=SEED)
+        )
         model_list = []
-        objective = lambda trial : run_trial(
+        objective = lambda trial: run_trial(
             trial,
-            X_train, 
+            X_train,
             Y_train,
             A_train,
-            get_model(args["model_name"], random_state = SEED),
+            get_model(args["model_name"], random_state=SEED),
             get_param_spaces(args["model_name"]),
             model_list,
         )
-        study.optimize(objective, n_trials = args["n_params"], n_jobs = args["n_jobs"], show_progress_bar = True)
-        trials_df = study.trials_dataframe(attrs = ("number", "duration", "params"))
-        trials_df.to_csv(os.path.join(args["output_dir"], f"trials_fold_{i}.csv"), index = False)
-        
-
+        study.optimize(
+            objective,
+            n_trials=args["n_params"],
+            n_jobs=args["n_jobs"],
+            show_progress_bar=True,
+        )
+        trials_df = study.trials_dataframe(attrs=("number", "duration", "params"))
+        trials_df.to_csv(
+            os.path.join(args["output_dir"], f"trials_fold_{i}.csv"), index=False
+        )
 
         results_val, results_test = eval_model(
             args["alpha_list"],
@@ -535,45 +586,50 @@ def run_subgroup_experiment(args):
         )
 
         # save results of fold
-        results_val.to_csv(os.path.join(args["output_dir"], f"validation_fold_{i}.csv"), index = False)
-        results_test.to_csv(os.path.join(args["output_dir"], f"test_fold_{i}.csv"), index = False)
-
+        results_val.to_csv(
+            os.path.join(args["output_dir"], f"validation_fold_{i}.csv"), index=False
+        )
+        results_test.to_csv(
+            os.path.join(args["output_dir"], f"test_fold_{i}.csv"), index=False
+        )
 
 
 def main():
     import lightgbm as lgb
     import fairgbm
+
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
     n_folds = 10
     thresh = "ks"
-    alpha_list = [i/20 for i in range(0, 21)]
+    alpha_list = [i / 20 for i in range(0, 21)]
     n_jobs = 10
 
-
     # experiment 1
-    dataset = "compas"
+    dataset = "acsincome"
     fair_metric = "min_bal_acc"
-    n_params = 500
-    for n_groups in [2, 4, 8]:
+    n_params = 250
+    for n_groups in [4, 8]:
         for model_name in [
-            "M2FGB_grad", 
+            "M2FGB_grad",
             "FairGBMClassifier",
             #"MinMaxFair"
-            ]:
-            output_dir =  f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
+        ]:
+            output_dir = (
+                f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
+            )
             args = {
                 "dataset": dataset,
                 "alpha_list": alpha_list,
                 "output_dir": output_dir,
                 "model_name": model_name,
-                "n_folds" : n_folds,
-                "n_groups" : n_groups,
-                "n_params" : n_params,
-                "fair_metric" : fair_metric,
-                "n_jobs" : n_jobs,
-                "thresh" : thresh,
+                "n_folds": n_folds,
+                "n_groups": n_groups,
+                "n_params": n_params,
+                "fair_metric": fair_metric,
+                "n_jobs": n_jobs,
+                "thresh": thresh,
             }
             run_subgroup_experiment(args)
 
