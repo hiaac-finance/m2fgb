@@ -18,8 +18,12 @@ import lightgbm as lgb
 import fairgbm
 
 import sys
+
 sys.path.append("../minimax-fair")
 import src.minmaxML as mmml
+
+sys.path.append("../MMPF")
+from MinimaxParetoFair.MMPF_trainer import APSTAR, SKLearn_Weighted_LLR
 
 lgb.register_logger(utils.CustomLogger())
 fairgbm.register_logger(utils.CustomLogger())
@@ -53,7 +57,7 @@ PARAM_SPACES = {
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 7},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
+        "fair_weight": {"type": "float", "low": 1e-2, "high": 1, "log": True},
     },
     "M2FGB_grad": {
         "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
@@ -117,6 +121,13 @@ PARAM_SPACES = {
         "a": {"type": "float", "low": 0.1, "high": 1},
         "b": {"type": "float", "low": 1e-2, "high": 1},
     },
+    "MinimaxPareto" : {
+        "n_iterations": {"type": "int", "low": 10, "high": 500, "log": True},
+        "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
+        "alpha" : {"type": "float", "low": 0.1, "high": 0.9},
+        "Kmin" : {"type": "int", "low": 10, "high": 50},
+
+    }
 }
 
 
@@ -745,7 +756,7 @@ class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
         covariance_threshold=0.1,
         C=1.0,
         penalty="l1",
-        max_iter=100,
+        max_iter=500,
         random_state=None,
     ):
         assert fairness_constraint in [
@@ -949,7 +960,59 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         # random select a model for each line of X
         predictions = np.zeros((X.shape[0], 2))
         for i in range(X.shape[0]):
-            predictions[i] = self.model[np.random.choice(len(self.model))].predict_proba(
-                X[i].reshape(1, -1)
-            )
+            predictions[i] = self.model[
+                np.random.choice(len(self.model))
+            ].predict_proba(X[i].reshape(1, -1))
         return predictions
+
+
+class MinimaxPareto(BaseEstimator, ClassifierMixin):
+    def __init__(self, n_iterations=100, C=1.0, Kini=1, Kmin=20, alpha=0.5):
+        self.n_iterations = n_iterations
+        self.C = C
+        self.Kini = Kini
+        self.Kmin = Kmin
+        self.alpha = alpha
+
+    def fit(self, X, y, sensitive_attribute):
+        X, y = check_X_y(X, y)
+        # insert sensitive attribute as first column of the dataframe
+        self.classes_ = np.unique(y)
+
+        model = SKLearn_Weighted_LLR(
+            X.values,
+            y.values,
+            sensitive_attribute.values,
+            X.values,
+            y.values,
+            sensitive_attribute.values,
+            C_reg=self.C,
+        )
+        mu_ini = np.ones(len(sensitive_attribute.unique()))
+        mu_ini /= mu_ini.sum()
+        results = APSTAR(
+            model,
+            mu_ini,
+            niter=self.n_iterations,
+            max_patience=200,
+            Kini=1,
+            Kmin=self.Kmin,
+            alpha=self.alpha,
+            verbose=False,
+        )
+
+        mu_best = results["mu_best_list"][-1]
+        model.weighted_fit(X, y, sensitive_attribute, mu_best)
+        self.model = model
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self)
+        X = check_array(X)
+        predictions = self.predict_proba(X)[:, 1]
+        return (predictions > 0.5).astype(int)
+
+    def predict_proba(self, X):
+        check_is_fitted(self)
+        X = check_array(X)
+        return self.model.predict_proba(X)

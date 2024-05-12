@@ -130,6 +130,11 @@ def get_model(model_name, random_state=None):
         def model(**params):
             return models.MinMaxFair(**params)
 
+    elif model_name == "MinimaxPareto":
+
+        def model(**params):
+            return models.MinimaxPareto(**params)
+
     return model
 
 
@@ -170,9 +175,9 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             A_val = X_val.race == "Caucasian"
             A_test = X_test.race == "Caucasian"
         elif dataset == "acsincome":
-            A_train = X_train.SEX
-            A_val = X_val.SEX
-            A_test = X_test.SEX
+            A_train = X_train.SEX.astype(str)
+            A_val = X_val.SEX.astype(str)
+            A_test = X_test.SEX.astype(str)
 
     elif n_groups == 4:
         if dataset == "german":
@@ -615,7 +620,7 @@ def experiment1():
         "german",
         "compas",
         #"adult",
-        "acsincome"
+        #"acsincome"
     ]
     n_groups_list = [
         2, 
@@ -625,9 +630,11 @@ def experiment1():
     model_name_list = [
         #"M2FGB_grad",
         #"FairGBMClassifier",
-        "MinMaxFair",
+        #"MinMaxFair",
         #"LGBMClassifier",
         #"FairClassifier"
+        #"M2FGB",
+        "MinimaxPareto"
     ]
 
     n_params = 500
