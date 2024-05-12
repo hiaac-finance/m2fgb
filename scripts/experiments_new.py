@@ -214,7 +214,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             def race_cat(race):
                 if race == "white":
                     return "1"
-                elif race == "african_american":
+                elif race == "african_america":
                     return "2"
                 elif race == "asian":
                     return "3"
@@ -298,7 +298,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             def race_cat(race):
                 if race == "white":
                     return "1"
-                elif race == "african_american":
+                elif race == "african_america":
                     return "2"
                 elif race == "asian":
                     return "3"
