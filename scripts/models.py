@@ -980,12 +980,12 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
         self.classes_ = np.unique(y)
 
         model = SKLearn_Weighted_LLR(
-            X.values,
-            y.values,
-            sensitive_attribute.values,
-            X.values,
-            y.values,
-            sensitive_attribute.values,
+            X,
+            y,
+            sensitive_attribute,
+            X,
+            y,
+            sensitive_attribute,
             C_reg=self.C,
         )
         mu_ini = np.ones(len(sensitive_attribute.unique()))

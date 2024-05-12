@@ -620,7 +620,7 @@ def experiment1():
         "german",
         "compas",
         #"adult",
-        #"acsincome"
+        "acsincome"
     ]
     n_groups_list = [
         2, 
@@ -643,7 +643,7 @@ def experiment1():
             n_params = 250
         for n_groups in n_groups_list:
             for model_name in model_name_list:
-                if model_name == "MinMaxFair":
+                if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
                     n_params = 100
 
                 with open("log.txt", "a+") as f:
