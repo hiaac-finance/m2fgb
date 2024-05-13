@@ -3,8 +3,8 @@ import torch
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-import torchvision
-from torchvision.transforms import Resize, ToPILImage, ToTensor
+#import torchvision
+#from torchvision.transforms import Resize, ToPILImage, ToTensor
 
 
 class PandasDataset(Dataset):

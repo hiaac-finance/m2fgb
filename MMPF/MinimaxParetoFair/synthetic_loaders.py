@@ -5,7 +5,7 @@ import sys
 sys.path.append(".")
 sys.path.append("..")
 from MinimaxParetoFair.network import *
-import torchvision
+#import torchvision
 import torch
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt

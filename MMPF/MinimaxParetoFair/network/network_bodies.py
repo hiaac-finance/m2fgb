@@ -1,5 +1,5 @@
 from .network_utils import *
-from torchvision import models
+#from torchvision import models
 
 class ConvStackBody(nn.Module):
     def __init__(self, in_channels=4, in_w=32, in_h=32,

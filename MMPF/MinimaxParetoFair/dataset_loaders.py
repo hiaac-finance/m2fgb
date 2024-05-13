@@ -8,12 +8,12 @@ sys.path.append("..")
 
 from MinimaxParetoFair import *
 from .dataloader_utils import *
-import torchvision
+#import torchvision
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-from torchvision.transforms import Resize, ToPILImage, ToTensor,RandomHorizontalFlip,RandomVerticalFlip, RandomRotation, RandomAffine
-from torchvision import models
+#from torchvision.transforms import Resize, ToPILImage, ToTensor,RandomHorizontalFlip,RandomVerticalFlip, RandomRotation, RandomAffine
+#from torchvision import models
 from .misc import *
 from .network import *
 
