@@ -157,6 +157,26 @@ def get_param_spaces(model_name):
         return models.PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "FairClassifier_spd":
         return models.PARAM_SPACES["FairClassifier"]
+    
+def get_param_spaces_acsincome(model_name):
+    """Helper function to get parameter space from model name."""
+    if model_name not in [
+        "M2FGB_eod",
+        "M2FGB_spd",
+        "M2FGB_grad_eod",
+        "M2FGB_grad_spd",
+        "FairGBMClassifier_eod",
+        "FairClassifier_spd",
+    ]:
+        return models.PARAM_SPACES_ACSINCOME[model_name]
+    elif model_name == "M2FGB_eod" or model_name == "M2FGB_spd":
+        return models.PARAM_SPACES_ACSINCOME["M2FGB"]
+    elif model_name == "M2FGB_grad_eod" or model_name == "M2FGB_grad_spd":
+        return models.PARAM_SPACES_ACSINCOME["M2FGB_grad"]
+    elif model_name == "FairGBMClassifier_eod":
+        return models.PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
+    elif model_name == "FairClassifier_spd":
+        return models.PARAM_SPACES_ACSINCOME["FairClassifier"]
 
 
 def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
@@ -563,6 +583,11 @@ def run_subgroup_experiment(args):
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
 
+        if args["dataset"] == "acsincome":
+            param_space = get_param_spaces(args["model_name"])
+        else:
+            param_space = get_param_spaces_acsincome(args["model_name"])
+
         study = optuna.create_study(
             direction="maximize", sampler=RandomSampler(seed=SEED)
         )
@@ -573,7 +598,7 @@ def run_subgroup_experiment(args):
             Y_train,
             A_train,
             get_model(args["model_name"], random_state=SEED),
-            get_param_spaces(args["model_name"]),
+            param_space,
             model_list,
         )
         study.optimize(

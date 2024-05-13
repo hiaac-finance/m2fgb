@@ -121,13 +121,30 @@ PARAM_SPACES = {
         "a": {"type": "float", "low": 0.1, "high": 1},
         "b": {"type": "float", "low": 1e-2, "high": 1},
     },
-    "MinimaxPareto" : {
+    "MinimaxPareto": {
         "n_iterations": {"type": "int", "low": 10, "high": 500, "log": True},
         "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
-        "alpha" : {"type": "float", "low": 0.1, "high": 0.9},
-        "Kmin" : {"type": "int", "low": 10, "high": 50},
+        "alpha": {"type": "float", "low": 0.1, "high": 0.9},
+        "Kmin": {"type": "int", "low": 10, "high": 50},
+    },
+}
 
-    }
+PARAM_SPACES_ACSINCOME = PARAM_SPACES.copy()
+PARAM_SPACES_ACSINCOME["MinMaxFair"] = {
+    "n_estimators": {"type": "int", "low": 10, "high": 25, "log": True},
+    "gamma": {"type": "float", "low": 0, "high": 1},
+    "penalty": {"type": "str", "options": ["none", "l2"]},
+    "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
+    "a": {"type": "float", "low": 0.1, "high": 1},
+    "b": {"type": "float", "low": 1e-2, "high": 1},
+    "max_iter": {"type": "int", "low": 10, "high": 10},
+}
+PARAM_SPACES_ACSINCOME["MinimaxPareto"] = {
+    "n_iterations": {"type": "int", "low": 10, "high": 25, "log": True},
+    "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
+    "alpha": {"type": "float", "low": 0.1, "high": 0.9},
+    "Kmin": {"type": "int", "low": 10, "high": 50},
+    "max_iter": {"type": "int", "low": 10, "high": 10},
 }
 
 
@@ -849,6 +866,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         relaxed=False,
         penalty=None,
         C=1.0,
+        max_iter=100,
     ):
         self.n_estimators = n_estimators
         self.a = a
@@ -857,6 +875,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         self.relaxed = relaxed
         self.penalty = penalty
         self.C = C
+        self.max_iter = max_iter
 
     def fit(self, X, y, sensitive_attribute):
         X, y = check_X_y(X, y)
@@ -866,7 +885,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         model = LogisticRegression(
             penalty=self.penalty,
             C=1 if self.penalty == "none" else self.C,
-            max_iter=100,
+            max_iter=self.max_iter,
             solver="saga",
         )
         model.fit(X, y)
@@ -920,7 +939,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
             # model selection
             model_type="LogisticRegression",
             # parameters related to LR model
-            max_logi_iters=100,
+            max_logi_iters=self.max_iter,
             tol=1e-8,
             fit_intercept=True,
             logistic_solver="saga",
@@ -967,12 +986,15 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
 
 
 class MinimaxPareto(BaseEstimator, ClassifierMixin):
-    def __init__(self, n_iterations=100, C=1.0, Kini=1, Kmin=20, alpha=0.5):
+    def __init__(
+        self, n_iterations=100, C=1.0, Kini=1, Kmin=20, alpha=0.5, max_iter=1000
+    ):
         self.n_iterations = n_iterations
         self.C = C
         self.Kini = Kini
         self.Kmin = Kmin
         self.alpha = alpha
+        self.max_iter = max_iter
 
     def fit(self, X, y, sensitive_attribute):
         X, y = check_X_y(X, y)
@@ -987,9 +1009,12 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
             y,
             sensitive_attribute,
             C_reg=self.C,
+            max_iter=self.max_iter,
         )
+
         mu_ini = np.ones(len(sensitive_attribute.unique()))
         mu_ini /= mu_ini.sum()
+
         results = APSTAR(
             model,
             mu_ini,
@@ -998,8 +1023,9 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
             Kini=1,
             Kmin=self.Kmin,
             alpha=self.alpha,
-            verbose=False,
+            verbose=True,
         )
+
 
         mu_best = results["mu_best_list"][-1]
         model.weighted_fit(X, y, sensitive_attribute, mu_best)
