@@ -27,6 +27,8 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 import sys
 import warnings
 
+sys.stderr = open("stderr.txt", "w")
+
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
     os.environ["PYTHONWARNINGS"] = "ignore"
@@ -537,6 +539,7 @@ def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_
             values_cp = {n: v for n, v in values.items() if n != "type"}
             params[name] = trial.suggest_float(name, **values_cp)
 
+    print(params)
     model = model_class(**params)
     model.fit(X_train, Y_train, A_train)
     model_list.append(model)
@@ -583,7 +586,7 @@ def run_subgroup_experiment(args):
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
 
-        if args["dataset"] == "acsincome":
+        if args["dataset"] != "acsincome":
             param_space = get_param_spaces(args["model_name"])
         else:
             param_space = get_param_spaces_acsincome(args["model_name"])
@@ -642,8 +645,8 @@ def experiment1():
     fair_metric = "min_bal_acc"
     
     datasets = [
-        "german",
-        "compas",
+        #"german",
+        #"compas",
         #"adult",
         "acsincome"
     ]
@@ -669,7 +672,10 @@ def experiment1():
         for n_groups in n_groups_list:
             for model_name in model_name_list:
                 if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
-                    n_params = 100
+                    if dataset == "acsincome":
+                        n_params = 25
+                    else:
+                        n_params = 100
 
                 with open("log.txt", "a+") as f:
                     now = datetime.datetime.now()

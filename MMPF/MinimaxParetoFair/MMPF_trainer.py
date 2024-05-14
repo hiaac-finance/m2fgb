@@ -369,9 +369,9 @@ def APSTAR(bs_optimal, mua_ini, niter = 100, max_patience = 20, Kini=1,
 
 class SKLearn_Weighted_LLR():
 
-    def __init__(self, x_train, y_train, a_train, x_val, y_val, a_val, C_reg=1e7, max_iter = 1000):
+    def __init__(self, x_train, y_train, a_train, x_val, y_val, a_val, C_reg=1e7, max_iter = 100):
         from sklearn.linear_model import LogisticRegression
-        self.model = LogisticRegression(solver='saga', max_iter=max_iter, warm_start=True, C=C_reg)
+        self.model = LogisticRegression(solver='saga', max_iter=max_iter, C=C_reg)
         self.x_train = x_train
         self.y_train = y_train
         self.a_train = a_train

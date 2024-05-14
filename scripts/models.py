@@ -131,19 +131,14 @@ PARAM_SPACES = {
 
 PARAM_SPACES_ACSINCOME = PARAM_SPACES.copy()
 PARAM_SPACES_ACSINCOME["MinMaxFair"] = {
-    "n_estimators": {"type": "int", "low": 10, "high": 25, "log": True},
+    "n_estimators": {"type": "int", "low": 10, "high": 50},
     "gamma": {"type": "float", "low": 0, "high": 1},
-    "penalty": {"type": "str", "options": ["none", "l2"]},
     "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
-    "a": {"type": "float", "low": 0.1, "high": 1},
-    "b": {"type": "float", "low": 1e-2, "high": 1},
     "max_iter": {"type": "int", "low": 10, "high": 10},
 }
 PARAM_SPACES_ACSINCOME["MinimaxPareto"] = {
-    "n_iterations": {"type": "int", "low": 10, "high": 25, "log": True},
+    "n_iterations": {"type": "int", "low": 10, "high": 50},
     "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
-    "alpha": {"type": "float", "low": 0.1, "high": 0.9},
-    "Kmin": {"type": "int", "low": 10, "high": 50},
     "max_iter": {"type": "int", "low": 10, "high": 10},
 }
 
@@ -987,7 +982,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
 
 class MinimaxPareto(BaseEstimator, ClassifierMixin):
     def __init__(
-        self, n_iterations=100, C=1.0, Kini=1, Kmin=20, alpha=0.5, max_iter=1000
+        self, n_iterations=100, C=1.0, Kini=1, Kmin=20, alpha=0.5, max_iter=100
     ):
         self.n_iterations = n_iterations
         self.C = C
@@ -1019,7 +1014,7 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
             model,
             mu_ini,
             niter=self.n_iterations,
-            max_patience=200,
+            max_patience=self.n_iterations // 2,
             Kini=1,
             Kmin=self.Kmin,
             alpha=self.alpha,
