@@ -138,7 +138,7 @@ def statistical_parity_score(y_ground, y_pred, A):
     return np.mean(y_pred[A == 1]) - np.mean(y_pred[A == 0])
 
 
-def min_statistical_parity_score(y_ground, y_pred, A):
+def min_positive_rate(y_ground, y_pred, A):
     """Calculate the minimum probability of true outcome of the groups.
     It work with multiple groups.
 
@@ -207,8 +207,8 @@ def get_combined_metrics_scorer(
             fair = statistical_parity_score(y_ground, y_pred, A)
         elif fairness_metric == "min_tpr":
             fair = min_true_positive_rate(y_ground, y_pred, A)
-        elif fairness_metric == "min_spd":
-            fair = min_statistical_parity_score(y_ground, y_pred, A)
+        elif fairness_metric == "min_pr":
+            fair = min_positive_rate(y_ground, y_pred, A)
         elif fairness_metric == "min_bal_acc":
             fair = min_balanced_accuracy(y_ground, y_pred, A)
 

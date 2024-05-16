@@ -180,7 +180,7 @@ def logloss_group(predt, dtrain, subgroup, fairness_constraint):
     predt = np.clip(predt, 1e-7, 1 - 1e-7)  # avoid log(0)
     if fairness_constraint == "equalized_loss":
         loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
-    if fairness_constraint == "demographic_parity":
+    if fairness_constraint == "positive_rate":
         y_ = np.ones(y.shape[0])  # all positive class
         loss = -(y_ * np.log(predt) + (1 - y_) * np.log(1 - predt))
     elif fairness_constraint == "equal_opportunity":
@@ -197,7 +197,7 @@ def logloss_group_grad(predt, dtrain, fairness_constraint):
     predt = 1 / (1 + np.exp(-predt))
     if fairness_constraint == "equalized_loss":
         grad = -(y - predt)
-    elif fairness_constraint == "demographic_parity":
+    elif fairness_constraint == "positive_rate":
         y_ = np.ones(y.shape[0])  # all positive class
         grad = -(y_ - predt)
     elif fairness_constraint == "equal_opportunity":
@@ -214,7 +214,7 @@ def logloss_group_hess(predt, dtrain, fairness_constraint):
     if fairness_constraint == "equalized_loss":
         hess = predt * (1 - predt)
     elif (
-        fairness_constraint == "demographic_parity"
+        fairness_constraint == "positive_rate"
         or fairness_constraint == "equal_opportunity"
     ):
         hess = predt * (1 - predt)
@@ -612,7 +612,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         assert fairness_constraint in [
             "equalized_loss",
             "equal_opportunity",
-            "demographic_parity",
+            "positive_rate",
         ]
         assert dual_learning in ["optim", "gradient", "gradient_norm", "gradient_norm2"]
 

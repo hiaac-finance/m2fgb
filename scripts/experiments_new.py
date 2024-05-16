@@ -80,7 +80,7 @@ def get_model(model_name, random_state=None):
                 **params,
             )
 
-    elif model_name == "M2FGB_spd":
+    elif model_name == "M2FGB_pr":
 
         def model(**params):
             return models.M2FGB(
@@ -89,7 +89,7 @@ def get_model(model_name, random_state=None):
                 **params,
             )
 
-    elif model_name == "M2FGB_grad_spd":
+    elif model_name == "M2FGB_grad_pr":
 
         def model(**params):
             return models.M2FGB(
@@ -159,18 +159,18 @@ def get_param_spaces(model_name):
     """Helper function to get parameter space from model name."""
     if model_name not in [
         "M2FGB_eod",
-        "M2FGB_spd",
+        "M2FGB_pr",
         "M2FGB_grad_tpr",
-        "M2FGB_grad_spd",
+        "M2FGB_grad_pr",
         "M2FGB_onlyfair",
         "FairGBMClassifier_eod",
-        "FairClassifier_spd",
+        "FairClassifier_pr",
         "MinMaxFair_tpr",
     ]:
         return models.PARAM_SPACES[model_name]
-    elif model_name == "M2FGB_eod" or model_name == "M2FGB_spd":
+    elif model_name == "M2FGB_eod" or model_name == "M2FGB_pr":
         return models.PARAM_SPACES["M2FGB"]
-    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_spd":
+    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_pr":
         return models.PARAM_SPACES["M2FGB_grad"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES["FairGBMClassifier"]
@@ -188,16 +188,16 @@ def get_param_spaces_acsincome(model_name):
     """Helper function to get parameter space from model name."""
     if model_name not in [
         "M2FGB_eod",
-        "M2FGB_spd",
+        "M2FGB_pr",
         "M2FGB_grad_eod",
-        "M2FGB_grad_spd",
+        "M2FGB_grad_pr",
         "FairGBMClassifier_eod",
         "FairClassifier_spd",
     ]:
         return models.PARAM_SPACES_ACSINCOME[model_name]
-    elif model_name == "M2FGB_eod" or model_name == "M2FGB_spd":
+    elif model_name == "M2FGB_eod" or model_name == "M2FGB_pr":
         return models.PARAM_SPACES_ACSINCOME["M2FGB"]
-    elif model_name == "M2FGB_grad_eod" or model_name == "M2FGB_grad_spd":
+    elif model_name == "M2FGB_grad_eod" or model_name == "M2FGB_grad_pr":
         return models.PARAM_SPACES_ACSINCOME["M2FGB_grad"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
@@ -504,6 +504,7 @@ def eval_model(
         eod = utils.equal_opportunity_score(Y_val, y_val_pred, A_val)
         spd = utils.statistical_parity_score(Y_val, y_val_pred, A_val)
         min_tpr = 1 - utils.min_true_positive_rate(Y_val, y_val_pred, A_val)
+        min_pr = 1 - utils.min_positive_rate(Y_val, y_val_pred, A_val)
         min_bal_acc = 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val)
 
         for i, alpha in enumerate(alpha_list):
@@ -522,6 +523,7 @@ def eval_model(
                     "spd": spd,
                     "model": m,
                     "min_tpr": min_tpr,
+                    "min_pr": min_pr,
                     "min_bal_acc": min_bal_acc,
                 }
             )
@@ -533,6 +535,7 @@ def eval_model(
         eod = utils.equal_opportunity_score(Y_test, y_test_pred, A_test)
         spd = utils.statistical_parity_score(Y_test, y_test_pred, A_test)
         min_tpr = 1 - utils.min_true_positive_rate(Y_test, y_test_pred, A_test)
+        min_pr = 1 - utils.min_positive_rate(Y_test, y_test_pred, A_test)
         min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
 
         for i, alpha in enumerate(alpha_list):
@@ -551,6 +554,7 @@ def eval_model(
                     "spd": spd,
                     "model": m,
                     "min_tpr": min_tpr,
+                    "min_pr": min_pr,
                     "min_bal_acc": min_bal_acc,
                 }
             )
@@ -738,12 +742,11 @@ def experiment2():
     thresh = "ks"
     alpha_list = [i / 20 for i in range(0, 21)]
     n_jobs = 10
-    fair_metric = "min_spd"
+    fair_metric = "min_pr"
 
     datasets = [
         "german",
         "compas",
-        # "adult",
         "acsincome",
     ]
     n_groups_list = [
@@ -752,7 +755,7 @@ def experiment2():
         8,
     ]
     model_name_list = [
-        "M2FGB_grad_spd",
+        "M2FGB_grad_pr",
         # "FairGBMClassifier",
         # "MinMaxFair",
         "LGBMClassifier",
@@ -774,7 +777,7 @@ def experiment2():
                     f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
                 output_dir = (
-                    f"../results/experiment_{n_groups}_spd/{dataset}/{model_name}"
+                    f"../results/experiment_{n_groups}_pr/{dataset}/{model_name}"
                 )
                 args = {
                     "dataset": dataset,
