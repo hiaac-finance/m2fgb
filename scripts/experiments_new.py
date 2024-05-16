@@ -51,6 +51,16 @@ def get_model(model_name, random_state=None):
                 dual_learning="gradient_norm", random_state=random_state, **params
             )
 
+    elif model_name == "M2FGB_onlyfair":
+
+        def model(**params):
+            return models.M2FGB(
+                dual_learning="gradient_norm",
+                fair_weight=1,
+                random_state=random_state,
+                **params,
+            )
+
     elif model_name == "M2FGB_eod":
 
         def model(**params):
@@ -147,6 +157,7 @@ def get_param_spaces(model_name):
         "M2FGB_spd",
         "M2FGB_grad_eod",
         "M2FGB_grad_spd",
+        "M2FGB_onlyfair",
         "FairGBMClassifier_eod",
         "FairClassifier_spd",
     ]:
@@ -159,7 +170,12 @@ def get_param_spaces(model_name):
         return models.PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "FairClassifier_spd":
         return models.PARAM_SPACES["FairClassifier"]
-    
+    elif model_name == "M2FGB_onlyfair":
+        param_space = models.PARAM_SPACES["M2FGB_grad"].copy()
+        del param_space["fair_weight"]
+        return param_space
+
+
 def get_param_spaces_acsincome(model_name):
     """Helper function to get parameter space from model name."""
     if model_name not in [
@@ -233,6 +249,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             A_val = X_val.sex.astype(str) + "_" + (X_val.age > 50).astype(str)
             A_test = X_test.sex.astype(str) + "_" + (X_test.age > 50).astype(str)
         elif dataset == "acsincome":
+
             def race_cat(race):
                 if race == "white":
                     return "1"
@@ -242,12 +259,14 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                     return "3"
                 else:
                     return "4"
+
             A_train = X_train.RAC1P.apply(race_cat)
             A_val = X_val.RAC1P.apply(race_cat)
             A_test = X_test.RAC1P.apply(race_cat)
 
     elif n_groups == 8:
         if dataset == "german":
+
             def age_cat(age):
                 if age < 30:
                     return "1"
@@ -257,6 +276,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                     return "3"
                 else:
                     return "4"
+
             A_train = (
                 X_train.Gender.astype(str)
                 + "_"
@@ -269,6 +289,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                 X_test.Gender.astype(str) + "_" + X_test.Age.apply(age_cat).astype(str)
             )
         elif dataset == "adult":
+
             def age_cat(age):
                 if age < 30:
                     return "1"
@@ -278,6 +299,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                     return "3"
                 else:
                     return "4"
+
             A_train = (
                 X_train.sex.astype(str) + "_" + X_train.age.apply(age_cat).astype(str)
             )
@@ -286,6 +308,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                 X_test.sex.astype(str) + "_" + X_test.age.apply(age_cat).astype(str)
             )
         elif dataset == "compas":
+
             def race_cat(race):
                 if race == "African-American" or race == "Hispanic":
                     return "1"
@@ -295,6 +318,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                     return "3"
                 else:
                     return "4"
+
             A_train = (
                 X_train.race.apply(race_cat)
                 + "_"
@@ -317,6 +341,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                 ).astype(str)
             )
         elif dataset == "acsincome":
+
             def race_cat(race):
                 if race == "white":
                     return "1"
@@ -326,7 +351,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                     return "3"
                 else:
                     return "4"
-            
+
             A_train = X_train.RAC1P.apply(race_cat) + "_" + X_train.SEX.astype(str)
             A_val = X_val.RAC1P.apply(race_cat) + "_" + X_val.SEX.astype(str)
             A_test = X_test.RAC1P.apply(race_cat) + "_" + X_test.SEX.astype(str)

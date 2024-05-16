@@ -288,6 +288,44 @@ def equalized_loss_score(y_ground, y_prob, A):
 
     return np.mean(loss[A == 1]) - np.mean(loss[A == 0])
 
+def logloss_group(y_ground, y_prob, A, fairness_constraint):
+    """For each subgroup, calculates the mean log loss of the samples."""
+    eps = 1e-15
+    y_prob = np.clip(y_prob, eps, 1 - eps)
+    if fairness_constraint == "equalized_loss":
+        loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
+    if fairness_constraint == "demographic_parity":
+        y_ = np.ones(y_ground.shape[0])  # all positive class
+        loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
+    elif fairness_constraint == "equal_opportunity":
+        loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
+        loss[y_ground == 0] = 0  # only consider the loss of the positive class
+
+    loss = np.array([np.mean(loss[A == a]) for a in np.unique(A)])
+    return loss
+
+
+def max_logloss_score(y_ground, y_prob, A):
+    """Calculate the minimum mean loss of the groups. The loss is binary cross entropy.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted probabilities of the positive class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        Minimum mean loss of groups
+    """
+    logloss = logloss_group(y_ground, y_prob, A, "equalized_loss")
+    return max(logloss)
+
 
 def logloss_score(y_ground, y_pred):
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
