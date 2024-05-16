@@ -668,25 +668,21 @@ def experiment1():
     alpha_list = [i / 20 for i in range(0, 21)]
     n_jobs = 10
     fair_metric = "min_bal_acc"
-    
+
     datasets = [
-        #"german",
-        #"compas",
-        #"adult",
+        # "german",
+        # "compas",
+        # "adult",
         "acsincome"
     ]
-    n_groups_list = [
-        2, 
-        4, 
-        8
-    ]
+    n_groups_list = [2, 4, 8]
     model_name_list = [
-        #"M2FGB_grad",
-        #"FairGBMClassifier",
-        #"MinMaxFair",
-        #"LGBMClassifier",
-        #"FairClassifier"
-        #"M2FGB",
+        # "M2FGB_grad",
+        # "FairGBMClassifier",
+        # "MinMaxFair",
+        # "LGBMClassifier",
+        # "FairClassifier"
+        # "M2FGB",
         "MinimaxPareto"
     ]
 
@@ -705,9 +701,71 @@ def experiment1():
                 with open("log.txt", "a+") as f:
                     now = datetime.datetime.now()
                     f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
-                
+
                 output_dir = (
                     f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
+                )
+                args = {
+                    "dataset": dataset,
+                    "alpha_list": alpha_list,
+                    "output_dir": output_dir,
+                    "model_name": model_name,
+                    "n_folds": n_folds,
+                    "n_groups": n_groups,
+                    "n_params": n_params,
+                    "fair_metric": fair_metric,
+                    "n_jobs": n_jobs,
+                    "thresh": thresh,
+                }
+                run_subgroup_experiment(args)
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+
+def experiment2():
+    n_folds = 10
+    thresh = "ks"
+    alpha_list = [i / 20 for i in range(0, 21)]
+    n_jobs = 10
+    fair_metric = "min_spd"
+
+    datasets = [
+        "german",
+        "compas",
+        # "adult",
+        "acsincome",
+    ]
+    n_groups_list = [
+        # 2,
+        4,
+        8,
+    ]
+    model_name_list = [
+        "M2FGB_grad_spd",
+        # "FairGBMClassifier",
+        # "MinMaxFair",
+        "LGBMClassifier",
+        # "FairClassifier"
+        # "M2FGB",
+        # "MinimaxPareto"
+    ]
+
+    n_params = 100
+    for dataset in datasets:
+        for n_groups in n_groups_list:
+            for model_name in model_name_list:
+                if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
+                    if dataset == "acsincome":
+                        n_params = 25
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+                output_dir = (
+                    f"../results/experiment_{n_groups}_spd/{dataset}/{model_name}"
                 )
                 args = {
                     "dataset": dataset,
