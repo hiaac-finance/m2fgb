@@ -83,7 +83,7 @@ def get_model(model_name, random_state=None):
 
         def model(**params):
             return models.M2FGB(
-                dual_learning="gradient",
+                dual_learning="gradient_norm",
                 fairness_constraint="demographic_parity",
                 random_state=random_state,
                 **params,
