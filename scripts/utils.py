@@ -83,7 +83,7 @@ def equal_opportunity_score(y_ground, y_pred, A):
     )
 
 
-def min_equal_opportunity_score(y_ground, y_pred, A):
+def min_true_positive_rate(y_ground, y_pred, A):
     """Calculate the minimum true positive rate of the groups.
     Return 1 - tpr so that the lowest the better.
     It work with multiple groups.
@@ -205,8 +205,8 @@ def get_combined_metrics_scorer(
             fair = equal_opportunity_score(y_ground, y_pred, A)
         elif fairness_metric == "spd":
             fair = statistical_parity_score(y_ground, y_pred, A)
-        elif fairness_metric == "min_eod":
-            fair = min_equal_opportunity_score(y_ground, y_pred, A)
+        elif fairness_metric == "min_tpr":
+            fair = min_true_positive_rate(y_ground, y_pred, A)
         elif fairness_metric == "min_spd":
             fair = min_statistical_parity_score(y_ground, y_pred, A)
         elif fairness_metric == "min_bal_acc":

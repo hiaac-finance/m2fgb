@@ -855,6 +855,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
         n_estimators=100,
+        fairness_constraint="equalized_loss",
         a=1,
         b=0.5,
         gamma=0.0,
@@ -862,7 +863,11 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         penalty=None,
         C=1.0,
         max_iter=100,
-    ):
+    ):  
+        assert fairness_constraint in [
+            "equalized_loss",
+            "tpr"]
+        self.fairness_constraint = fairness_constraint
         self.n_estimators = n_estimators
         self.a = a
         self.b = b
@@ -875,6 +880,10 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
     def fit(self, X, y, sensitive_attribute):
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
+
+        error_type = "Log-Loss"
+        if self.fairness_constraint == "tpr":
+            error_type = "FN-Log-Loss"
 
         # train a logistic model to get min and max logloss
         model = LogisticRegression(
@@ -924,9 +933,9 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
             equal_error=False,
             gamma=gamma_hat,
             relaxed=True,
-            error_type="Log-Loss",
+            error_type=error_type,
             extra_error_types=set(),
-            pop_error_type="Log-Loss",
+            pop_error_type=error_type,
             # data transform
             rescale_features=False,
             test_size=0.0,

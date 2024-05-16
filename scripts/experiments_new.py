@@ -70,7 +70,7 @@ def get_model(model_name, random_state=None):
                 **params,
             )
 
-    elif model_name == "M2FGB_grad_eod":
+    elif model_name == "M2FGB_grad_tpr":
 
         def model(**params):
             return models.M2FGB(
@@ -142,6 +142,11 @@ def get_model(model_name, random_state=None):
         def model(**params):
             return models.MinMaxFair(**params)
 
+    elif model_name == "MinMaxFair_tpr":
+
+        def model(**params):
+            return models.MinMaxFair(fairness_constraint="tpr", **params)
+
     elif model_name == "MinimaxPareto":
 
         def model(**params):
@@ -155,21 +160,24 @@ def get_param_spaces(model_name):
     if model_name not in [
         "M2FGB_eod",
         "M2FGB_spd",
-        "M2FGB_grad_eod",
+        "M2FGB_grad_tpr",
         "M2FGB_grad_spd",
         "M2FGB_onlyfair",
         "FairGBMClassifier_eod",
         "FairClassifier_spd",
+        "MinMaxFair_tpr",
     ]:
         return models.PARAM_SPACES[model_name]
     elif model_name == "M2FGB_eod" or model_name == "M2FGB_spd":
         return models.PARAM_SPACES["M2FGB"]
-    elif model_name == "M2FGB_grad_eod" or model_name == "M2FGB_grad_spd":
+    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_spd":
         return models.PARAM_SPACES["M2FGB_grad"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "FairClassifier_spd":
         return models.PARAM_SPACES["FairClassifier"]
+    elif model_name == "MinMaxFair_tpr":
+        return models.PARAM_SPACES["MinMaxFair"]
     elif model_name == "M2FGB_onlyfair":
         param_space = models.PARAM_SPACES["M2FGB_grad"].copy()
         del param_space["fair_weight"]
@@ -195,6 +203,8 @@ def get_param_spaces_acsincome(model_name):
         return models.PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
     elif model_name == "FairClassifier_spd":
         return models.PARAM_SPACES_ACSINCOME["FairClassifier"]
+    elif model_name == "MinMaxFair_tpr":
+        return models.PARAM_SPACES["MinMaxFair"]
 
 
 def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
@@ -493,7 +503,7 @@ def eval_model(
         eq_loss = utils.equalized_loss_score(Y_val, y_val_score, A_val)
         eod = utils.equal_opportunity_score(Y_val, y_val_pred, A_val)
         spd = utils.statistical_parity_score(Y_val, y_val_pred, A_val)
-        min_tpr = 1 - utils.min_equal_opportunity_score(Y_val, y_val_pred, A_val)
+        min_tpr = 1 - utils.min_true_positive_rate(Y_val, y_val_pred, A_val)
         min_bal_acc = 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val)
 
         for i, alpha in enumerate(alpha_list):
@@ -522,7 +532,7 @@ def eval_model(
         eq_loss = utils.equalized_loss_score(Y_test, y_test_score, A_test)
         eod = utils.equal_opportunity_score(Y_test, y_test_pred, A_test)
         spd = utils.statistical_parity_score(Y_test, y_test_pred, A_test)
-        min_tpr = 1 - utils.min_equal_opportunity_score(Y_test, y_test_pred, A_test)
+        min_tpr = 1 - utils.min_true_positive_rate(Y_test, y_test_pred, A_test)
         min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
 
         for i, alpha in enumerate(alpha_list):
@@ -564,7 +574,6 @@ def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_
             values_cp = {n: v for n, v in values.items() if n != "type"}
             params[name] = trial.suggest_float(name, **values_cp)
 
-    print(params)
     model = model_class(**params)
     model.fit(X_train, Y_train, A_train)
     model_list.append(model)
@@ -786,6 +795,63 @@ def experiment2():
                     f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
+def experiment3():
+    n_folds = 10
+    thresh = "ks"
+    alpha_list = [i / 20 for i in range(0, 21)]
+    n_jobs = 10
+    fair_metric = "min_tpr"
+
+    datasets = [
+        "german",
+        "compas",
+        "acsincome",
+    ]
+    n_groups_list = [
+        # 2,
+        4,
+        8,
+    ]
+    model_name_list = [
+        "LGBMClassifier",
+        "M2FGB_grad_tpr",
+        "MinMaxFair_tpr",
+    ]
+
+    n_params = 100
+    for dataset in datasets:
+        for n_groups in n_groups_list:
+            for model_name in model_name_list:
+                if model_name == "MinMaxFair_tpr" or model_name == "MinimaxPareto":
+                    if dataset == "acsincome":
+                        n_params = 25
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+                output_dir = (
+                    f"../results/experiment_{n_groups}_tpr/{dataset}/{model_name}"
+                )
+                args = {
+                    "dataset": dataset,
+                    "alpha_list": alpha_list,
+                    "output_dir": output_dir,
+                    "model_name": model_name,
+                    "n_folds": n_folds,
+                    "n_groups": n_groups,
+                    "n_params": n_params,
+                    "fair_metric": fair_metric,
+                    "n_jobs": n_jobs,
+                    "thresh": thresh,
+                }
+                run_subgroup_experiment(args)
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+
 def main():
     import lightgbm as lgb
     import fairgbm
@@ -793,7 +859,7 @@ def main():
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
-    experiment1()
+    experiment3()
 
 
 if __name__ == "__main__":
