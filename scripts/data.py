@@ -1,5 +1,8 @@
 import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 
 CAT_FEATURES = {
     "german": [
@@ -116,6 +119,29 @@ def load_dataset(dataset):
         return load_acsincome()
     else:
         raise ValueError(f"Unknown dataset {dataset}")
+
+
+def preprocess_dataset(dataset, X_train, X_val, X_test):
+    col_trans = ColumnTransformer(
+        [
+            ("numeric", StandardScaler(), NUM_FEATURES[dataset]),
+            (
+                "categorical",
+                OneHotEncoder(
+                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
+                ),
+                CAT_FEATURES[dataset],
+            ),
+        ],
+        verbose_feature_names_out=False,
+    )
+    col_trans.set_output(transform="pandas")
+    preprocess = Pipeline([("preprocess", col_trans)])
+    preprocess.fit(X_train)
+    X_train = preprocess.transform(X_train)
+    X_val = preprocess.transform(X_val)
+    X_test = preprocess.transform(X_test)
+    return X_train, X_val, X_test
 
 
 def get_fold(dataset, fold, n_folds=10, random_state=None):
