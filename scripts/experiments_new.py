@@ -84,7 +84,7 @@ def get_model(model_name, random_state=None):
 
         def model(**params):
             return models.M2FGB(
-                fairness_constraint="demographic_parity",
+                fairness_constraint="positive_rate",
                 random_state=random_state,
                 **params,
             )
@@ -94,7 +94,7 @@ def get_model(model_name, random_state=None):
         def model(**params):
             return models.M2FGB(
                 dual_learning="gradient_norm",
-                fairness_constraint="demographic_parity",
+                fairness_constraint="positive_rate",
                 random_state=random_state,
                 **params,
             )
@@ -189,22 +189,23 @@ def get_param_spaces_acsincome(model_name):
     if model_name not in [
         "M2FGB_eod",
         "M2FGB_pr",
-        "M2FGB_grad_eod",
+        "M2FGB_grad_tpr",
         "M2FGB_grad_pr",
         "FairGBMClassifier_eod",
         "FairClassifier_spd",
+        "MinMaxFair_tpr",       
     ]:
         return models.PARAM_SPACES_ACSINCOME[model_name]
-    elif model_name == "M2FGB_eod" or model_name == "M2FGB_pr":
+    elif model_name == "M2FGB_tpr" or model_name == "M2FGB_pr":
         return models.PARAM_SPACES_ACSINCOME["M2FGB"]
-    elif model_name == "M2FGB_grad_eod" or model_name == "M2FGB_grad_pr":
+    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_pr":
         return models.PARAM_SPACES_ACSINCOME["M2FGB_grad"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
     elif model_name == "FairClassifier_spd":
         return models.PARAM_SPACES_ACSINCOME["FairClassifier"]
     elif model_name == "MinMaxFair_tpr":
-        return models.PARAM_SPACES["MinMaxFair"]
+        return models.PARAM_SPACES_ACSINCOME["MinMaxFair"]
 
 
 def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
@@ -578,6 +579,7 @@ def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_
             values_cp = {n: v for n, v in values.items() if n != "type"}
             params[name] = trial.suggest_float(name, **values_cp)
 
+    print(params)
     model = model_class(**params)
     model.fit(X_train, Y_train, A_train)
     model_list.append(model)
@@ -806,19 +808,20 @@ def experiment3():
     fair_metric = "min_tpr"
 
     datasets = [
-        "german",
-        "compas",
+        #"german",
+        #"compas",
         "acsincome",
     ]
     n_groups_list = [
         # 2,
-        4,
+        # 4,
         8,
     ]
     model_name_list = [
+        #"MinMaxFair_tpr",
         "LGBMClassifier",
         "M2FGB_grad_tpr",
-        "MinMaxFair_tpr",
+        
     ]
 
     n_params = 100
