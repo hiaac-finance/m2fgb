@@ -20,6 +20,7 @@ from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
     precision_score,
+    log_loss,
 )
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -193,7 +194,7 @@ def get_param_spaces_acsincome(model_name):
         "M2FGB_grad_pr",
         "FairGBMClassifier_eod",
         "FairClassifier_spd",
-        "MinMaxFair_tpr",       
+        "MinMaxFair_tpr",
     ]:
         return models.PARAM_SPACES_ACSINCOME[model_name]
     elif model_name == "M2FGB_tpr" or model_name == "M2FGB_pr":
@@ -375,8 +376,7 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
     return A_train, A_val, A_test
 
 
-def get_param_list(model_name, n_params):
-    param_space = get_param_spaces(model_name)
+def get_param_list(param_space, n_params):
 
     def sample_random_parameters(param_space):
         params = {}
@@ -579,6 +579,16 @@ def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_
             values_cp = {n: v for n, v in values.items() if n != "type"}
             params[name] = trial.suggest_float(name, **values_cp)
 
+    print(params)
+    model = model_class(**params)
+    model.fit(X_train, Y_train, A_train)
+    model_list.append(model)
+    return 0.5
+
+
+def run_trial_fixed(trial, X_train, Y_train, A_train, model_class, param_list, model_list):
+    """Function to run a single trial of optuna."""
+    params = param_list[trial.number]
     print(params)
     model = model_class(**params)
     model.fit(X_train, Y_train, A_train)
@@ -808,8 +818,8 @@ def experiment3():
     fair_metric = "min_tpr"
 
     datasets = [
-        #"german",
-        #"compas",
+        # "german",
+        # "compas",
         "acsincome",
     ]
     n_groups_list = [
@@ -818,10 +828,9 @@ def experiment3():
         8,
     ]
     model_name_list = [
-        #"MinMaxFair_tpr",
+        # "MinMaxFair_tpr",
         "LGBMClassifier",
         "M2FGB_grad_tpr",
-        
     ]
 
     n_params = 100
@@ -858,6 +867,110 @@ def experiment3():
                     f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
+def experiment4():
+    """Experiment that consider multiple fair_weights values and fit random model with each."""
+    if not os.path.exists("../results/experiment_fair_weight"):
+        os.mkdir("../results/experiment_fair_weight")
+
+    n_folds = 10
+    fold = 0
+    n_groups = 4
+    n_params = 100
+    fair_weight_list = [
+        0,
+        0.01,
+        0.025,
+        0.05,
+        0.075,
+        0.1,
+        0.15,
+        0.2,
+        0.25,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.8,
+        1,
+    ]
+    #fair_weight_list = [i/10 for i in range(11)]
+    datasets = [
+        "german",
+        "compas",
+        "acsincome"
+    ]
+
+    param_space = models.PARAM_SPACES["M2FGB_grad"].copy()
+    del param_space["fair_weight"]
+    param_list = get_param_list(param_space, n_params)
+
+    for dataset in datasets:
+        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
+            dataset, fold, n_folds, SEED
+        )
+        A_train, A_val, A_test = get_subgroup_feature(
+            dataset, X_train, X_val, X_test, n_groups
+        )
+        X_train, X_val, X_test = data.preprocess_dataset(
+            dataset, X_train, X_val, X_test
+        )
+
+        results = []
+        for fair_weight in fair_weight_list:
+
+            for p_i in range(n_params):
+                param_list[p_i]["fair_weight"] = fair_weight
+
+            
+
+            model_list = []
+            study = optuna.create_study(
+                direction="maximize", sampler=RandomSampler(seed=SEED)
+            )
+            objective = lambda trial: run_trial_fixed(
+                trial,
+                X_train,
+                Y_train,
+                A_train,
+                get_model("M2FGB_grad", random_state=SEED),
+                param_list,
+                model_list,
+            )
+            study.optimize(
+                objective,
+                n_trials=n_params,
+                n_jobs=10,
+                show_progress_bar=True,
+            )
+
+            # for i, param in tqdm(enumerate(param_list)):
+            #     param["fair_weight"] = fair_weight
+            #     model = models.M2FGB(dual_learning="gradient_norm", **param)
+            #    model.fit(X_train, Y_train, A_train)
+            for i, model in enumerate(model_list):
+
+                Y_pred = model.predict_proba(X_train)[:, 1]
+                overall_score = log_loss(Y_train, Y_pred)
+                group_scores = utils.logloss_group(
+                    Y_train, Y_pred, A_train, "equalized_loss"
+                )
+
+                results.append(
+                    {
+                        "param": i,
+                        "fair_weight": fair_weight,
+                        "overall_score": overall_score,
+                        "max_group_score": group_scores.max(),
+                    } |
+                    {f"group_{i}": group_score for i, group_score in enumerate(group_scores)} |
+                    {f"param_{key}": value for key, value in model.get_params().items()}
+                )
+
+            pd.DataFrame(results).to_csv(
+                f"../results/experiment_fair_weight/{dataset}.csv", index = False
+            )
+
+
 def main():
     import lightgbm as lgb
     import fairgbm
@@ -865,7 +978,7 @@ def main():
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
-    experiment3()
+    experiment4()
 
 
 if __name__ == "__main__":
