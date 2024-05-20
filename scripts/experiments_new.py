@@ -695,19 +695,16 @@ def experiment1():
     fair_metric = "min_bal_acc"
 
     datasets = [
-        # "german",
-        # "compas",
-        # "adult",
+        "german",
+        "compas",
         "acsincome"
     ]
     n_groups_list = [2, 4, 8]
     model_name_list = [
-        # "M2FGB_grad",
-        # "FairGBMClassifier",
-        # "MinMaxFair",
-        # "LGBMClassifier",
-        # "FairClassifier"
-        # "M2FGB",
+        "M2FGB_grad",
+        "FairGBMClassifier",
+        "MinMaxFair",
+        "LGBMClassifier",
         "MinimaxPareto"
     ]
 
@@ -761,19 +758,10 @@ def experiment2():
         "compas",
         "acsincome",
     ]
-    n_groups_list = [
-        # 2,
-        4,
-        8,
-    ]
+    n_groups_list = [4, 8]
     model_name_list = [
         "M2FGB_grad_pr",
-        # "FairGBMClassifier",
-        # "MinMaxFair",
         "LGBMClassifier",
-        # "FairClassifier"
-        # "M2FGB",
-        # "MinimaxPareto"
     ]
 
     n_params = 100
@@ -811,6 +799,7 @@ def experiment2():
 
 
 def experiment3():
+    """Experiment of hyperparameter tuning with TPR fairness constraint."""
     n_folds = 10
     thresh = "ks"
     alpha_list = [i / 20 for i in range(0, 21)]
@@ -818,17 +807,13 @@ def experiment3():
     fair_metric = "min_tpr"
 
     datasets = [
-        # "german",
-        # "compas",
+        "german",
+        "compas",
         "acsincome",
     ]
-    n_groups_list = [
-        # 2,
-        # 4,
-        8,
-    ]
+    n_groups_list = [4, 8]
     model_name_list = [
-        # "MinMaxFair_tpr",
+        "MinMaxFair_tpr",
         "LGBMClassifier",
         "M2FGB_grad_tpr",
     ]
@@ -893,7 +878,6 @@ def experiment4():
         0.8,
         1,
     ]
-    #fair_weight_list = [i/10 for i in range(11)]
     datasets = [
         "german",
         "compas",
@@ -943,10 +927,6 @@ def experiment4():
                 show_progress_bar=True,
             )
 
-            # for i, param in tqdm(enumerate(param_list)):
-            #     param["fair_weight"] = fair_weight
-            #     model = models.M2FGB(dual_learning="gradient_norm", **param)
-            #    model.fit(X_train, Y_train, A_train)
             for i, model in enumerate(model_list):
 
                 Y_pred = model.predict_proba(X_train)[:, 1]
@@ -978,7 +958,7 @@ def main():
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
-    experiment4()
+    experiment3()
 
 
 if __name__ == "__main__":

@@ -116,7 +116,7 @@ PARAM_SPACES = {
     "MinMaxFair": {
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "gamma": {"type": "float", "low": 0, "high": 1},
-        "penalty": {"type": "str", "options": ["none", "l2"]},
+        "penalty": {"type": "categorical", "choices": [None, "l2"]},
         "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
         "a": {"type": "float", "low": 0.1, "high": 1},
         "b": {"type": "float", "low": 1e-2, "high": 1},
@@ -860,7 +860,7 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         b=0.5,
         gamma=0.0,
         relaxed=False,
-        penalty=None,
+        penalty="l2",
         C=1.0,
         max_iter=100,
     ):  
