@@ -813,9 +813,10 @@ def experiment3():
     ]
     n_groups_list = [4, 8]
     model_name_list = [
-        "MinMaxFair_tpr",
-        "LGBMClassifier",
-        "M2FGB_grad_tpr",
+        #"MinMaxFair_tpr",
+        #"LGBMClassifier",
+        #"M2FGB_grad_tpr",
+        "FairGBMClassifier_eod",
     ]
 
     n_params = 100
