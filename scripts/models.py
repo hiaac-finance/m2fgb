@@ -100,19 +100,6 @@ PARAM_SPACES = {
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
     },
-    "ExponentiatedGradient": {
-        "eps": {"type": "float", "low": 0.001, "high": 0.5, "log": True},
-        "max_iter": {"type": "int", "low": 10, "high": 1000, "log": True},
-        "eta0": {"type": "float", "low": 0.1, "high": 100, "log": True},
-        "min_child_leaf": {"type": "int", "low": 5, "high": 500, "log": True},
-        "max_depth": {"type": "int", "low": 2, "high": 10},
-        "criterion": {"type": "str", "options": ["gini", "entropy"]},
-    },
-    "FairClassifier": {
-        "covariance_threshold": {"type": "float", "low": 0.1, "high": 1, "log": True},
-        "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
-        "penalty": {"type": "str", "options": ["none", "l1"]},
-    },
     "MinMaxFair": {
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "gamma": {"type": "float", "low": 0, "high": 1},
@@ -600,7 +587,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         self,
         fairness_constraint="equalized_loss",
         fair_weight=0.5,
-        dual_learning="optim",
+        dual_learning="gradient_norm",
         multiplier_learning_rate=0.1,
         n_estimators=10,
         learning_rate=0.1,
@@ -700,145 +687,6 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         return preds
 
 
-class ExponentiatedGradient_Wrap(BaseEstimator, ClassifierMixin):
-    def __init__(
-        self,
-        fairness_constraint,
-        eps,
-        max_iter,
-        eta0,
-        min_samples_leaf,
-        max_depth,
-        criterion,
-        random_state=None,
-    ):
-        assert fairness_constraint in [
-            "equalized_loss",
-            "equal_opportunity",
-            "demographic_parity",
-        ]
-        fairness_mapper = {
-            "equalized_loss": EqualizedOdds(),
-            "equal_opportunity": TruePositiveRateParity(),
-            "demographic_parity": DemographicParity(),
-        }
-        self.fairness_constraint = fairness_mapper[fairness_constraint]
-        self.eps = eps
-        self.max_iter = max_iter
-        self.eta0 = eta0
-        self.min_samples_leaf = min_samples_leaf
-        self.max_depth = max_depth
-        self.criterion = criterion
-
-        self.estimator = DecisionTreeClassifier(
-            min_samples_leaf=self.min_samples_leaf,
-            max_depth=self.max_depth,
-            criterion=self.criterion,
-            random_state=random_state,
-        )
-
-    def fit(self, X, y, sensitive_attribute):
-        X, y = check_X_y(X, y)
-        self.classes_ = np.unique(y)
-        self.model_ = ExponentiatedGradient(
-            self.estimator,
-            constraints=self.fairness_constraint,
-            eps=self.eps,
-            max_iter=self.max_iter,
-            eta0=self.eta0,
-        )
-        self.model_.fit(X, y, sensitive_features=sensitive_attribute)
-        return self
-
-    def predict(self, X):
-        check_is_fitted(self)
-        X = check_array(X)
-        return self.model_.predict(X)
-
-    def predict_proba(self, X):
-        check_is_fitted(self)
-        X = check_array(X)
-        return self.model_.predict_proba(X)
-
-
-class FairClassifier_Wrap(BaseEstimator, ClassifierMixin):
-    def __init__(
-        self,
-        fairness_constraint="equal_opportunity",
-        covariance_threshold=0.1,
-        C=1.0,
-        penalty="l1",
-        max_iter=500,
-        random_state=None,
-    ):
-        assert fairness_constraint in [
-            "equal_opportunity",
-            "demographic_parity",
-        ]
-        self.fairness_constraint = fairness_constraint
-        self.covariance_threshold = covariance_threshold
-        self.C = C
-        self.penalty = penalty
-        self.max_iter = max_iter
-        self.random_state = random_state
-
-    def fit(self, X, y, sensitive_attribute):
-        X, y = check_X_y(X, y)
-        # insert sensitive attribute as first column of the dataframe
-        X = X.copy()
-        X = np.insert(X, 0, sensitive_attribute, axis=1)
-        self.classes_ = np.unique(y)
-        if self.fairness_constraint == "equal_opportunity":
-            self.model_ = EqualOpportunityClassifier(
-                covariance_threshold=self.covariance_threshold,
-                positive_target=1,
-                C=self.C,
-                sensitive_cols=0,
-                penalty=self.penalty,
-                max_iter=self.max_iter,
-                train_sensitive_cols=False,
-            )
-        elif self.fairness_constraint == "demographic_parity":
-            self.model_ = DemographicParityClassifier(
-                covariance_threshold=self.covariance_threshold,
-                C=self.C,
-                sensitive_cols=0,
-                penalty=self.penalty,
-                max_iter=self.max_iter,
-                train_sensitive_cols=False,
-            )
-
-        try:
-            self.model_.fit(X, y)
-        except:
-            print("Error in FairClassifier")
-            self.model_ = LogisticRegression(
-                C=self.C,
-                penalty=self.penalty,
-                max_iter=self.max_iter,
-                random_state=self.random_state,
-                solver="saga",
-            )
-            self.model_.fit(X, y)
-        return self
-
-    def predict(self, X):
-        check_is_fitted(self)
-        X = check_array(X)
-        X = X.copy()
-        A = np.ones(X.shape[0])
-        X = np.insert(X, 0, A, axis=1)
-        return self.model_.predict(X)
-
-    def predict_proba(self, X):
-        check_is_fitted(self)
-        X = check_array(X)
-        X = X.copy()
-        A = np.ones(X.shape[0])
-        X = np.insert(X, 0, A, axis=1)
-        return self.model_.predict_proba(X)
-
-
 class LGBMClassifier(lgb.LGBMClassifier):
     def fit(self, X, Y, A):
         super().fit(X, Y)
@@ -863,10 +711,8 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         penalty="l2",
         C=1.0,
         max_iter=100,
-    ):  
-        assert fairness_constraint in [
-            "equalized_loss",
-            "tpr"]
+    ):
+        assert fairness_constraint in ["equalized_loss", "tpr"]
         self.fairness_constraint = fairness_constraint
         self.n_estimators = n_estimators
         self.a = a
@@ -1029,7 +875,6 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
             alpha=self.alpha,
             verbose=True,
         )
-
 
         mu_best = results["mu_best_list"][-1]
         model.weighted_fit(X, y, sensitive_attribute, mu_best)

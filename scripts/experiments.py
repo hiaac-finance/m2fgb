@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from multiprocessing import Pool
 import joblib
-import optuna
+import datetime
 
-optuna.logging.set_verbosity(optuna.logging.WARNING)
+import optuna
+from optuna.samplers import RandomSampler
 
 import os
 import data
@@ -13,48 +15,27 @@ import utils
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.metrics import roc_auc_score, accuracy_score, balanced_accuracy_score
+from sklearn.metrics import (
+    roc_auc_score,
+    accuracy_score,
+    balanced_accuracy_score,
+    precision_score,
+    log_loss,
+)
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+import sys
+import warnings
+
+sys.stderr = open("stderr.txt", "w")
+
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+    os.environ["PYTHONWARNINGS"] = "ignore"
 
 
 SEED = 0
-
-
-def run_trial(
-    trial,
-    scorer,
-    X_train,
-    Y_train,
-    A_train,
-    X_val,
-    Y_val,
-    A_val,
-    model_class,
-    param_space,
-    args,
-):
-    """Function to run a single trial of optuna."""
-    params = {}
-    for name, values in param_space.items():
-        if values["type"] == "int":
-            values_cp = {n: v for n, v in values.items() if n != "type"}
-            params[name] = trial.suggest_int(name, **values_cp)
-        elif values["type"] == "categorical":
-            values_cp = {n: v for n, v in values.items() if n != "type"}
-            params[name] = trial.suggest_categorical(name, **values_cp)
-        elif values["type"] == "float":  # corrected this line
-            values_cp = {n: v for n, v in values.items() if n != "type"}
-            params[name] = trial.suggest_float(name, **values_cp)
-
-    model = model_class(**params)
-    model.fit(X_train, Y_train, A_train)
-
-    Y_val_score = model.predict_proba(X_val)[:, 1]
-    if args["thresh"] == "ks":
-        thresh = utils.get_best_threshold(Y_val, Y_val_score)
-    else:
-        thresh = 0.5
-    Y_val_pred = Y_val_score > thresh
-    return scorer(Y_val, Y_val_pred, A_val)
 
 
 def get_model(model_name, random_state=None):
@@ -68,7 +49,17 @@ def get_model(model_name, random_state=None):
 
         def model(**params):
             return models.M2FGB(
-                dual_learning="gradient", random_state=random_state, **params
+                dual_learning="gradient_norm", random_state=random_state, **params
+            )
+
+    elif model_name == "M2FGB_onlyfair":
+
+        def model(**params):
+            return models.M2FGB(
+                dual_learning="gradient_norm",
+                fair_weight=1,
+                random_state=random_state,
+                **params,
             )
 
     elif model_name == "M2FGB_eod":
@@ -80,7 +71,7 @@ def get_model(model_name, random_state=None):
                 **params,
             )
 
-    elif model_name == "M2FGB_grad_eod":
+    elif model_name == "M2FGB_grad_tpr":
 
         def model(**params):
             return models.M2FGB(
@@ -90,21 +81,21 @@ def get_model(model_name, random_state=None):
                 **params,
             )
 
-    elif model_name == "M2FGB_spd":
+    elif model_name == "M2FGB_pr":
 
         def model(**params):
             return models.M2FGB(
-                fairness_constraint="demographic_parity",
+                fairness_constraint="positive_rate",
                 random_state=random_state,
                 **params,
             )
 
-    elif model_name == "M2FGB_grad_spd":
+    elif model_name == "M2FGB_grad_pr":
 
         def model(**params):
             return models.M2FGB(
-                dual_learning="gradient",
-                fairness_constraint="demographic_parity",
+                dual_learning="gradient_norm",
+                fairness_constraint="positive_rate",
                 random_state=random_state,
                 **params,
             )
@@ -112,7 +103,9 @@ def get_model(model_name, random_state=None):
     elif model_name == "LGBMClassifier":
 
         def model(**params):
-            return models.LGBMClassifier(random_state=random_state, verbose=-1, **params)
+            return models.LGBMClassifier(
+                random_state=random_state, verbose=-1, **params
+            )
 
     elif model_name == "FairGBMClassifier":
 
@@ -126,24 +119,20 @@ def get_model(model_name, random_state=None):
                 constraint_type="FNR", random_state=random_state, **params
             )
 
-    elif model_name == "ExponentiatedGradient":
+    elif model_name == "MinMaxFair":
 
         def model(**params):
-            return models.ExponentiatedGradient_Wrap(
-                random_state=random_state, **params
-            )
+            return models.MinMaxFair(**params)
 
-    elif model_name == "FairClassifier":
+    elif model_name == "MinMaxFair_tpr":
 
         def model(**params):
-            return models.FairClassifier_Wrap(**params)
+            return models.MinMaxFair(fairness_constraint="tpr", **params)
 
-    elif model_name == "FairClassifier_spd":
+    elif model_name == "MinimaxPareto":
 
         def model(**params):
-            return models.FairClassifier_Wrap(
-                fairness_constraint="demographic_parity", **params
-            )
+            return models.MinimaxPareto(**params)
 
     return model
 
@@ -152,21 +141,51 @@ def get_param_spaces(model_name):
     """Helper function to get parameter space from model name."""
     if model_name not in [
         "M2FGB_eod",
-        "M2FGB_spd",
-        "M2FGB_grad_eod",
-        "M2FGB_grad_spd",
+        "M2FGB_pr",
+        "M2FGB_grad_tpr",
+        "M2FGB_grad_pr",
+        "M2FGB_onlyfair",
         "FairGBMClassifier_eod",
-        "FairClassifier_spd",
+        "MinMaxFair_tpr",
     ]:
         return models.PARAM_SPACES[model_name]
-    elif model_name == "M2FGB_eod" or model_name == "M2FGB_spd":
+    elif model_name == "M2FGB_eod" or model_name == "M2FGB_pr":
         return models.PARAM_SPACES["M2FGB"]
-    elif model_name == "M2FGB_grad_eod" or model_name == "M2FGB_grad_spd":
+    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_pr":
         return models.PARAM_SPACES["M2FGB_grad"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "FairClassifier_spd":
         return models.PARAM_SPACES["FairClassifier"]
+    elif model_name == "MinMaxFair_tpr":
+        return models.PARAM_SPACES["MinMaxFair"]
+    elif model_name == "M2FGB_onlyfair":
+        param_space = models.PARAM_SPACES["M2FGB_grad"].copy()
+        del param_space["fair_weight"]
+        return param_space
+
+
+def get_param_spaces_acsincome(model_name):
+    """Helper function to get parameter space from model name."""
+    if model_name not in [
+        "M2FGB_eod",
+        "M2FGB_pr",
+        "M2FGB_grad_tpr",
+        "M2FGB_grad_pr",
+        "FairGBMClassifier_eod",
+        "MinMaxFair_tpr",
+    ]:
+        return models.PARAM_SPACES_ACSINCOME[model_name]
+    elif model_name == "M2FGB_tpr" or model_name == "M2FGB_pr":
+        return models.PARAM_SPACES_ACSINCOME["M2FGB"]
+    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_pr":
+        return models.PARAM_SPACES_ACSINCOME["M2FGB_grad"]
+    elif model_name == "FairGBMClassifier_eod":
+        return models.PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
+    elif model_name == "FairClassifier_spd":
+        return models.PARAM_SPACES_ACSINCOME["FairClassifier"]
+    elif model_name == "MinMaxFair_tpr":
+        return models.PARAM_SPACES_ACSINCOME["MinMaxFair"]
 
 
 def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
@@ -184,6 +203,10 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             A_train = X_train.race == "Caucasian"
             A_val = X_val.race == "Caucasian"
             A_test = X_test.race == "Caucasian"
+        elif dataset == "acsincome":
+            A_train = X_train.SEX.astype(str)
+            A_val = X_val.SEX.astype(str)
+            A_test = X_test.SEX.astype(str)
 
     elif n_groups == 4:
         if dataset == "german":
@@ -216,30 +239,35 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
             A_train = X_train.sex.astype(str) + "_" + (X_train.age > 50).astype(str)
             A_val = X_val.sex.astype(str) + "_" + (X_val.age > 50).astype(str)
             A_test = X_test.sex.astype(str) + "_" + (X_test.age > 50).astype(str)
+        elif dataset == "acsincome":
+
+            def race_cat(race):
+                if race == "white":
+                    return "1"
+                elif race == "african_america":
+                    return "2"
+                elif race == "asian":
+                    return "3"
+                else:
+                    return "4"
+
+            A_train = X_train.RAC1P.apply(race_cat)
+            A_val = X_val.RAC1P.apply(race_cat)
+            A_test = X_test.RAC1P.apply(race_cat)
 
     elif n_groups == 8:
-
-        def age_cat(age):
-            if age < 30:
-                return "1"
-            elif age < 40:
-                return "2"
-            elif age < 50:
-                return "3"
-            else:
-                return "4"
-
-        def race_cat(race):
-            if race == "African-American" or race == "Hispanic":
-                return "1"
-            elif race == "Caucasian":
-                return "2"
-            elif race == "Asian":
-                return "3"
-            else:
-                return "4"
-
         if dataset == "german":
+
+            def age_cat(age):
+                if age < 30:
+                    return "1"
+                elif age < 40:
+                    return "2"
+                elif age < 50:
+                    return "3"
+                else:
+                    return "4"
+
             A_train = (
                 X_train.Gender.astype(str)
                 + "_"
@@ -252,6 +280,17 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                 X_test.Gender.astype(str) + "_" + X_test.Age.apply(age_cat).astype(str)
             )
         elif dataset == "adult":
+
+            def age_cat(age):
+                if age < 30:
+                    return "1"
+                elif age < 40:
+                    return "2"
+                elif age < 50:
+                    return "3"
+                else:
+                    return "4"
+
             A_train = (
                 X_train.sex.astype(str) + "_" + X_train.age.apply(age_cat).astype(str)
             )
@@ -260,6 +299,17 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                 X_test.sex.astype(str) + "_" + X_test.age.apply(age_cat).astype(str)
             )
         elif dataset == "compas":
+
+            def race_cat(race):
+                if race == "African-American" or race == "Hispanic":
+                    return "1"
+                elif race == "Caucasian":
+                    return "2"
+                elif race == "Asian":
+                    return "3"
+                else:
+                    return "4"
+
             A_train = (
                 X_train.race.apply(race_cat)
                 + "_"
@@ -281,6 +331,21 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
                     (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
                 ).astype(str)
             )
+        elif dataset == "acsincome":
+
+            def race_cat(race):
+                if race == "white":
+                    return "1"
+                elif race == "african_america":
+                    return "2"
+                elif race == "asian":
+                    return "3"
+                else:
+                    return "4"
+
+            A_train = X_train.RAC1P.apply(race_cat) + "_" + X_train.SEX.astype(str)
+            A_val = X_val.RAC1P.apply(race_cat) + "_" + X_val.SEX.astype(str)
+            A_test = X_test.RAC1P.apply(race_cat) + "_" + X_test.SEX.astype(str)
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
     print(sensitive_map)
@@ -290,44 +355,181 @@ def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
     return A_train, A_val, A_test
 
 
-def eval_model(y_true, y_score, y_pred, A):
+def get_param_list(param_space, n_params):
+
+    def sample_random_parameters(param_space):
+        params = {}
+        for key, value in param_space.items():
+            if value["type"] == "int":
+                if "log" in value and value["log"]:
+                    params[key] = int(
+                        np.exp(
+                            np.random.uniform(
+                                np.log(value["low"]),
+                                np.log(value["high"]),
+                            )
+                        )
+                    )
+                else:
+                    params[key] = np.random.randint(
+                        value["low"],
+                        value["high"],
+                    )
+            elif value["type"] == "float":
+                if "log" in value and value["log"]:
+                    params[key] = np.exp(
+                        np.random.uniform(
+                            np.log(value["low"]),
+                            np.log(value["high"]),
+                        )
+                    )
+                else:
+                    params[key] = np.random.uniform(
+                        value["low"],
+                        value["high"],
+                    )
+            elif value["type"] == "str":
+                params[key] = np.random.choice(value["options"])
+
+        return params
+
+    param_list = [sample_random_parameters(param_space) for _ in range(n_params)]
+    return param_list
+
+
+def eval_model(
+    alpha_list,
+    fair_metric,
+    model_list,
+    thresh,
+    X_val,
+    Y_val,
+    A_val,
+    X_test,
+    Y_test,
+    A_test,
+):
     """Evaluate model performance and fairness metrics."""
-    acc = accuracy_score(y_true, y_pred)
-    bal_acc = balanced_accuracy_score(y_true, y_pred)
-    roc = roc_auc_score(y_true, y_score)
-    eq_loss = utils.equalized_loss_score(y_true, y_score, A)
-    eod = utils.equal_opportunity_score(y_true, y_pred, A)
-    spd = utils.statistical_parity_score(y_true, y_pred, A)
-    metrics = {
-        "acc": acc,
-        "bal_acc": bal_acc,
-        "roc": roc,
-        "eq_loss": eq_loss,
-        "eod": eod,
-        "spd": spd,
-    }
+    scorer_list = [
+        utils.get_combined_metrics_scorer(
+            alpha=alpha,
+            performance_metric="bal_acc",
+            fairness_metric=fair_metric,
+        )
+        for alpha in alpha_list
+    ]
+    results_val = []
+    results_test = []
+    for m, model in tqdm(enumerate(model_list), total=len(model_list)):
+        y_val_score = model.predict_proba(X_val)[:, 1]
+        if thresh == "ks":
+            thresh = utils.get_best_threshold(Y_val, y_val_score)
+        else:
+            thresh = 0.5
 
-    pr_list = []
-    tpr_list = []
-    bal_acc_list = []
+        y_val_pred = y_val_score > thresh
+        y_test_score = model.predict_proba(X_test)[:, 1]
+        y_test_pred = y_test_score > thresh
 
-    for g in np.unique(A):
-        bool_g = A == g
-        pr_list.append(y_pred[bool_g].mean())
-        tpr_list.append(y_pred[bool_g & (y_true == 1)].mean())
-        bal_acc_list.append(balanced_accuracy_score(y_true[bool_g], y_pred[bool_g]))
+        bal_acc = balanced_accuracy_score(Y_val, y_val_pred)
+        prec = precision_score(Y_val, y_val_pred)
+        acc = accuracy_score(Y_val, y_val_pred)
+        roc = roc_auc_score(Y_val, y_val_score)
+        eq_loss = utils.equalized_loss_score(Y_val, y_val_score, A_val)
+        eod = utils.equal_opportunity_score(Y_val, y_val_pred, A_val)
+        spd = utils.statistical_parity_score(Y_val, y_val_pred, A_val)
+        min_tpr = 1 - utils.min_true_positive_rate(Y_val, y_val_pred, A_val)
+        min_pr = 1 - utils.min_positive_rate(Y_val, y_val_pred, A_val)
+        min_bal_acc = 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val)
 
-    metrics["tpr_min"] = min(tpr_list)
-    metrics["tpr_max"] = max(tpr_list)
-    metrics["tpr_mean"] = np.mean(tpr_list)
-    metrics["pr_min"] = min(pr_list)
-    metrics["pr_max"] = max(pr_list)
-    metrics["pr_mean"] = np.mean(pr_list)
-    metrics["bal_acc_min"] = min(bal_acc_list)
-    metrics["bal_acc_max"] = max(bal_acc_list)
-    metrics["bal_acc_mean"] = np.mean(bal_acc_list)
+        for i, alpha in enumerate(alpha_list):
+            score = scorer_list[i](Y_val, y_val_pred, A_val)
 
-    return metrics
+            results_val.append(
+                {
+                    "alpha": alpha,
+                    "score": score,
+                    "bal_acc": bal_acc,
+                    "prec": prec,
+                    "acc": acc,
+                    "roc": roc,
+                    "eq_loss": eq_loss,
+                    "eod": eod,
+                    "spd": spd,
+                    "model": m,
+                    "min_tpr": min_tpr,
+                    "min_pr": min_pr,
+                    "min_bal_acc": min_bal_acc,
+                }
+            )
+
+        bal_acc = balanced_accuracy_score(Y_test, y_test_pred)
+        acc = accuracy_score(Y_test, y_test_pred)
+        roc = roc_auc_score(Y_test, y_test_score)
+        eq_loss = utils.equalized_loss_score(Y_test, y_test_score, A_test)
+        eod = utils.equal_opportunity_score(Y_test, y_test_pred, A_test)
+        spd = utils.statistical_parity_score(Y_test, y_test_pred, A_test)
+        min_tpr = 1 - utils.min_true_positive_rate(Y_test, y_test_pred, A_test)
+        min_pr = 1 - utils.min_positive_rate(Y_test, y_test_pred, A_test)
+        min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
+
+        for i, alpha in enumerate(alpha_list):
+            score = scorer_list[i](Y_test, y_test_pred, A_test)
+
+            results_test.append(
+                {
+                    "alpha": alpha,
+                    "score": score,
+                    "bal_acc": bal_acc,
+                    "prec": prec,
+                    "acc": acc,
+                    "roc": roc,
+                    "eq_loss": eq_loss,
+                    "eod": eod,
+                    "spd": spd,
+                    "model": m,
+                    "min_tpr": min_tpr,
+                    "min_pr": min_pr,
+                    "min_bal_acc": min_bal_acc,
+                }
+            )
+
+    results_val = pd.DataFrame(results_val)
+    results_test = pd.DataFrame(results_test)
+    return results_val, results_test
+
+
+def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_list):
+    """Function to run a single trial of optuna."""
+    params = {}
+    for name, values in param_space.items():
+        if values["type"] == "int":
+            values_cp = {n: v for n, v in values.items() if n != "type"}
+            params[name] = trial.suggest_int(name, **values_cp)
+        elif values["type"] == "categorical":
+            values_cp = {n: v for n, v in values.items() if n != "type"}
+            params[name] = trial.suggest_categorical(name, **values_cp)
+        elif values["type"] == "float":  # corrected this line
+            values_cp = {n: v for n, v in values.items() if n != "type"}
+            params[name] = trial.suggest_float(name, **values_cp)
+
+    print(params)
+    model = model_class(**params)
+    model.fit(X_train, Y_train, A_train)
+    model_list.append(model)
+    return 0.5
+
+
+def run_trial_fixed(
+    trial, X_train, Y_train, A_train, model_class, param_list, model_list
+):
+    """Function to run a single trial of optuna."""
+    params = param_list[trial.number]
+    print(params)
+    model = model_class(**params)
+    model.fit(X_train, Y_train, A_train)
+    model_list.append(model)
+    return 0.5
 
 
 def run_subgroup_experiment(args):
@@ -337,10 +539,6 @@ def run_subgroup_experiment(args):
     # clear best_params.txt if exists
     if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
         os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
-    results_train = []
-    results_val = []
-    results_test = []
-    
 
     col_trans = ColumnTransformer(
         [
@@ -356,10 +554,6 @@ def run_subgroup_experiment(args):
         verbose_feature_names_out=False,
     )
     col_trans.set_output(transform="pandas")
-
-    scorer = utils.get_combined_metrics_scorer(
-        alpha=args["alpha"], performance_metric="bal_acc", fairness_metric=args["fairness_metric"]
-    )
 
     for i in tqdm(range(args["n_folds"])):
         # Load and prepare data
@@ -378,303 +572,327 @@ def run_subgroup_experiment(args):
         X_val = preprocess.transform(X_val)
         X_test = preprocess.transform(X_test)
 
-        model_class = get_model(args["model_name"], random_state=SEED)
-        study = optuna.create_study(direction="maximize")
+        if args["dataset"] != "acsincome":
+            param_space = get_param_spaces(args["model_name"])
+        else:
+            param_space = get_param_spaces_acsincome(args["model_name"])
+
+        study = optuna.create_study(
+            direction="maximize", sampler=RandomSampler(seed=SEED)
+        )
+        model_list = []
         objective = lambda trial: run_trial(
             trial,
-            scorer,
             X_train,
             Y_train,
             A_train,
+            get_model(args["model_name"], random_state=SEED),
+            param_space,
+            model_list,
+        )
+        study.optimize(
+            objective,
+            n_trials=args["n_params"],
+            n_jobs=args["n_jobs"],
+            show_progress_bar=True,
+        )
+        trials_df = study.trials_dataframe(attrs=("number", "duration", "params"))
+        trials_df.to_csv(
+            os.path.join(args["output_dir"], f"trials_fold_{i}.csv"), index=False
+        )
+
+        results_val, results_test = eval_model(
+            args["alpha_list"],
+            args["fair_metric"],
+            model_list,
+            args["thresh"],
             X_val,
             Y_val,
             A_val,
-            model_class,
-            get_param_spaces(args["model_name"]),
-            args,
-        )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
-        best_params = study.best_params.copy()
-
-        model = model_class(**study.best_params)
-        model.fit(X_train, Y_train, A_train)
-
-        y_train_score = model.predict_proba(X_train)[:, 1]
-        y_val_score = model.predict_proba(X_val)[:, 1]
-        y_test_score = model.predict_proba(X_test)[:, 1]
-        if args["thresh"] == "ks":
-            thresh = utils.get_best_threshold(Y_val, y_val_score)
-        else:
-            thresh = 0.5
-        
-        y_train_pred = y_train_score > thresh
-        y_val_pred = y_val_score > thresh
-        y_test_pred = y_test_score > thresh
-
-        best_params["threshold"] = thresh
-        joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
-        with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
-            f.write(str(best_params))
-            f.write("\n")
-
-        metrics_train = eval_model(Y_train, y_train_score, y_train_pred, A_train)
-        metrics_val = eval_model(Y_val, y_val_score, y_val_pred, A_val)
-        metrics_test = eval_model(Y_test, y_test_score, y_test_pred, A_test)
-        
-        results_train.append(metrics_train)
-        results_val.append(metrics_val)
-        results_test.append(metrics_test)
-        
-        
-    results_train = pd.DataFrame(results_train)
-    results_val = pd.DataFrame(results_val)
-    results_test = pd.DataFrame(results_test)
-    results_train.to_csv(os.path.join(args["output_dir"], "results_train.csv"), index=False)
-    results_val.to_csv(os.path.join(args["output_dir"], "results_val.csv"), index=False)
-    results_test.to_csv(os.path.join(args["output_dir"], "results.csv"), index=False)
-
-
-def run_fairness_goal_experiment(args):
-    # create output directory if not exists
-    if not os.path.exists(args["output_dir"]):
-        os.makedirs(args["output_dir"])
-    # clear best_params.txt if exists
-    if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
-        os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
-    results = []
-
-    col_trans = ColumnTransformer(
-        [
-            ("numeric", StandardScaler(), data.NUM_FEATURES[args["dataset"]]),
-            (
-                "categorical",
-                OneHotEncoder(
-                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
-                ),
-                data.CAT_FEATURES[args["dataset"]],
-            ),
-        ],
-        verbose_feature_names_out=False,
-    )
-    col_trans.set_output(transform="pandas")
-
-    scorer = utils.get_fairness_goal_scorer(
-        fairness_goal=args["goal"],
-        M=1000,
-        performance_metric="bal_acc",
-        fairness_metric="eod",
-    )
-
-    for i in tqdm(range(10)):
-        # Load and prepare data
-        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
-            args["dataset"], i, SEED
+            X_test,
+            Y_test,
+            A_test,
         )
 
-        # Define sensitive attribute from gender and age
-        A_train, A_val, A_test = get_subgroup_feature(
-            args["dataset"], X_train, X_val, X_test, args["n_groups"]
+        # save results of fold
+        results_val.to_csv(
+            os.path.join(args["output_dir"], f"validation_fold_{i}.csv"), index=False
         )
-
-        preprocess = Pipeline([("preprocess", col_trans)])
-        preprocess.fit(X_train)
-        X_train = preprocess.transform(X_train)
-        X_val = preprocess.transform(X_val)
-        X_test = preprocess.transform(X_test)
-
-        model_class = get_model(args["model_name"], random_state=SEED)
-        study = optuna.create_study(direction="maximize")
-        objective = lambda trial: run_trial(
-            trial,
-            scorer,
-            X_train,
-            Y_train,
-            A_train,
-            X_val,
-            Y_val,
-            A_val,
-            model_class,
-            get_param_spaces(args["model_name"]),
-            args,
+        results_test.to_csv(
+            os.path.join(args["output_dir"], f"test_fold_{i}.csv"), index=False
         )
-        study.optimize(objective, n_trials=args["n_trials"], n_jobs=-1)
-        best_params = study.best_params.copy()
-
-        model = model_class(**study.best_params)
-        model.fit(X_train, Y_train, A_train)
-        y_val_score = model.predict_proba(X_val)[:, 1]
-        if args["thresh"] == "ks":
-            thresh = utils.get_best_threshold(Y_val, y_val_score)
-        else:
-            thresh = 0.5
-        y_test_score = model.predict_proba(X_test)[:, 1]
-        y_test_pred = y_test_score > thresh
-        metrics = eval_model(Y_test, y_test_score, y_test_pred, A_test)
-        best_params["threshold"] = thresh
-        joblib.dump(model, os.path.join(args["output_dir"], f"model_{i}.pkl"))
-        # save best params
-        with open(os.path.join(args["output_dir"], f"best_params.txt"), "a+") as f:
-            f.write(str(best_params))
-            f.write("\n")
-        results.append(metrics)
-
-    results = pd.DataFrame(results)
-    results.to_csv(os.path.join(args["output_dir"], "results.csv"))
 
 
 def experiment1():
-    datasets = ["german", "compas", "adult"]
-    model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "FairClassifier",
-        "M2FGB",
+    """Equalized loss experiment."""
+    n_folds = 10
+    thresh = "ks"
+    alpha_list = [i / 20 for i in range(0, 21)]
+    n_jobs = 10
+    fair_metric = "min_bal_acc"
+
+    datasets = ["german", "compas", "acsincome"]
+    n_groups_list = [2, 4, 8]
+    model_name_list = [
         "M2FGB_grad",
+        "FairGBMClassifier",
+        "MinMaxFair",
+        "LGBMClassifier",
+        "MinimaxPareto",
     ]
-    alphas = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-    alphas += [0.05, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
-    alphas_adult = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
+    n_params = 100
     for dataset in datasets:
-        for alpha in alphas:
-            if dataset == "adult" and not alpha in alphas_adult:
-                continue
+        for n_groups in n_groups_list:
+            for model_name in model_name_list:
+                if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
+                    if dataset == "acsincome":
+                        n_params = 25
 
-            for model_name in model_names:
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+                output_dir = (
+                    f"../results/experiment_{n_groups}_groups/{dataset}/{model_name}"
+                )
                 args = {
                     "dataset": dataset,
-                    "alpha": alpha,
-                    "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
+                    "alpha_list": alpha_list,
+                    "output_dir": output_dir,
                     "model_name": model_name,
-                    "n_trials": 50,
-                    "n_groups": 2,
-                    "fairness_metric" : "eod"
+                    "n_folds": n_folds,
+                    "n_groups": n_groups,
+                    "n_params": n_params,
+                    "fair_metric": fair_metric,
+                    "n_jobs": n_jobs,
+                    "thresh": thresh,
                 }
-                print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
 def experiment2():
-    datasets = ["german", "compas", "adult"]
-    model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "FairGBMClassifier_eod",
-        "M2FGB",
-        "M2FGB_grad",
-        "M2FGB_eod",
-        "M2FGB_grad_eod",
+    """Positive rate experiment."""
+    n_folds = 10
+    thresh = "ks"
+    alpha_list = [i / 20 for i in range(0, 21)]
+    n_jobs = 10
+    fair_metric = "min_pr"
+
+    datasets = [
+        "german",
+        "compas",
+        "acsincome",
     ]
-    alphas = [0.75]
+    n_groups_list = [4, 8]
+    model_name_list = [
+        "M2FGB_grad_pr",
+        "LGBMClassifier",
+    ]
+
+    n_params = 100
     for dataset in datasets:
-        for alpha in alphas:
-            for model_name in model_names:
+        for n_groups in n_groups_list:
+            for model_name in model_name_list:
+                if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
+                    if dataset == "acsincome":
+                        n_params = 25
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+                output_dir = (
+                    f"../results/experiment_{n_groups}_pr/{dataset}/{model_name}"
+                )
                 args = {
                     "dataset": dataset,
-                    "alpha": alpha,
-                    "output_dir": f"../results/subgroup_experiment/{dataset}/{model_name}_{alpha}",
+                    "alpha_list": alpha_list,
+                    "output_dir": output_dir,
                     "model_name": model_name,
-                    "n_trials": 100,
-                    "n_groups": 4,
-                    "fairness_metric" : "eod",
+                    "n_folds": n_folds,
+                    "n_groups": n_groups,
+                    "n_params": n_params,
+                    "fair_metric": fair_metric,
+                    "n_jobs": n_jobs,
+                    "thresh": thresh,
                 }
-                print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
 def experiment3():
-    datasets = ["german", "compas", "adult"]
-    model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "FairGBMClassifier_eod",
-        "M2FGB",
-        "M2FGB_grad",
-        "M2FGB_eod",
-        "M2FGB_grad_eod",
+    """Experiment of hyperparameter tuning with TPR fairness constraint."""
+    n_folds = 10
+    thresh = "ks"
+    alpha_list = [i / 20 for i in range(0, 21)]
+    n_jobs = 10
+    fair_metric = "min_tpr"
+
+    datasets = [
+        "german",
+        "compas",
+        "acsincome",
     ]
-    alphas = [0.75]
+    n_groups_list = [4, 8]
+    model_name_list = [
+        "MinMaxFair_tpr",
+        "LGBMClassifier",
+        "M2FGB_grad_tpr",
+        "FairGBMClassifier_eod",
+    ]
+
+    n_params = 100
     for dataset in datasets:
-        for alpha in alphas:
-            for model_name in model_names:
+        for n_groups in n_groups_list:
+            for model_name in model_name_list:
+                if model_name == "MinMaxFair_tpr" or model_name == "MinimaxPareto":
+                    if dataset == "acsincome":
+                        n_params = 25
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+                output_dir = (
+                    f"../results/experiment_{n_groups}_tpr/{dataset}/{model_name}"
+                )
                 args = {
                     "dataset": dataset,
-                    "alpha": alpha,
-                    "output_dir": f"../results/subgroup2_experiment/{dataset}/{model_name}_{alpha}",
+                    "alpha_list": alpha_list,
+                    "output_dir": output_dir,
                     "model_name": model_name,
-                    "n_trials": 100,
-                    "n_groups": 8,
-                    "fairness_metric" : "eod",
+                    "n_folds": n_folds,
+                    "n_groups": n_groups,
+                    "n_params": n_params,
+                    "fair_metric": fair_metric,
+                    "n_jobs": n_jobs,
+                    "thresh": thresh,
                 }
-                print(f"{dataset} {model_name} {alpha}")
                 run_subgroup_experiment(args)
+
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
 def experiment4():
-    datasets = ["german", "compas", "adult"]
-    model_names = [
-        "LGBMClassifier",
-        "FairGBMClassifier",
-        "FairGBMClassifier_eod",
-        "FairClassifier",
-        "M2FGB",
-        "M2FGB_grad",
-        "M2FGB_eod",
-        "M2FGB_grad_eod",
-    ]
-    goals = [0.95]
-    for dataset in datasets:
-        for goal in goals:
-            for model_name in model_names:
-                args = {
-                    "dataset": dataset,
-                    "goal": goal,
-                    "output_dir": f"../results/fairness_goal_experiment2/{dataset}/{model_name}_{goal}",
-                    "model_name": model_name,
-                    "n_trials": 100,
-                    "n_groups": 2,
-                    "fairness_metric" : "eod",
-                }
-                print(f"{dataset} {model_name} {goal}")
-                run_fairness_goal_experiment(args)
+    """Experiment that consider multiple fair_weights values and fit random model with each."""
+    if not os.path.exists("../results/experiment_fair_weight"):
+        os.mkdir("../results/experiment_fair_weight")
 
-
-def experiment5():
-    datasets = ["german", "compas", "adult"]
-    model_names = [
-        "LGBMClassifier",
-        "FairClassifier_spd",
-        "M2FGB_spd",
-        "M2FGB_grad_spd",
+    n_folds = 10
+    fold = 0
+    n_groups = 4
+    n_params = 100
+    fair_weight_list = [
+        0,
+        0.01,
+        0.025,
+        0.05,
+        0.075,
+        0.1,
+        0.15,
+        0.2,
+        0.25,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.8,
+        1,
     ]
-    alphas = [0.7]
+    datasets = ["german", "compas", "acsincome"]
+
+    param_space = models.PARAM_SPACES["M2FGB_grad"].copy()
+    del param_space["fair_weight"]
+    param_list = get_param_list(param_space, n_params)
 
     for dataset in datasets:
-        for alpha in alphas:
-            for model_name in model_names:
-                args = {
-                    "dataset": dataset,
-                    "alpha": alpha,
-                    "output_dir": f"../results/group_experiment/{dataset}/{model_name}_{alpha}",
-                    "model_name": model_name,
-                    "n_trials": 50,
-                    "n_groups": 2,
-                    "fairness_metric" : "eod",
-                }
-                print(f"{dataset} {model_name} {alpha}")
-                run_subgroup_experiment(args)
+        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
+            dataset, fold, n_folds, SEED
+        )
+        A_train, A_val, A_test = get_subgroup_feature(
+            dataset, X_train, X_val, X_test, n_groups
+        )
+        X_train, X_val, X_test = data.preprocess_dataset(
+            dataset, X_train, X_val, X_test
+        )
+
+        results = []
+        for fair_weight in fair_weight_list:
+
+            for p_i in range(n_params):
+                param_list[p_i]["fair_weight"] = fair_weight
+
+            model_list = []
+            study = optuna.create_study(
+                direction="maximize", sampler=RandomSampler(seed=SEED)
+            )
+            objective = lambda trial: run_trial_fixed(
+                trial,
+                X_train,
+                Y_train,
+                A_train,
+                get_model("M2FGB_grad", random_state=SEED),
+                param_list,
+                model_list,
+            )
+            study.optimize(
+                objective,
+                n_trials=n_params,
+                n_jobs=10,
+                show_progress_bar=True,
+            )
+
+            for i, model in enumerate(model_list):
+
+                Y_pred = model.predict_proba(X_train)[:, 1]
+                overall_score = log_loss(Y_train, Y_pred)
+                group_scores = utils.logloss_group(
+                    Y_train, Y_pred, A_train, "equalized_loss"
+                )
+
+                results.append(
+                    {
+                        "param": i,
+                        "fair_weight": fair_weight,
+                        "overall_score": overall_score,
+                        "max_group_score": group_scores.max(),
+                    }
+                    | {
+                        f"group_{i}": group_score
+                        for i, group_score in enumerate(group_scores)
+                    }
+                    | {
+                        f"param_{key}": value
+                        for key, value in model.get_params().items()
+                    }
+                )
+
+            pd.DataFrame(results).to_csv(
+                f"../results/experiment_fair_weight/{dataset}.csv", index=False
+            )
 
 
 def main():
-    experiment1()  # (binary groups)
+    import lightgbm as lgb
+    import fairgbm
 
-    experiment2()  # (4 groups)
+    lgb.register_logger(utils.CustomLogger())
+    fairgbm.register_logger(utils.CustomLogger())
 
-    experiment3()  # (8 groups)
-
-    experiment4()  # (fairness goal)
-
-    experiment5()  # (SPD)
+    experiment1()
+    experiment2()
+    experiment3()
+    experiment4()
 
 
 if __name__ == "__main__":
