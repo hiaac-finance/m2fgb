@@ -28,7 +28,6 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 import sys
 import warnings
 
-sys.stderr = open("stderr.txt", "w")
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
