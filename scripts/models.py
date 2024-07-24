@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve, log_loss
@@ -173,8 +174,11 @@ def logloss_group(predt, dtrain, subgroup, fairness_constraint):
     elif fairness_constraint == "equal_opportunity":
         loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
         loss[y == 0] = 0  # only consider the loss of the positive class
-
-    loss = np.array([np.mean(loss[subgroup == g]) for g in np.unique(subgroup)])
+    
+    # smart numpy groupby that assumes that subgroup is sorted
+    loss = np.column_stack((loss, subgroup))
+    loss = np.split(loss[:, 0], np.unique(loss[:, 1], return_index=True)[1][1:])
+    loss = np.array([np.mean(l) for l in loss])
     return loss
 
 
@@ -621,7 +625,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
 
         Parameters
         ----------
-        X : pandas.DataFrame
+        X : pandas.DataFrame or numpy.ndarray
             Dataframe of shape (n_samples, n_features)
         y : pandas.Series or numpy.ndarray
             Labels array-like of shape (n_samples), must be (0 or 1)
@@ -633,6 +637,19 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         M2FGB
             Fitted model
         """
+        if isinstance(X, pd.DataFrame):
+            X = X.values
+        if isinstance(y, pd.Series):
+            y = y.values
+        if isinstance(sensitive_attribute, pd.Series):
+            sensitive_attribute = sensitive_attribute.values
+        
+        # sort based in sensitive_attribute
+        idx = np.argsort(sensitive_attribute)
+        X = X[idx]
+        y = y[idx]
+        sensitive_attribute = sensitive_attribute[idx]
+
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
         self.group_losses = []
