@@ -190,6 +190,32 @@ def min_balanced_accuracy(y_ground, y_pred, A):
     return 1 - min_bal_acc
 
 
+def min_accuracy(y_ground, y_pred, A):
+    """Calculate the minimum accuracy among groups.
+    It will return 1 - acc so that values close to 0 are better.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        1 - Minimum accuracy
+    """
+    min_acc = np.inf
+    for a in np.unique(A):
+        acc = accuracy_score(y_ground[A == a], y_pred[A == a])
+        min_acc = min(min_acc, acc)
+    return 1 - min_acc
+
+
 def get_combined_metrics_scorer(
     alpha=1, performance_metric="acc", fairness_metric="eod"
 ):
@@ -287,6 +313,7 @@ def equalized_loss_score(y_ground, y_prob, A):
         return max_ - min_
 
     return np.mean(loss[A == 1]) - np.mean(loss[A == 0])
+
 
 def logloss_group(y_ground, y_prob, A, fairness_constraint):
     """For each subgroup, calculates the mean log loss of the samples."""
