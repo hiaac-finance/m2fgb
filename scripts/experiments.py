@@ -12,9 +12,6 @@ import os
 import data
 import models
 import utils
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.metrics import (
     roc_auc_score,
     accuracy_score,
@@ -440,6 +437,7 @@ def eval_model(
         min_tpr = 1 - utils.min_true_positive_rate(Y_val, y_val_pred, A_val)
         min_pr = 1 - utils.min_positive_rate(Y_val, y_val_pred, A_val)
         min_bal_acc = 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val)
+        min_acc = 1 - utils.min_accuracy(Y_val, y_val_pred, A_val)
 
         for i, alpha in enumerate(alpha_list):
             score = scorer_list[i](Y_val, y_val_pred, A_val)
@@ -459,6 +457,7 @@ def eval_model(
                     "min_tpr": min_tpr,
                     "min_pr": min_pr,
                     "min_bal_acc": min_bal_acc,
+                    "min_acc": min_acc,
                 }
             )
 
@@ -471,6 +470,7 @@ def eval_model(
         min_tpr = 1 - utils.min_true_positive_rate(Y_test, y_test_pred, A_test)
         min_pr = 1 - utils.min_positive_rate(Y_test, y_test_pred, A_test)
         min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
+        min_acc = 1 - utils.min_accuracy(Y_test, y_test_pred, A_test)
 
         for i, alpha in enumerate(alpha_list):
             score = scorer_list[i](Y_test, y_test_pred, A_test)
@@ -490,6 +490,7 @@ def eval_model(
                     "min_tpr": min_tpr,
                     "min_pr": min_pr,
                     "min_bal_acc": min_bal_acc,
+                    "min_acc": min_acc,
                 }
             )
 
@@ -539,37 +540,11 @@ def run_subgroup_experiment(args):
     if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
         os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
 
-    col_trans = ColumnTransformer(
-        [
-            ("numeric", StandardScaler(), data.NUM_FEATURES[args["dataset"]]),
-            (
-                "categorical",
-                OneHotEncoder(
-                    drop="if_binary", sparse_output=False, handle_unknown="ignore"
-                ),
-                data.CAT_FEATURES[args["dataset"]],
-            ),
-        ],
-        verbose_feature_names_out=False,
-    )
-    col_trans.set_output(transform="pandas")
-
     for i in tqdm(range(args["n_folds"])):
         # Load and prepare data
-        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
-            args["dataset"], i, args["n_folds"], SEED
+        X_train, A_train, Y_train, X_val, A_val, Y_val, X_test, A_test, Y_test = data.get_fold(
+            args["dataset"], i, args["n_folds"], args["n_groups"], SEED
         )
-
-        # Define sensitive attribute from gender and age
-        A_train, A_val, A_test = get_subgroup_feature(
-            args["dataset"], X_train, X_val, X_test, args["n_groups"]
-        )
-
-        preprocess = Pipeline([("preprocess", col_trans)])
-        preprocess.fit(X_train)
-        X_train = preprocess.transform(X_train)
-        X_val = preprocess.transform(X_val)
-        X_test = preprocess.transform(X_test)
 
         if args["dataset"] != "acsincome":
             param_space = get_param_spaces(args["model_name"])
