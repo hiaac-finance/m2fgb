@@ -186,17 +186,164 @@ def preprocess_dataset(dataset, X_train, X_val, X_test):
     return X_train, X_val, X_test
 
 
-def get_fold(dataset, fold, n_folds=10, random_state=None):
-    X, Y = load_dataset(dataset)
-    kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
-    for i, (train_index, test_index) in enumerate(kf.split(X, Y)):
-        if i == fold:
-            X_train, Y_train = X.iloc[train_index], Y.iloc[train_index]
-            X_train, X_val, Y_train, Y_val = train_test_split(
-                X_train, Y_train, test_size=1 / (n_folds - 1), random_state=random_state
+def get_subgroup_feature(dataset, X, n_groups=2):
+    assert n_groups in [2, 4, 8]
+    if n_groups == 2:
+        if dataset == "german":
+            A = X.Gender.astype(str)
+        elif dataset == "adult":
+            A = X.sex.astype(str)
+        elif dataset == "compas":
+            A = X.race == "Caucasian"
+        elif dataset == "acsincome":
+            A = X.SEX.astype(str)
+        elif dataset == "taiwan":
+            A = X.SEX.astype(str)
+
+    elif n_groups == 4:
+        if dataset == "german":
+            A = X.Gender.astype(str) + "_" + (X.Age > 50).astype(str)
+        elif dataset == "compas":
+            A = (
+                (X.race == "Caucasian").astype(str)
+                + "_"
+                + ((X.age_cat == "25 - 45") | (X.age_cat == "Less than 25")).astype(str)
             )
-            X_test, Y_test = X.iloc[test_index], Y.iloc[test_index]
-            return X_train, Y_train, X_val, Y_val, X_test, Y_test
+        elif dataset == "adult":
+            A = X.sex.astype(str) + "_" + (X.age > 50).astype(str)
+        elif dataset == "taiwan":
+            A = X.SEX.astype(str) + "_" + (X.AGE > 50).astype(str)
+        elif dataset == "acsincome":
+
+            def race_cat(race):
+                if race == "white":
+                    return "1"
+                elif race == "african_america":
+                    return "2"
+                elif race == "asian":
+                    return "3"
+                else:
+                    return "4"
+
+            A = X.RAC1P.apply(race_cat)
+
+    elif n_groups == 8:
+        if dataset == "german":
+
+            def age_cat(age):
+                if age < 30:
+                    return "1"
+                elif age < 40:
+                    return "2"
+                elif age < 50:
+                    return "3"
+                else:
+                    return "4"
+
+            A = X.Gender.astype(str) + "_" + X.Age.apply(age_cat).astype(str)
+        elif dataset == "adult":
+
+            def age_cat(age):
+                if age < 30:
+                    return "1"
+                elif age < 40:
+                    return "2"
+                elif age < 50:
+                    return "3"
+                else:
+                    return "4"
+
+            A = X.sex.astype(str) + "_" + X.age.apply(age_cat).astype(str)
+        
+        elif dataset == "taiwan":
+
+            def age_cat(age):
+                if age < 30:
+                    return "1"
+                elif age < 40:
+                    return "2"
+                elif age < 50:
+                    return "3"
+                else:
+                    return "4"
+
+            A = X.SEX.astype(str) + "_" + X.AGE.apply(age_cat).astype(str)
+
+        elif dataset == "compas":
+
+            def race_cat(race):
+                if race == "African-American" or race == "Hispanic":
+                    return "1"
+                elif race == "Caucasian":
+                    return "2"
+                elif race == "Asian":
+                    return "3"
+                else:
+                    return "4"
+
+            A = (
+                X.race.apply(race_cat)
+                + "_"
+                + ((X.age_cat == "25 - 45") | (X.age_cat == "Less than 25")).astype(str)
+            )
+
+        elif dataset == "acsincome":
+
+            def race_cat(race):
+                if race == "white":
+                    return "1"
+                elif race == "african_america":
+                    return "2"
+                elif race == "asian":
+                    return "3"
+                else:
+                    return "4"
+
+            A = X.RAC1P.apply(race_cat) + "_" + X.SEX.astype(str)
+
+    sensitive_map = dict([(attr, i) for i, attr in enumerate(A.unique())])
+    print(sensitive_map)
+    A = A.map(sensitive_map)
+    return A
+
+
+def get_fold(dataset, fold, n_folds=10, n_groups=2, random_state=None):
+    X, Y = load_dataset(dataset)
+    A = get_subgroup_feature(dataset, X, n_groups)
+    kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+    for i, (train_index, test_index) in enumerate(kf.split(X, Y, A)):
+        if i == fold:
+            X_train, A_train, Y_train = (
+                X.iloc[train_index],
+                A.iloc[train_index],
+                Y.iloc[train_index],
+            )
+            X_train, X_val, A_train, A_val, Y_train, Y_val = train_test_split(
+                X_train,
+                A_train,
+                Y_train,
+                test_size=1 / (n_folds - 1),
+                random_state=random_state,
+                stratify=A_train,
+            )
+            X_test, A_test, Y_test = (
+                X.iloc[test_index],
+                A.iloc[test_index],
+                Y.iloc[test_index],
+            )
+            X_train, X_val, X_test = preprocess_dataset(dataset, X_train, X_val, X_test)
+
+            return (
+                X_train,
+                A_train,
+                Y_train,
+                X_val,
+                A_val,
+                Y_val,
+                X_test,
+                A_test,
+                Y_test,
+            )
 
 
 def get_fold_holdout(dataset, fold, random_state=None):
