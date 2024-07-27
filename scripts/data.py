@@ -36,7 +36,19 @@ CAT_FEATURES = {
         "race",
     ],
     "acsincome": ["COW", "SCHL", "MAR", "RELP", "RAC1P", "SEX"],
+    "taiwan": [
+        "SEX",
+        "EDUCATION",
+        "MARRIAGE",
+        "PAY_0",
+        "PAY_2",
+        "PAY_3",
+        "PAY_4",
+        "PAY_5",
+        "PAY_6",
+    ],
 }
+
 
 NUM_FEATURES = {
     "german": [
@@ -56,6 +68,22 @@ NUM_FEATURES = {
         "priors_count",
     ],
     "acsincome": ["AGEP", "WKHP"],
+    "taiwan": [
+        "LIMIT_BAL",
+        "AGE",
+        "BILL_AMT1",
+        "BILL_AMT2",
+        "BILL_AMT3",
+        "BILL_AMT4",
+        "BILL_AMT5",
+        "BILL_AMT6",
+        "PAY_AMT1",
+        "PAY_AMT2",
+        "PAY_AMT3",
+        "PAY_AMT4",
+        "PAY_AMT5",
+        "PAY_AMT6",
+    ],
 }
 
 
@@ -78,6 +106,18 @@ def load_adult():
     Y = Y.map({"<=50K": 0, "<=50K.": 0, ">50K": 1, ">50K.": 1})
     for col in X.columns:
         if col in CAT_FEATURES["adult"]:
+            X[col] = X[col].astype("category")
+        else:
+            X[col] = X[col].astype(float)
+    return X, Y
+
+
+def load_taiwan():
+    df = pd.read_csv("../data/taiwan_preprocessed.csv")
+    X = df.drop(["DEFAULT"], axis=1)
+    Y = df["DEFAULT"]
+    for col in X.columns:
+        if col in CAT_FEATURES["taiwan"]:
             X[col] = X[col].astype("category")
         else:
             X[col] = X[col].astype(float)
@@ -115,6 +155,8 @@ def load_dataset(dataset):
         return load_adult()
     elif dataset == "compas":
         return load_compas()
+    elif dataset == "taiwan":
+        return load_taiwan()
     elif dataset == "acsincome":
         return load_acsincome()
     else:
