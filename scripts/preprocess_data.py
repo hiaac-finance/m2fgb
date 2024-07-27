@@ -239,16 +239,12 @@ def preprocess_ACSIncome():
         6: "asian",
         7: "native_hawaiian",
         8: "other_race",
-        9: "two_or_more"
+        9: "two_or_more",
     }
     df["RAC1P"] = df["RAC1P"].apply(lambda x: mapping[x])
 
-    mapping = {
-        1 : "male",
-        2 : "female"
-    }
+    mapping = {1: "male", 2: "female"}
     df["SEX"] = df["SEX"].apply(lambda x: mapping[x])
-
 
     df["PINCP"] = df["PINCP"].apply(
         lambda x: 1 if x is True else 0 if x is False else x
@@ -263,6 +259,50 @@ def preprocess_ACSIncome():
             df[col] = pd.Categorical(df[col])
 
     df.to_csv("data/acsincome_preprocessed.csv", index=False)
+
+
+def preprocess_taiwan():
+    df = pd.read_csv("data/taiwan.csv")
+    df.columns = df.iloc[0, :].tolist()
+    df = df.iloc[1:, :]
+    df = df.drop(columns=["ID"])
+    df = df.rename(columns={"default payment next month": "DEFAULT"})
+    df = df.astype("float64")
+    sex_map = {2: "Female", 1: "Male"}
+    education_map = {
+        -2: "Unknown",
+        -1: "Unknown",
+        0: "Unknown",
+        1: "Graduate School",
+        2: "University",
+        3: "High School",
+        4: "Others",
+        5: "Unknown",
+        6: "Unknown",
+    }
+    marriage_map = {
+        0: "Others",
+        1: "Married",
+        2: "Single",
+        3: "Others",
+    }
+    df.SEX = df.SEX.apply(sex_map.get)
+    df.EDUCATION = df.EDUCATION.apply(education_map.get)
+    df.MARRIAGE = df.MARRIAGE.apply(marriage_map.get)
+    cat_cols = [
+        "SEX",
+        "EDUCATION",
+        "MARRIAGE",
+        "PAY_0",
+        "PAY_2",
+        "PAY_3",
+        "PAY_4",
+        "PAY_5",
+        "PAY_6",
+    ]
+    for col in cat_cols:
+        df[col] = pd.Categorical(df[col])
+    df.to_csv("data/taiwan_preprocessed.csv", index=False)
 
 
 def download_data():
