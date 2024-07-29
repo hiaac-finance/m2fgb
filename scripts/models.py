@@ -2,17 +2,10 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
-from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve, log_loss
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import log_loss
 import xgboost as xgb
-from fairlearn.reductions import (
-    ExponentiatedGradient,
-    DemographicParity,
-    TruePositiveRateParity,
-    EqualizedOdds,
-)
-from sklego.linear_model import DemographicParityClassifier, EqualOpportunityClassifier
 from sklearn.linear_model import LogisticRegression
+from scipy.sparse import csr_matrix
 
 import utils
 import lightgbm as lgb
@@ -146,35 +139,31 @@ def projection_to_simplex(mu, z=1):
     return x
 
 
-def logloss_grad(predt, dtrain):
+def logloss_grad(y_pred, y_true):
     """Compute the gradient for cross entropy log loss."""
-    y = dtrain.get_label()
-    predt = 1 / (1 + np.exp(-predt))
-    grad = -(y - predt)
+    grad = -(y_true - y_pred)
     return grad
 
 
-def logloss_hessian(predt, dtrain):
+def logloss_hessian(y_pred, y_true):
     """Compute the hessian for cross entropy log loss."""
-    predt = 1 / (1 + np.exp(-predt))
-    hess = predt * (1 - predt)
+    hess = y_pred * (1 - y_pred)
     return hess
 
 
-def logloss_group(predt, dtrain, subgroup, fairness_constraint):
+def logloss_group(y_pred, y_true, subgroup, fairness_constraint):
     """For each subgroup, calculates the mean log loss of the samples."""
-    y = dtrain.get_label()
-    predt = 1 / (1 + np.exp(-predt))
-    predt = np.clip(predt, 1e-7, 1 - 1e-7)  # avoid log(0)
     if fairness_constraint == "equalized_loss":
-        loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
+        loss = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
     if fairness_constraint == "positive_rate":
-        y_ = np.ones(y.shape[0])  # all positive class
-        loss = -(y_ * np.log(predt) + (1 - y_) * np.log(1 - predt))
+        y_ = np.ones(y_true.shape[0])  # all positive class
+        loss = -(y_ * np.log(y_pred) + (1 - y_) * np.log(1 - y_pred))
     elif fairness_constraint == "equal_opportunity":
-        loss = -(y * np.log(predt) + (1 - y) * np.log(1 - predt))
-        loss[y == 0] = 0  # only consider the loss of the positive class
-    
+        loss = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+        loss[y_true == 0] = 0  # only consider the loss of the positive class
+
+    # TODO LATER: use I (indicator) to calculate averages
+
     # smart numpy groupby that assumes that subgroup is sorted
     loss = np.column_stack((loss, subgroup))
     loss = np.split(loss[:, 0], np.unique(loss[:, 1], return_index=True)[1][1:])
@@ -182,34 +171,30 @@ def logloss_group(predt, dtrain, subgroup, fairness_constraint):
     return loss
 
 
-def logloss_group_grad(predt, dtrain, fairness_constraint):
+def logloss_group_grad(y_pred, y_true, fairness_constraint):
     """Create an array with the gradient of fairness metrics."""
-    y = dtrain.get_label()
-    predt = 1 / (1 + np.exp(-predt))
     if fairness_constraint == "equalized_loss":
-        grad = -(y - predt)
+        grad = -(y_true - y_pred)
     elif fairness_constraint == "positive_rate":
-        y_ = np.ones(y.shape[0])  # all positive class
-        grad = -(y_ - predt)
+        y_ = np.ones(y_true.shape[0])  # all positive class
+        grad = -(y_ - y_pred)
     elif fairness_constraint == "equal_opportunity":
-        grad = -(y - predt)
-        grad[y == 0] = 0  # only consider the loss of the positive class
+        grad = -(y_true - y_pred)
+        grad[y_true == 0] = 0  # only consider the loss of the positive class
 
     return grad
 
 
-def logloss_group_hess(predt, dtrain, fairness_constraint):
+def logloss_group_hess(y_pred, y_true, fairness_constraint):
     """Create an array with the hessian of fairness metrics."""
-    y = dtrain.get_label()
-    predt = 1 / (1 + np.exp(-predt))
     if fairness_constraint == "equalized_loss":
-        hess = predt * (1 - predt)
+        hess = y_pred * (1 - y_pred)
     elif (
         fairness_constraint == "positive_rate"
         or fairness_constraint == "equal_opportunity"
     ):
-        hess = predt * (1 - predt)
-        hess[y == 0] = 0  # only consider the loss of the positive class
+        hess = y_pred * (1 - y_pred)
+        hess[y_true == 0] = 0  # only consider the loss of the positive class
 
     return hess
 
@@ -462,6 +447,7 @@ def get_subgroup_indicator_test(subgroup):
         I[subgroup == g, i] = 1 / np.sum(subgroup == g)
 
     I = I * n
+    I = csr_matrix(I)
     return I
 
 
@@ -496,7 +482,10 @@ def dual_obj_1(
     I = get_subgroup_indicator_test(subgroup)
 
     def custom_obj(predt, dtrain):
-        loss_group = logloss_group(predt, dtrain, subgroup, fairness_constraint)
+        y_true = dtrain.get_label()
+        y_pred = 1 / (1 + np.exp(-predt))
+        y_pred = np.clip(y_pred, 1e-7, 1 - 1e-7)  # avoid log(0)
+        loss_group = logloss_group(y_pred, y_true, subgroup, fairness_constraint)
         group_losses.append(loss_group)
 
         if dual_learning == "optim":
@@ -537,14 +526,16 @@ def dual_obj_1(
         else:
             mu_opt_list.append(mu_opt)
 
-        grad_fair = logloss_group_grad(predt, dtrain, fairness_constraint)
-        grad_fair = I * grad_fair.reshape(-1, 1) @ mu_opt
+        grad_fair = logloss_group_grad(y_pred, y_true, fairness_constraint)
+        # grad_fair = I * grad_fair.reshape(-1, 1) @ mu_opt
+        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu_opt
 
-        hess_fair = logloss_group_hess(predt, dtrain, fairness_constraint)
-        hess_fair = I * hess_fair.reshape(-1, 1) @ mu_opt
+        hess_fair = logloss_group_hess(y_pred, y_true, fairness_constraint)
+        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu_opt
+        # hess_fair = I * hess_fair.reshape(-1, 1) @ mu_opt
 
-        grad = logloss_grad(predt, dtrain)
-        hess = logloss_hessian(predt, dtrain)
+        grad = logloss_grad(y_pred, y_true)
+        hess = logloss_hessian(y_pred, y_true)
 
         # It is not necessary to multiply fairness gradient by fair_weight because it is already included on mu
         # grad = (1 - fair_weight) * grad + fair_weight * grad_fair
@@ -643,7 +634,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
             y = y.values
         if isinstance(sensitive_attribute, pd.Series):
             sensitive_attribute = sensitive_attribute.values
-        
+
         # sort based in sensitive_attribute
         idx = np.argsort(sensitive_attribute)
         X = X[idx]
