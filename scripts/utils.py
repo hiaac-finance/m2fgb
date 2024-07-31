@@ -237,6 +237,8 @@ def get_combined_metrics_scorer(
             fair = min_positive_rate(y_ground, y_pred, A)
         elif fairness_metric == "min_bal_acc":
             fair = min_balanced_accuracy(y_ground, y_pred, A)
+        elif fairness_metric == "min_acc":
+            fair = min_accuracy(y_ground, y_pred, A)
 
         return alpha * perf + (1 - alpha) * (1 - abs(fair))
 
