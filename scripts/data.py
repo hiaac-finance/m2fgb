@@ -40,12 +40,6 @@ CAT_FEATURES = {
         "SEX",
         "EDUCATION",
         "MARRIAGE",
-        "PAY_0",
-        "PAY_2",
-        "PAY_3",
-        "PAY_4",
-        "PAY_5",
-        "PAY_6",
     ],
 }
 
@@ -83,6 +77,12 @@ NUM_FEATURES = {
         "PAY_AMT4",
         "PAY_AMT5",
         "PAY_AMT6",
+        "PAY_0",
+        "PAY_2",
+        "PAY_3",
+        "PAY_4",
+        "PAY_5",
+        "PAY_6",
     ],
 }
 
