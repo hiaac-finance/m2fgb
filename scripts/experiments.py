@@ -516,10 +516,12 @@ def run_subgroup_experiment(args):
             param_space = get_param_spaces(args["model_name"])
         else:
             param_space = get_param_spaces_acsincome(args["model_name"])
-
+        param_list = get_param_list(param_space, args["n_params"])
         study = optuna.create_study(
-            direction="maximize", sampler=RandomSampler(seed=SEED)
+            direction="maximize"#, sampler=RandomSampler(seed=SEED)
         )
+        for param in param_list:
+            study.enqueue_trial(param)
         model_list = []
         objective = lambda trial: run_trial(
             trial,
