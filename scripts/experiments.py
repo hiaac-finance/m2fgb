@@ -18,6 +18,7 @@ from sklearn.metrics import (
     balanced_accuracy_score,
     precision_score,
     log_loss,
+    recall_score
 )
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -394,10 +395,12 @@ def get_param_list(param_space, n_params):
 
 
 def eval_model(
-    alpha_list,
-    fair_metric,
     model_list,
+    trials_df,
     thresh,
+    X_train,
+    Y_train,
+    A_train,
     X_val,
     Y_val,
     A_val,
@@ -406,93 +409,58 @@ def eval_model(
     A_test,
 ):
     """Evaluate model performance and fairness metrics."""
-    scorer_list = [
-        utils.get_combined_metrics_scorer(
-            alpha=alpha,
-            performance_metric="bal_acc",
-            fairness_metric=fair_metric,
-        )
-        for alpha in alpha_list
-    ]
     results_val = []
     results_test = []
     for m, model in tqdm(enumerate(model_list), total=len(model_list)):
-        y_val_score = model.predict_proba(X_val)[:, 1]
+        # get threshold
         if thresh == "ks":
-            thresh = utils.get_best_threshold(Y_val, y_val_score)
+            y_train_score = model.predict_proba(X_train)[:, 1]
+            thresh = utils.get_best_threshold(Y_train, y_train_score)
         else:
             thresh = 0.5
+        duration = trials_df.duration[trials_df.number == m].values[0]
 
-        y_val_pred = y_val_score > thresh
-        y_test_score = model.predict_proba(X_test)[:, 1]
-        y_test_pred = y_test_score > thresh
+        y_val_pred = model.predict_proba(X_val)[:, 1] > thresh
+        y_test_pred = model.predict_proba(X_test)[:, 1] > thresh
+        
+        results_val.append({
+            "model": m,
+            "thresh": thresh,
+            # perf metrics
+            "bal_acc" : balanced_accuracy_score(Y_val, y_val_pred),
+            "precision" : precision_score(Y_val, y_val_pred),
+            "acc" : accuracy_score(Y_val, y_val_pred),
+            "recall" : recall_score(Y_val, y_val_pred),
+            # fair metrics
+            "eod" : utils.equal_opportunity_score(Y_val, y_val_pred, A_val),
+            "spd" : utils.statistical_parity_score(Y_val, y_val_pred, A_val),
+            "min_tpr" : 1 - utils.min_true_positive_rate(Y_val, y_val_pred, A_val),
+            "min_pr" : 1 - utils.min_positive_rate(Y_val, y_val_pred, A_val),
+            "min_bal_acc" : 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val),
+            "min_acc" : 1 - utils.min_accuracy(Y_val, y_val_pred, A_val),
+            # time
+            "duration" : duration
+        })
 
-        bal_acc = balanced_accuracy_score(Y_val, y_val_pred)
-        prec = precision_score(Y_val, y_val_pred)
-        acc = accuracy_score(Y_val, y_val_pred)
-        roc = roc_auc_score(Y_val, y_val_score)
-        eq_loss = utils.equalized_loss_score(Y_val, y_val_score, A_val)
-        eod = utils.equal_opportunity_score(Y_val, y_val_pred, A_val)
-        spd = utils.statistical_parity_score(Y_val, y_val_pred, A_val)
-        min_tpr = 1 - utils.min_true_positive_rate(Y_val, y_val_pred, A_val)
-        min_pr = 1 - utils.min_positive_rate(Y_val, y_val_pred, A_val)
-        min_bal_acc = 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val)
-        min_acc = 1 - utils.min_accuracy(Y_val, y_val_pred, A_val)
+        results_test.append({
+            "model": m,
+            "thresh": thresh,
+            # perf metrics
+            "bal_acc" : balanced_accuracy_score(Y_test, y_test_pred),
+            "precision" : precision_score(Y_test, y_test_pred),
+            "acc" : accuracy_score(Y_test, y_test_pred),
+            "recall" : recall_score(Y_test, y_test_pred),
+            # fair metrics
+            "eod" : utils.equal_opportunity_score(Y_test, y_test_pred, A_test),
+            "spd" : utils.statistical_parity_score(Y_test, y_test_pred, A_test),
+            "min_tpr" : 1 - utils.min_true_positive_rate(Y_test, y_test_pred, A_test),
+            "min_pr" : 1 - utils.min_positive_rate(Y_test, y_test_pred, A_test),
+            "min_bal_acc" : 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test),
+            "min_acc" : 1 - utils.min_accuracy(Y_test, y_test_pred, A_test),
+            # time
+            "duration" : duration
+        })
 
-        for i, alpha in enumerate(alpha_list):
-            score = scorer_list[i](Y_val, y_val_pred, A_val)
-
-            results_val.append(
-                {
-                    "alpha": alpha,
-                    "score": score,
-                    "bal_acc": bal_acc,
-                    "prec": prec,
-                    "acc": acc,
-                    "roc": roc,
-                    "eq_loss": eq_loss,
-                    "eod": eod,
-                    "spd": spd,
-                    "model": m,
-                    "min_tpr": min_tpr,
-                    "min_pr": min_pr,
-                    "min_bal_acc": min_bal_acc,
-                    "min_acc": min_acc,
-                }
-            )
-
-        bal_acc = balanced_accuracy_score(Y_test, y_test_pred)
-        acc = accuracy_score(Y_test, y_test_pred)
-        roc = roc_auc_score(Y_test, y_test_score)
-        eq_loss = utils.equalized_loss_score(Y_test, y_test_score, A_test)
-        eod = utils.equal_opportunity_score(Y_test, y_test_pred, A_test)
-        spd = utils.statistical_parity_score(Y_test, y_test_pred, A_test)
-        min_tpr = 1 - utils.min_true_positive_rate(Y_test, y_test_pred, A_test)
-        min_pr = 1 - utils.min_positive_rate(Y_test, y_test_pred, A_test)
-        min_bal_acc = 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test)
-        min_acc = 1 - utils.min_accuracy(Y_test, y_test_pred, A_test)
-
-        for i, alpha in enumerate(alpha_list):
-            score = scorer_list[i](Y_test, y_test_pred, A_test)
-
-            results_test.append(
-                {
-                    "alpha": alpha,
-                    "score": score,
-                    "bal_acc": bal_acc,
-                    "prec": prec,
-                    "acc": acc,
-                    "roc": roc,
-                    "eq_loss": eq_loss,
-                    "eod": eod,
-                    "spd": spd,
-                    "model": m,
-                    "min_tpr": min_tpr,
-                    "min_pr": min_pr,
-                    "min_bal_acc": min_bal_acc,
-                    "min_acc": min_acc,
-                }
-            )
 
     results_val = pd.DataFrame(results_val)
     results_test = pd.DataFrame(results_test)
@@ -574,10 +542,12 @@ def run_subgroup_experiment(args):
         )
 
         results_val, results_test = eval_model(
-            args["alpha_list"],
-            args["fair_metric"],
             model_list,
+            trials_df,
             args["thresh"],
+            X_train,
+            Y_train,
+            A_train,
             X_val,
             Y_val,
             A_val,
@@ -599,9 +569,7 @@ def experiment1():
     """Equalized loss experiment."""
     n_folds = 10
     thresh = "ks"
-    alpha_list = [i / 20 for i in range(0, 21)]
-    n_jobs = 10
-    fair_metric = "min_bal_acc"
+    n_jobs = 6
 
     datasets = ["german", "compas", "acsincome"]
     n_groups_list = [2, 4, 8]
@@ -630,13 +598,11 @@ def experiment1():
                 )
                 args = {
                     "dataset": dataset,
-                    "alpha_list": alpha_list,
                     "output_dir": output_dir,
                     "model_name": model_name,
                     "n_folds": n_folds,
                     "n_groups": n_groups,
                     "n_params": n_params,
-                    "fair_metric": fair_metric,
                     "n_jobs": n_jobs,
                     "thresh": thresh,
                 }
@@ -704,9 +670,7 @@ def experiment3():
     """Experiment of hyperparameter tuning with TPR fairness constraint."""
     n_folds = 10
     thresh = "ks"
-    alpha_list = [i / 20 for i in range(0, 21)]
     n_jobs = 10
-    fair_metric = "min_tpr"
 
     datasets = [
         "german",
@@ -738,13 +702,11 @@ def experiment3():
                 )
                 args = {
                     "dataset": dataset,
-                    "alpha_list": alpha_list,
                     "output_dir": output_dir,
                     "model_name": model_name,
                     "n_folds": n_folds,
                     "n_groups": n_groups,
                     "n_params": n_params,
-                    "fair_metric": fair_metric,
                     "n_jobs": n_jobs,
                     "thresh": thresh,
                 }
