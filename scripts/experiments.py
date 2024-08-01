@@ -100,7 +100,7 @@ def get_model(model_name, random_state=None):
 
         def model(**params):
             return models.LGBMClassifier(
-                random_state=random_state, verbose=-1, **params
+                random_state=random_state, **params
             )
 
     elif model_name == "FairGBMClassifier":

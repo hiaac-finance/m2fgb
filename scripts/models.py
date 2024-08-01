@@ -54,7 +54,7 @@ PARAM_SPACES = {
         "fair_weight": {"type": "float", "low": 1e-2, "high": 1, "log": True},
     },
     "M2FGB_grad": {
-        "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
+        "min_child_weight": {"type": "float", "low": 1e-3, "high": 10, "log": True},
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 7},
@@ -87,9 +87,10 @@ PARAM_SPACES = {
         },
     },
     "LGBMClassifier": {
-        "num_leaves": {"type": "int", "low": 2, "high": 1000, "log": True},
+        "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
+        #"num_leaves": {"type": "int", "low": 2, "high": 1000, "log": True},
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
-        "min_child_samples": {"type": "int", "low": 5, "high": 500, "log": True},
+        #"min_child_samples": {"type": "int", "low": 5, "high": 500, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 10},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
@@ -635,6 +636,10 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         if isinstance(sensitive_attribute, pd.Series):
             sensitive_attribute = sensitive_attribute.values
 
+        n_g = len(np.unique(sensitive_attribute))
+        min_child_weight = self.min_child_weight
+        #min_child_weight *= (1 - self.fair_weight) + self.fair_weight/n_g # trick to scale min_child_weight with hessian
+
         # sort based in sensitive_attribute
         idx = np.argsort(sensitive_attribute)
         X = X[idx]
@@ -659,7 +664,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
             ),
             "learning_rate": self.learning_rate,
             "max_depth": self.max_depth,
-            "min_child_weight": self.min_child_weight,
+            "min_child_weight": min_child_weight,
             "reg_lambda": self.reg_lambda,
             "verbose": -1,
         }
@@ -695,10 +700,75 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         return preds
 
 
-class LGBMClassifier(lgb.LGBMClassifier):
-    def fit(self, X, Y, A):
-        super().fit(X, Y)
+class LGBMClassifier():
+    def __init__(
+        self,
+        n_estimators=10,
+        learning_rate=0.1,
+        max_depth=6,
+        min_child_weight=1,
+        reg_lambda=1,
+        random_state=None,
+        ):
+        self.n_estimators = n_estimators
+        self.learning_rate = learning_rate
+        self.max_depth = max_depth
+        self.min_child_weight = min_child_weight
+        self.reg_lambda = reg_lambda
+        self.random_state = random_state
+
+    def fit(self, X, y, sensitive_attribute):
+        if isinstance(X, pd.DataFrame):
+            X = X.values
+        if isinstance(y, pd.Series):
+            y = y.values
+        if isinstance(sensitive_attribute, pd.Series):
+            sensitive_attribute = sensitive_attribute.values
+
+        # sort based in sensitive_attribute
+        idx = np.argsort(sensitive_attribute)
+        X = X[idx]
+        y = y[idx]
+        sensitive_attribute = sensitive_attribute[idx]
+
+        X, y = check_X_y(X, y)
+        self.classes_ = np.unique(y)
+        dtrain = lgb.Dataset(X, label=y)
+
+        params = {
+            "objective": "binary",
+            "learning_rate": self.learning_rate,
+            "max_depth": self.max_depth,
+            "min_child_weight": self.min_child_weight,
+            "reg_lambda": self.reg_lambda,
+            "verbose": -1,
+        }
+        if self.random_state is not None:
+            params["random_seed"] = self.random_state
+
+        self.model_ = lgb.train(
+            params,
+            dtrain,
+            num_boost_round=self.n_estimators,
+        )
         return self
+
+    def predict(self, X):
+        """Predict the labels of the data."""
+        check_is_fitted(self)
+        X = check_array(X)
+        preds = self.model_.predict(X)
+        return (preds > 0.5).astype(int)
+
+    def predict_proba(self, X):
+        """Predict the probabilities of the data."""
+        check_is_fitted(self)
+        X = check_array(X)
+        preds_pos = self.model_.predict(X)
+        preds = np.ones((preds_pos.shape[0], 2))
+        preds[:, 1] = preds_pos
+        preds[:, 0] -= preds_pos
+        return preds
 
 
 class FairGBMClassifier(fairgbm.FairGBMClassifier):
