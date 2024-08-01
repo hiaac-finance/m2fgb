@@ -513,7 +513,6 @@ def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_
             values_cp = {n: v for n, v in values.items() if n != "type"}
             params[name] = trial.suggest_float(name, **values_cp)
 
-    print(params)
     model = model_class(**params)
     model.fit(X_train, Y_train, A_train)
     model_list.append(model)
@@ -525,7 +524,6 @@ def run_trial_fixed(
 ):
     """Function to run a single trial of optuna."""
     params = param_list[trial.number]
-    print(params)
     model = model_class(**params)
     model.fit(X_train, Y_train, A_train)
     model_list.append(model)
@@ -546,7 +544,7 @@ def run_subgroup_experiment(args):
             args["dataset"], i, args["n_folds"], args["n_groups"], SEED
         )
 
-        if args["dataset"] != "acsincome":
+        if args["dataset"] not in ["taiwan", "adult", "acsincome"]:
             param_space = get_param_spaces(args["model_name"])
         else:
             param_space = get_param_spaces_acsincome(args["model_name"])
