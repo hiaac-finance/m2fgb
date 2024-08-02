@@ -33,6 +33,7 @@ if not sys.warnoptions:
 
 
 SEED = 0
+np.random.seed(SEED)
 
 
 def get_model(model_name, random_state=None):
@@ -185,173 +186,6 @@ def get_param_spaces_acsincome(model_name):
         return models.PARAM_SPACES_ACSINCOME["MinMaxFair"]
 
 
-def get_subgroup_feature(dataset, X_train, X_val, X_test, n_groups=2):
-    assert n_groups in [2, 4, 8]
-    if n_groups == 2:
-        if dataset == "german":
-            A_train = X_train.Gender.astype(str)
-            A_val = X_val.Gender.astype(str)
-            A_test = X_test.Gender.astype(str)
-        elif dataset == "adult":
-            A_train = X_train.sex.astype(str)
-            A_val = X_val.sex.astype(str)
-            A_test = X_test.sex.astype(str)
-        elif dataset == "compas":
-            A_train = X_train.race == "Caucasian"
-            A_val = X_val.race == "Caucasian"
-            A_test = X_test.race == "Caucasian"
-        elif dataset == "acsincome":
-            A_train = X_train.SEX.astype(str)
-            A_val = X_val.SEX.astype(str)
-            A_test = X_test.SEX.astype(str)
-
-    elif n_groups == 4:
-        if dataset == "german":
-            A_train = X_train.Gender.astype(str) + "_" + (X_train.Age > 50).astype(str)
-            A_val = X_val.Gender.astype(str) + "_" + (X_val.Age > 50).astype(str)
-            A_test = X_test.Gender.astype(str) + "_" + (X_test.Age > 50).astype(str)
-        elif dataset == "compas":
-            A_train = (
-                (X_train.race == "Caucasian").astype(str)
-                + "_"
-                + (
-                    (X_train.age_cat == "25 - 45") | (X_train.age_cat == "Less than 25")
-                ).astype(str)
-            )
-            A_val = (
-                (X_val.race == "Caucasian").astype(str)
-                + "_"
-                + (
-                    (X_val.age_cat == "25 - 45") | (X_val.age_cat == "Less than 25")
-                ).astype(str)
-            )
-            A_test = (
-                (X_test.race == "Caucasian").astype(str)
-                + "_"
-                + (
-                    (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
-                ).astype(str)
-            )
-        elif dataset == "adult":
-            A_train = X_train.sex.astype(str) + "_" + (X_train.age > 50).astype(str)
-            A_val = X_val.sex.astype(str) + "_" + (X_val.age > 50).astype(str)
-            A_test = X_test.sex.astype(str) + "_" + (X_test.age > 50).astype(str)
-        elif dataset == "acsincome":
-
-            def race_cat(race):
-                if race == "white":
-                    return "1"
-                elif race == "african_america":
-                    return "2"
-                elif race == "asian":
-                    return "3"
-                else:
-                    return "4"
-
-            A_train = X_train.RAC1P.apply(race_cat)
-            A_val = X_val.RAC1P.apply(race_cat)
-            A_test = X_test.RAC1P.apply(race_cat)
-
-    elif n_groups == 8:
-        if dataset == "german":
-
-            def age_cat(age):
-                if age < 30:
-                    return "1"
-                elif age < 40:
-                    return "2"
-                elif age < 50:
-                    return "3"
-                else:
-                    return "4"
-
-            A_train = (
-                X_train.Gender.astype(str)
-                + "_"
-                + X_train.Age.apply(age_cat).astype(str)
-            )
-            A_val = (
-                X_val.Gender.astype(str) + "_" + X_val.Age.apply(age_cat).astype(str)
-            )
-            A_test = (
-                X_test.Gender.astype(str) + "_" + X_test.Age.apply(age_cat).astype(str)
-            )
-        elif dataset == "adult":
-
-            def age_cat(age):
-                if age < 30:
-                    return "1"
-                elif age < 40:
-                    return "2"
-                elif age < 50:
-                    return "3"
-                else:
-                    return "4"
-
-            A_train = (
-                X_train.sex.astype(str) + "_" + X_train.age.apply(age_cat).astype(str)
-            )
-            A_val = X_val.sex.astype(str) + "_" + X_val.age.apply(age_cat).astype(str)
-            A_test = (
-                X_test.sex.astype(str) + "_" + X_test.age.apply(age_cat).astype(str)
-            )
-        elif dataset == "compas":
-
-            def race_cat(race):
-                if race == "African-American" or race == "Hispanic":
-                    return "1"
-                elif race == "Caucasian":
-                    return "2"
-                elif race == "Asian":
-                    return "3"
-                else:
-                    return "4"
-
-            A_train = (
-                X_train.race.apply(race_cat)
-                + "_"
-                + (
-                    (X_train.age_cat == "25 - 45") | (X_train.age_cat == "Less than 25")
-                ).astype(str)
-            )
-            A_val = (
-                X_val.race.apply(race_cat)
-                + "_"
-                + (
-                    (X_val.age_cat == "25 - 45") | (X_val.age_cat == "Less than 25")
-                ).astype(str)
-            )
-            A_test = (
-                X_test.race.apply(race_cat)
-                + "_"
-                + (
-                    (X_test.age_cat == "25 - 45") | (X_test.age_cat == "Less than 25")
-                ).astype(str)
-            )
-        elif dataset == "acsincome":
-
-            def race_cat(race):
-                if race == "white":
-                    return "1"
-                elif race == "african_america":
-                    return "2"
-                elif race == "asian":
-                    return "3"
-                else:
-                    return "4"
-
-            A_train = X_train.RAC1P.apply(race_cat) + "_" + X_train.SEX.astype(str)
-            A_val = X_val.RAC1P.apply(race_cat) + "_" + X_val.SEX.astype(str)
-            A_test = X_test.RAC1P.apply(race_cat) + "_" + X_test.SEX.astype(str)
-
-    sensitive_map = dict([(attr, i) for i, attr in enumerate(A_train.unique())])
-    print(sensitive_map)
-    A_train = A_train.map(sensitive_map)
-    A_val = A_val.map(sensitive_map)
-    A_test = A_test.map(sensitive_map)
-    return A_train, A_val, A_test
-
-
 def get_param_list(param_space, n_params):
 
     def sample_random_parameters(param_space):
@@ -487,17 +321,6 @@ def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_
     return 0.5
 
 
-def run_trial_fixed(
-    trial, X_train, Y_train, A_train, model_class, param_list, model_list
-):
-    """Function to run a single trial of optuna."""
-    params = param_list[trial.number]
-    model = model_class(**params)
-    model.fit(X_train, Y_train, A_train)
-    model_list.append(model)
-    return 0.5
-
-
 def run_subgroup_experiment(args):
     # create output directory if not exists
     if not os.path.exists(args["output_dir"]):
@@ -506,17 +329,20 @@ def run_subgroup_experiment(args):
     if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
         os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
 
+    if args["dataset"] not in ["taiwan", "adult", "acsincome"]:
+        param_space = get_param_spaces(args["model_name"])
+    else:
+        param_space = get_param_spaces_acsincome(args["model_name"])
+    param_list = get_param_list(param_space, args["n_params"])
+
     for i in tqdm(range(args["n_folds"])):
         # Load and prepare data
         X_train, A_train, Y_train, X_val, A_val, Y_val, X_test, A_test, Y_test = data.get_fold(
             args["dataset"], i, args["n_folds"], args["n_groups"], SEED
         )
 
-        if args["dataset"] not in ["taiwan", "adult", "acsincome"]:
-            param_space = get_param_spaces(args["model_name"])
-        else:
-            param_space = get_param_spaces_acsincome(args["model_name"])
-        param_list = get_param_list(param_space, args["n_params"])
+        
+        
         study = optuna.create_study(
             direction="maximize"#, sampler=RandomSampler(seed=SEED)
         )
