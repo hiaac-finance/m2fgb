@@ -254,7 +254,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                     return "4"
 
             A = X.sex.astype(str) + "_" + X.age.apply(age_cat).astype(str)
-        
+
         elif dataset == "taiwan":
 
             def age_cat(age):
@@ -346,16 +346,28 @@ def get_fold(dataset, fold, n_folds=10, n_groups=2, random_state=None):
             )
 
 
-def get_fold_holdout(dataset, fold, random_state=None):
+def get_fold_holdout(dataset, fold, n_folds=10, n_groups=2, random_state=None):
     X, Y = load_dataset(dataset)
-    X_train, X_test, Y_train, Y_test = train_test_split(
-        X, Y, test_size=0.2, random_state=random_state
+    A = get_subgroup_feature(dataset, X, n_groups)
+    X_train, X_test, Y_train, Y_test, A_train, A_test = train_test_split(
+        X, Y, A, test_size=0.2, random_state=random_state
     )
 
     kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=random_state)
     for i, (train_index, val_index) in enumerate(kf.split(X_train, Y_train)):
         if i == fold:
             X_train, X_val = X_train.iloc[train_index], X_train.iloc[val_index]
+            A_train, A_val = A_train.iloc[train_index], A_train.iloc[val_index]
             Y_train, Y_val = Y_train.iloc[train_index], Y_train.iloc[val_index]
-
-            return X_train, Y_train, X_val, Y_val, X_test, Y_test
+            X_train, X_val, X_test = preprocess_dataset(dataset, X_train, X_val, X_test)
+            return (
+                X_train,
+                A_train,
+                Y_train,
+                X_val,
+                A_val,
+                Y_val,
+                X_test,
+                A_test,
+                Y_test,
+            )
