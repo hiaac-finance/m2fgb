@@ -43,6 +43,12 @@ def fnr_score(y_ground, y_pred):
     fnr = fn / (fn + tp)
     return fnr
 
+def fpr_score(y_ground, y_pred):
+    """Calculates the false positive rate"""
+    fp = ((y_pred == 1) & (y_ground == 0)).sum()
+    tn = ((y_pred == 0) & (y_ground == 0)).sum()
+    fpr = fp / (fp + tn)
+    return fpr
 
 def tpr_score(y_ground, y_pred):
     """Calculates the true positive rate"""
@@ -108,6 +114,25 @@ def min_true_positive_rate(y_ground, y_pred, A):
         min_tpr = min(min_tpr, tpr)
     return 1 - min_tpr
 
+def max_fnr_score(y_ground, y_pred, A):
+    max_fnr = -np.inf
+    for a in np.unique(A):
+        # check if the group has any positive class
+        if np.sum(y_ground[A == a]) == 0:
+            continue
+        fnr = fnr_score(y_ground[A == a], y_pred[A == a])
+        max_fnr = max(max_fnr, fnr)
+    return max_fnr
+
+def max_fpr_score(y_ground, y_pred, A):
+    max_fpr = -np.inf
+    for a in np.unique(A):
+        # check if the group has any negative class
+        if np.sum(1 - y_ground[A == a]) == 0:
+            continue
+        fpr = fpr_score(y_ground[A == a], y_pred[A == a])
+        max_fpr = max(max_fpr, fpr)
+    return max_fpr
 
 def statistical_parity_score(y_ground, y_pred, A):
     """Calculate the difference between probability of true outcome of the groups.
