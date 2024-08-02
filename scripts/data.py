@@ -41,6 +41,10 @@ CAT_FEATURES = {
         "EDUCATION",
         "MARRIAGE",
     ],
+    "enem" : [
+        "racebin",
+        "sexbin"
+    ]
 }
 
 
@@ -115,7 +119,7 @@ def load_adult():
 def load_taiwan():
     df = pd.read_csv("../data/taiwan_preprocessed.csv")
     X = df.drop(["DEFAULT"], axis=1)
-    Y = df["DEFAULT"]
+    Y = 1 - df["DEFAULT"]
     for col in X.columns:
         if col in CAT_FEATURES["taiwan"]:
             X[col] = X[col].astype("category")
@@ -147,6 +151,17 @@ def load_acsincome():
             X[col] = X[col].astype(float)
     return X, Y
 
+def load_enem():
+    df = pd.read_pickle("../data/enem-50000-20.pkl").reset_index(drop=True)
+    Y = df["gradebin"].astype(int)
+    X = df.drop(columns=["gradebin"])
+    for col in X.columns:
+        if col in CAT_FEATURES["enem"]:
+            X[col] = X[col].astype("category")
+        else:
+            X[col] = X[col].astype(float)
+    return X, Y
+
 
 def load_dataset(dataset):
     if dataset == "german":
@@ -159,11 +174,16 @@ def load_dataset(dataset):
         return load_taiwan()
     elif dataset == "acsincome":
         return load_acsincome()
+    elif dataset == "enem":
+        return load_enem()
     else:
         raise ValueError(f"Unknown dataset {dataset}")
 
 
 def preprocess_dataset(dataset, X_train, X_val, X_test):
+    if dataset not in NUM_FEATURES:
+        NUM_FEATURES[dataset] = [col for col in X_train.columns if col not in CAT_FEATURES[dataset]]
+        
     col_trans = ColumnTransformer(
         [
             ("numeric", StandardScaler(), NUM_FEATURES[dataset]),
@@ -199,6 +219,8 @@ def get_subgroup_feature(dataset, X, n_groups=2):
             A = X.SEX.astype(str)
         elif dataset == "taiwan":
             A = X.SEX.astype(str)
+        elif dataset == "enem":
+            A = X.racebin.astype(str)
 
     elif n_groups == 4:
         if dataset == "german":
@@ -226,6 +248,8 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                     return "4"
 
             A = X.RAC1P.apply(race_cat)
+        elif dataset == "enem":
+            A = X.racebin.astype(str) + "_" + X.sexbin.astype(str)
 
     elif n_groups == 8:
         if dataset == "german":
@@ -300,6 +324,10 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                     return "4"
 
             A = X.RAC1P.apply(race_cat) + "_" + X.SEX.astype(str)
+        elif dataset == "enem":
+            # transform age into 2 categories
+            age = X[[f"TP_FAIXA_ETARIA_{i}" for i in range(1, 10)]].sum(axis=1)
+            A = X.racebin.astype(str) + "_" + X.sexbin.astype(str) + "_" + age.astype(str)
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A.unique())])
     print(sensitive_map)
