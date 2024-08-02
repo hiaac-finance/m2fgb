@@ -46,32 +46,26 @@ PARAM_SPACES = {
         },
     },
     "M2FGB": {
-        "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 7},
-        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 1e-2, "high": 1, "log": True},
+        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "fair_weight": {"type": "float", "low": 1e-3, "high": 1, "log": True},
     },
     "M2FGB_grad": {
-        "min_child_weight": {"type": "float", "low": 1e-3, "high": 10, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 7},
-        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 1e-2, "high": 1},
+        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "fair_weight": {"type": "float", "low": 1e-3, "high": 1, "log": True},
         "multiplier_learning_rate": {
             "type": "float",
-            "low": 0.005,
+            "low": 1e-3,
             "high": 0.5,
             "log": True,
         },
     },
     "FairGBMClassifier": {
-        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
-        "min_child_samples": {"type": "int", "low": 5, "high": 250, "log": True},
         "max_depth": {"type": "int", "low": 2, "high": 7},
-        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "multiplier_learning_rate": {
             "type": "float",
@@ -87,12 +81,8 @@ PARAM_SPACES = {
         },
     },
     "LGBMClassifier": {
-        "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
-        #"num_leaves": {"type": "int", "low": 2, "high": 1000, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
-        #"min_child_samples": {"type": "int", "low": 5, "high": 500, "log": True},
-        "max_depth": {"type": "int", "low": 2, "high": 10},
-        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "max_depth": {"type": "int", "low": 2, "high": 7},
+        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
     },
     "MinMaxFair": {
@@ -587,9 +577,9 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         multiplier_learning_rate=0.1,
         n_estimators=10,
         learning_rate=0.1,
-        max_depth=6,
-        min_child_weight=1,
-        reg_lambda=1,
+        max_depth=-1,
+        min_child_weight=1e-3,
+        reg_lambda=0.0,
         random_state=None,
     ):
         assert fairness_constraint in [
@@ -638,7 +628,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
 
         n_g = len(np.unique(sensitive_attribute))
         min_child_weight = self.min_child_weight
-        #min_child_weight *= (1 - self.fair_weight) + self.fair_weight/n_g # trick to scale min_child_weight with hessian
+        min_child_weight *= (1 - self.fair_weight) + self.fair_weight/n_g # trick to scale min_child_weight with hessian
 
         # sort based in sensitive_attribute
         idx = np.argsort(sensitive_attribute)
@@ -705,9 +695,9 @@ class LGBMClassifier():
         self,
         n_estimators=10,
         learning_rate=0.1,
-        max_depth=6,
-        min_child_weight=1,
-        reg_lambda=1,
+        max_depth=-1,
+        min_child_weight=1e-3,
+        reg_lambda=0.0,
         random_state=None,
         ):
         self.n_estimators = n_estimators
