@@ -388,7 +388,7 @@ class SKLearn_Weighted_LLR():
         risks = []
         for a in np.unique(a_val):
             mask = a_val == a
-            y_mask = y_val[mask]
+            y_mask = y_val[mask].astype(int)
             x_mask = x_val[mask]
             log_proba = self.model.predict_log_proba(x_mask)
             running_risk = []
