@@ -355,6 +355,10 @@ def run_subgroup_experiment(args):
         fair_metric = utils.min_positive_rate
     elif args["fair_metric"] == "min_tpr":
         fair_metric = utils.min_true_positive_rate
+    elif args["fair_metric"] == "max_fnr":
+        fair_metric = lambda y_true, y_pred, a: 1 - utils.max_fnr_score(y_true, y_pred, a)
+    elif args["fair_metric"] == "max_fpr":
+        fair_metric = lambda y_true, y_pred, a: 1 - utils.max_fpr_score(y_true, y_pred, a)
 
     objective = lambda trial: run_trial(
         trial,
@@ -362,9 +366,7 @@ def run_subgroup_experiment(args):
         param_space,
         balanced_accuracy_score,
         fair_metric,
-        args["dataset"],
-        args["n_folds"],
-        args["n_groups"],
+        fold_data
     )
     study.optimize(
         objective,
@@ -410,7 +412,7 @@ def experiment1():
                     now = datetime.datetime.now()
                     f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-                output_dir = f"../results_aaai_v2/experiment_{n_groups}_groups/{dataset}/{model_name}"
+                output_dir = f"../results_aaai_v2/experiment_{n_groups}g_acc/{dataset}/{model_name}"
                 args = {
                     "dataset": dataset,
                     "output_dir": output_dir,
@@ -515,7 +517,7 @@ def experiment3():
                     now = datetime.datetime.now()
                     f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-                output_dir = f"../results_aaai_v2/experiment_{n_groups}_groups/{dataset}/{model_name}"
+                output_dir = f"../results_aaai_v2/experiment_{n_groups}g_tpr/{dataset}/{model_name}"
                 args = {
                     "dataset": dataset,
                     "output_dir": output_dir,
@@ -535,102 +537,55 @@ def experiment3():
 
 
 def experiment4():
-    """Experiment that consider multiple fair_weights values and fit random model with each."""
-    if not os.path.exists("../results/experiment_fair_weight"):
-        os.mkdir("../results/experiment_fair_weight")
+    """FALSE NEGATIVE RATE experiment."""
+    n_folds = 5
+    thresh = "ks"
+    n_jobs = 10
 
-    n_folds = 10
-    fold = 0
-    n_groups = 4
-    n_params = 100
-    fair_weight_list = [
-        0,
-        0.01,
-        0.025,
-        0.05,
-        0.075,
-        0.1,
-        0.15,
-        0.2,
-        0.25,
-        0.3,
-        0.4,
-        0.5,
-        0.6,
-        0.8,
-        1,
+    datasets = ["german", "compas", "taiwan", "adult"]  # , "acsincome"]
+    n_groups_list = [8]  # 2, 4, 8]
+    model_name_list = [
+        "M2FGB_grad_tpr",
+        # "FairGBMClassifier",
+        # "MinMaxFair",
+        "LGBMClassifier",
+        # "MinimaxPareto",
     ]
-    datasets = ["german", "compas", "acsincome"]
+    fair_metric = "max_fnr"
 
-    param_space = models.PARAM_SPACES["M2FGB_grad"].copy()
-    del param_space["fair_weight"]
-    param_list = get_param_list(param_space, n_params)
-
+    n_params = 100
     for dataset in datasets:
-        X_train, Y_train, X_val, Y_val, X_test, Y_test = data.get_fold(
-            dataset, fold, n_folds, SEED
-        )
-        A_train, A_val, A_test = get_subgroup_feature(
-            dataset, X_train, X_val, X_test, n_groups
-        )
-        X_train, X_val, X_test = data.preprocess_dataset(
-            dataset, X_train, X_val, X_test
-        )
+        for n_groups in n_groups_list:
+            for model_name in model_name_list:
+                if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
+                    if (
+                        dataset == "acsincome"
+                        or dataset == "taiwan"
+                        or dataset == "adult"
+                    ):
+                        n_params = 25
 
-        results = []
-        for fair_weight in fair_weight_list:
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-            for p_i in range(n_params):
-                param_list[p_i]["fair_weight"] = fair_weight
+                output_dir = f"../results_aaai_v2/experiment_{n_groups}g_fnr/{dataset}/{model_name}"
+                args = {
+                    "dataset": dataset,
+                    "output_dir": output_dir,
+                    "model_name": model_name,
+                    "n_folds": n_folds,
+                    "n_groups": n_groups,
+                    "n_params": n_params,
+                    "n_jobs": n_jobs,
+                    "thresh": thresh,
+                    "fair_metric": fair_metric,
+                }
+                run_subgroup_experiment(args)
 
-            model_list = []
-            study = optuna.create_study(
-                direction="maximize", sampler=RandomSampler(seed=SEED)
-            )
-            objective = lambda trial: run_trial_fixed(
-                trial,
-                X_train,
-                Y_train,
-                A_train,
-                get_model("M2FGB_grad", random_state=SEED),
-                param_list,
-                model_list,
-            )
-            study.optimize(
-                objective,
-                n_trials=n_params,
-                n_jobs=10,
-                show_progress_bar=True,
-            )
-
-            for i, model in enumerate(model_list):
-
-                Y_pred = model.predict_proba(X_train)[:, 1]
-                overall_score = log_loss(Y_train, Y_pred)
-                group_scores = utils.logloss_group(
-                    Y_train, Y_pred, A_train, "equalized_loss"
-                )
-
-                results.append(
-                    {
-                        "param": i,
-                        "fair_weight": fair_weight,
-                        "overall_score": overall_score,
-                        "max_group_score": group_scores.max(),
-                    }
-                    | {
-                        f"group_{i}": group_score
-                        for i, group_score in enumerate(group_scores)
-                    }
-                    | {
-                        f"param_{key}": value
-                        for key, value in model.get_params().items()
-                    }
-                )
-
-            pd.DataFrame(results).to_csv(
-                f"../results/experiment_fair_weight/{dataset}.csv", index=False
-            )
+                with open("log.txt", "a+") as f:
+                    now = datetime.datetime.now()
+                    f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
 def main():
@@ -640,10 +595,10 @@ def main():
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
-    experiment1()
-    # experiment2()
-    experiment3()
-    # experiment4()
+    #experiment1()
+    #experiment2()
+    #experiment3()
+    experiment4()
 
 
 if __name__ == "__main__":
