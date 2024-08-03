@@ -383,3 +383,10 @@ def max_logloss_score(y_ground, y_prob, A):
 
 def logloss_score(y_ground, y_pred):
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
+
+def max_mse(y_ground, y_pred, A):
+    max_mse = -np.inf
+    for a in np.unique(A):
+        mse = np.mean((y_ground[A == a] - y_pred[A == a]) ** 2)
+        max_mse = max(max_mse, mse)
+    return max_mse
