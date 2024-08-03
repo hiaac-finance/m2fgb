@@ -53,6 +53,8 @@ PARAM_SPACES = {
     },
     "M2FGB_grad": {
         "max_depth": {"type": "int", "low": 2, "high": 7},
+        "min_child_weight" : {"type": "float", "low": 1e-3, "high": 100, "log": True},
+        "colsample_bytree" : {"type" : "category", "choices" : [0.5, 0.75, 1]},
         "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "fair_weight": {"type": "float", "low": 1e-3, "high": 1, "log": True},
@@ -65,6 +67,8 @@ PARAM_SPACES = {
     },
     "FairGBMClassifier": {
         "max_depth": {"type": "int", "low": 2, "high": 7},
+        "min_child_weight" : {"type": "float", "low": 1e-3, "high": 100, "log": True},
+        "colsample_bytree" : {"type" : "category", "choices" : [0.5, 0.75, 1]},
         "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "multiplier_learning_rate": {
@@ -82,6 +86,8 @@ PARAM_SPACES = {
     },
     "LGBMClassifier": {
         "max_depth": {"type": "int", "low": 2, "high": 7},
+        "min_child_weight" : {"type": "float", "low": 1e-3, "high": 100, "log": True},
+        "colsample_bytree" : {"type" : "category", "choices" : [0.5, 0.75, 1]},
         "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
     },
