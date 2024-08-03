@@ -18,7 +18,7 @@ from sklearn.metrics import (
     balanced_accuracy_score,
     precision_score,
     log_loss,
-    recall_score
+    recall_score,
 )
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -98,12 +98,20 @@ def get_model(model_name, random_state=None):
                 **params,
             )
 
+    elif model_name == "M2FGBRegressor":
+
+        def model(**params):
+            return models.M2FGBRegressor(random_state=random_state, **params)
+
     elif model_name == "LGBMClassifier":
 
         def model(**params):
-            return models.LGBMClassifier(
-                random_state=random_state, **params
-            )
+            return models.LGBMClassifier(random_state=random_state, **params)
+
+    elif model_name == "LGBMRegressor":
+
+        def model(**params):
+            return models.LGBMRegressor(random_state=random_state, **params)
 
     elif model_name == "FairGBMClassifier":
 
@@ -127,6 +135,11 @@ def get_model(model_name, random_state=None):
         def model(**params):
             return models.MinMaxFair(fairness_constraint="tpr", **params)
 
+    elif model_name == "MinMaxFairRegressor":
+
+        def model(**params):
+            return models.MinMaxFairRegressor(**params)
+
     elif model_name == "MinimaxPareto":
 
         def model(**params):
@@ -145,11 +158,13 @@ def get_param_spaces(model_name):
         "M2FGB_onlyfair",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
+        "M2FGBRegressor",
+        "LGBMRegressor",
     ]:
         return models.PARAM_SPACES[model_name]
     elif model_name == "M2FGB_eod" or model_name == "M2FGB_pr":
         return models.PARAM_SPACES["M2FGB"]
-    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_pr":
+    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_pr" or model_name == "M2FGBRegressor":
         return models.PARAM_SPACES["M2FGB_grad"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES["FairGBMClassifier"]
@@ -161,6 +176,9 @@ def get_param_spaces(model_name):
         param_space = models.PARAM_SPACES["M2FGB_grad"].copy()
         del param_space["fair_weight"]
         return param_space
+    elif model_name == "LGBMRegressor":
+        return models.PARAM_SPACES["LGBMClassifier"]
+        
 
 
 def get_param_spaces_acsincome(model_name):
@@ -245,56 +263,86 @@ def eval_model(
     """Evaluate model performance and fairness metrics."""
     results_val = []
     results_test = []
+
+    # check if is classification
+    if np.unique(Y_train).shape[0] == 2:
+        is_classification = True
+    else:
+        is_classification = False
+
+    def get_classif_metrics(y_true, y_pred, A):
+        return {
+            # perf metrics
+            "bal_acc": balanced_accuracy_score(y_true, y_pred),
+            "precision": precision_score(y_true, y_pred),
+            "acc": accuracy_score(y_true, y_pred),
+            "recall": recall_score(y_true, y_pred),
+            # fair metrics
+            "eod": utils.equal_opportunity_score(y_true, y_pred, A),
+            "spd": utils.statistical_parity_score(y_true, y_pred, A),
+            "min_tpr": 1 - utils.min_true_positive_rate(y_true, y_pred, A),
+            "min_pr": 1 - utils.min_positive_rate(y_true, y_pred, A),
+            "min_bal_acc": 1 - utils.min_balanced_accuracy(y_true, y_pred, A),
+            "min_acc": 1 - utils.min_accuracy(y_true, y_pred, A),
+        }
+
+    def get_reg_metrics(y_true, y_pred, A):
+        return {
+            "mse": np.mean((y_true - y_pred) ** 2),
+            "max_mse": utils.max_mse(y_true, y_pred, A),
+        }
+
     for m, model in tqdm(enumerate(model_list), total=len(model_list)):
-        # get threshold
-        if thresh_type == "ks":
-            y_train_score = model.predict_proba(X_train)[:, 1]
-            thresh = utils.get_best_threshold(Y_train, y_train_score)
-        else:
-            thresh = 0.5
         duration = trials_df.duration[trials_df.number == m].values[0]
 
-        y_val_pred = model.predict_proba(X_val)[:, 1] > thresh
-        y_test_pred = model.predict_proba(X_test)[:, 1] > thresh
-        
-        results_val.append({
-            "model": m,
-            "thresh": thresh,
-            # perf metrics
-            "bal_acc" : balanced_accuracy_score(Y_val, y_val_pred),
-            "precision" : precision_score(Y_val, y_val_pred),
-            "acc" : accuracy_score(Y_val, y_val_pred),
-            "recall" : recall_score(Y_val, y_val_pred),
-            # fair metrics
-            "eod" : utils.equal_opportunity_score(Y_val, y_val_pred, A_val),
-            "spd" : utils.statistical_parity_score(Y_val, y_val_pred, A_val),
-            "min_tpr" : 1 - utils.min_true_positive_rate(Y_val, y_val_pred, A_val),
-            "min_pr" : 1 - utils.min_positive_rate(Y_val, y_val_pred, A_val),
-            "min_bal_acc" : 1 - utils.min_balanced_accuracy(Y_val, y_val_pred, A_val),
-            "min_acc" : 1 - utils.min_accuracy(Y_val, y_val_pred, A_val),
-            # time
-            "duration" : duration
-        })
+        if is_classification:
+            # get threshold
+            if thresh_type == "ks":
+                y_train_score = model.predict_proba(X_train)[:, 1]
+                thresh = utils.get_best_threshold(Y_train, y_train_score)
+            else:
+                thresh = 0.5
 
-        results_test.append({
-            "model": m,
-            "thresh": thresh,
-            # perf metrics
-            "bal_acc" : balanced_accuracy_score(Y_test, y_test_pred),
-            "precision" : precision_score(Y_test, y_test_pred),
-            "acc" : accuracy_score(Y_test, y_test_pred),
-            "recall" : recall_score(Y_test, y_test_pred),
-            # fair metrics
-            "eod" : utils.equal_opportunity_score(Y_test, y_test_pred, A_test),
-            "spd" : utils.statistical_parity_score(Y_test, y_test_pred, A_test),
-            "min_tpr" : 1 - utils.min_true_positive_rate(Y_test, y_test_pred, A_test),
-            "min_pr" : 1 - utils.min_positive_rate(Y_test, y_test_pred, A_test),
-            "min_bal_acc" : 1 - utils.min_balanced_accuracy(Y_test, y_test_pred, A_test),
-            "min_acc" : 1 - utils.min_accuracy(Y_test, y_test_pred, A_test),
-            # time
-            "duration" : duration
-        })
+            y_val_pred = model.predict_proba(X_val)[:, 1] > thresh
+            y_test_pred = model.predict_proba(X_test)[:, 1] > thresh
 
+            results_val.append(
+                {
+                    "model": m,
+                    "thresh": thresh,
+                    **get_classif_metrics(Y_val, y_val_pred, A_val),
+                    "duration": duration,
+                }
+            )
+            results_test.append(
+                {
+                    "model": m,
+                    "thresh": thresh,
+                    **get_classif_metrics(Y_test, y_test_pred, A_test),
+                    "duration": duration,
+                }
+            )
+
+        else:
+            y_val_pred = model.predict(X_val)
+            y_test_pred = model.predict(X_test)
+            thresh = 0.5
+            results_val.append(
+                {
+                    "model": m,
+                    "thresh": thresh,
+                    **get_reg_metrics(Y_val, y_val_pred, A_val),
+                    "duration": duration,
+                }
+            )
+            results_test.append(
+                {
+                    "model": m,
+                    "thresh": thresh,
+                    **get_reg_metrics(Y_test, y_test_pred, A_test),
+                    "duration": duration,
+                }
+            )
 
     results_val = pd.DataFrame(results_val)
     results_test = pd.DataFrame(results_test)
@@ -337,14 +385,12 @@ def run_subgroup_experiment(args):
 
     for i in tqdm(range(args["n_folds"])):
         # Load and prepare data
-        X_train, A_train, Y_train, X_val, A_val, Y_val, X_test, A_test, Y_test = data.get_fold(
-            args["dataset"], i, args["n_folds"], args["n_groups"], SEED
+        X_train, A_train, Y_train, X_val, A_val, Y_val, X_test, A_test, Y_test = (
+            data.get_fold(args["dataset"], i, args["n_folds"], args["n_groups"], SEED)
         )
 
-        
-        
         study = optuna.create_study(
-            direction="maximize"#, sampler=RandomSampler(seed=SEED)
+            direction="maximize"  # , sampler=RandomSampler(seed=SEED)
         )
         for param in param_list:
             study.enqueue_trial(param)
@@ -399,19 +445,15 @@ def experiment1(fair_metric):
     thresh = "ks"
     n_jobs = 10
 
-    datasets = [
-        "german",
-        "compas", 
-        "taiwan", 
-        "adult", 
-        "enem"]
-    n_groups_list = [8]#2, 4, 8]
+    datasets = ["german", "compas", "taiwan", "adult", "enem"]
+    n_groups_list = [8]  # 2, 4, 8]
     model_name_list = [
-        "M2FGB_grad",
+        "M2FGB_grad_tpr",
+        # "M2FGB_grad",
         "FairGBMClassifier",
-        #"MinMaxFair",
+        # "MinMaxFair",
         "LGBMClassifier",
-        #"MinimaxPareto",
+        # "MinimaxPareto",
     ]
 
     n_params = 100
@@ -419,16 +461,18 @@ def experiment1(fair_metric):
         for n_groups in n_groups_list:
             for model_name in model_name_list:
                 if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
-                    if dataset == "acsincome" or dataset == "taiwan" or dataset == "adult":
+                    if (
+                        dataset == "acsincome"
+                        or dataset == "taiwan"
+                        or dataset == "adult"
+                    ):
                         n_params = 25
 
                 with open("log.txt", "a+") as f:
-                    now = datetime.datetime.now()
+                    now = datetime.datetime.now() - datetime.timedelta(hours=3)
                     f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-                output_dir = (
-                    f"../results_aaai/experiment_{n_groups}g_{fair_metric}/{dataset}/{model_name}"
-                )
+                output_dir = f"../results_aaai/experiment_{n_groups}g_{fair_metric}/{dataset}/{model_name}"
                 args = {
                     "dataset": dataset,
                     "output_dir": output_dir,
@@ -442,8 +486,96 @@ def experiment1(fair_metric):
                 run_subgroup_experiment(args)
 
                 with open("log.txt", "a+") as f:
-                    now = datetime.datetime.now()
+                    now = datetime.datetime.now() - datetime.timedelta(hours=3)
                     f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+
+def experiment_many_groups(fair_metric):
+    """Equalized loss experiment."""
+    n_folds = 10
+    thresh = "ks"
+    n_jobs = 10
+
+    dataset = "enem_large"
+    n_groups = 27
+    model_name_list = [
+        "M2FGB_grad_tpr",
+        # "M2FGB_grad",
+        "FairGBMClassifier",
+        # "MinMaxFair",
+        "LGBMClassifier",
+        # "MinimaxPareto",
+    ]
+
+    n_params = 5
+    for model_name in model_name_list:
+        if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
+            if dataset == "acsincome" or dataset == "taiwan" or dataset == "adult":
+                n_params = 25
+
+        with open("log.txt", "a+") as f:
+            now = datetime.datetime.now() - datetime.timedelta(hours=3)
+            f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+        output_dir = f"../results_aaai/experiment_{n_groups}g_{fair_metric}/{dataset}/{model_name}"
+        args = {
+            "dataset": dataset,
+            "output_dir": output_dir,
+            "model_name": model_name,
+            "n_folds": n_folds,
+            "n_groups": n_groups,
+            "n_params": n_params,
+            "n_jobs": n_jobs,
+            "thresh": thresh,
+        }
+        run_subgroup_experiment(args)
+
+        with open("log.txt", "a+") as f:
+            now = datetime.datetime.now() - datetime.timedelta(hours=3)
+            f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+
+def experiment_regression():
+    """Equalized loss experiment."""
+    n_folds = 10
+    thresh = "ks"
+    n_jobs = 10
+    fair_metric = "max_mse"
+
+    dataset = "enem_reg"
+    n_groups = 8
+    model_name_list = [
+        #"LGBMRegressor",
+        "M2FGBRegressor",
+        "MinMaxFairRegressor",
+    ]
+
+    n_params = 2
+    for model_name in model_name_list:
+        if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
+            if dataset == "acsincome" or dataset == "taiwan" or dataset == "adult":
+                n_params = 25
+
+        with open("log.txt", "a+") as f:
+            now = datetime.datetime.now() - datetime.timedelta(hours=3)
+            f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+        output_dir = f"../results_aaai/experiment_{n_groups}g_{fair_metric}/{dataset}/{model_name}"
+        args = {
+            "dataset": dataset,
+            "output_dir": output_dir,
+            "model_name": model_name,
+            "n_folds": n_folds,
+            "n_groups": n_groups,
+            "n_params": n_params,
+            "n_jobs": n_jobs,
+            "thresh": thresh,
+        }
+        run_subgroup_experiment(args)
+
+        with open("log.txt", "a+") as f:
+            now = datetime.datetime.now() - datetime.timedelta(hours=3)
+            f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
 def main():
@@ -457,8 +589,9 @@ def main():
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
-    experiment1(parser.parse_args().fair_metric)
-   
+    # experiment1(parser.parse_args().fair_metric)
+    #experiment_many_groups(parser.parse_args().fair_metric)
+    experiment_regression()
 
 
 if __name__ == "__main__":
