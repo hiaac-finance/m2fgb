@@ -256,11 +256,17 @@ def get_subgroup_feature(dataset, X, n_groups=2):
         if dataset == "german":
             A = X.Gender.astype(str) + "_" + (X.Age > 50).astype(str)
         elif dataset == "compas":
-            A = (
-                (X.race == "Caucasian").astype(str)
-                + "_"
-                + ((X.age_cat == "25 - 45") | (X.age_cat == "Less than 25")).astype(str)
-            )
+            def race_cat(race):
+                if race == "African-American":
+                    return "1"
+                elif race == "Caucasian":
+                    return "2"
+                elif race == "Hispanic":
+                    return "3"
+                else:
+                    return "4"
+
+            A = X.race.apply(race_cat).astype(str)
         elif dataset == "adult":
             A = X.sex.astype(str) + "_" + (X.age > 50).astype(str)
         elif dataset == "taiwan":
@@ -286,83 +292,79 @@ def get_subgroup_feature(dataset, X, n_groups=2):
 
             def age_cat(age):
                 if age < 30:
-                    return "1"
+                    return "Under 30"
                 elif age < 40:
-                    return "2"
+                    return "Under 40"
                 elif age < 50:
-                    return "3"
+                    return "Under 50"
                 else:
-                    return "4"
+                    return "Older 50"
 
-            A = X.Gender.astype(str) + "_" + X.Age.apply(age_cat).astype(str)
+            A = X.Gender.astype(str) + ", " + X.Age.apply(age_cat).astype(str)
         elif dataset == "adult":
 
             def age_cat(age):
                 if age < 30:
-                    return "1"
+                    return "Under 30"
                 elif age < 40:
-                    return "2"
+                    return "Under 40"
                 elif age < 50:
-                    return "3"
+                    return "Under 50"
                 else:
-                    return "4"
+                    return "Older 50"
 
-            A = X.sex.astype(str) + "_" + X.age.apply(age_cat).astype(str)
+            A = X.sex.astype(str) + ", " + X.age.apply(age_cat).astype(str)
 
         elif dataset == "taiwan":
 
             def age_cat(age):
                 if age < 30:
-                    return "1"
+                    return "Under 30"
                 elif age < 40:
-                    return "2"
+                    return "Under 40"
                 elif age < 50:
-                    return "3"
+                    return "Under 50"
                 else:
-                    return "4"
+                    return "Older 50"
 
-            A = X.SEX.astype(str) + "_" + X.AGE.apply(age_cat).astype(str)
+            A = X.SEX.astype(str) + ", " + X.AGE.apply(age_cat).astype(str)
 
         elif dataset == "compas":
 
             def race_cat(race):
-                if race == "African-American" or race == "Hispanic":
-                    return "1"
-                elif race == "Caucasian":
-                    return "2"
-                elif race == "Asian":
-                    return "3"
+                if race in ["African-American", "Caucasian", "Hispanic"]:
+                    return race
                 else:
-                    return "4"
+                    return "Other"
 
             A = (
                 X.race.apply(race_cat)
-                + "_"
-                + ((X.age_cat == "25 - 45") | (X.age_cat == "Less than 25")).astype(str)
+                + ", "
+                + ((X.age_cat == "25 - 45")).apply(lambda x : "Between 25 and 45" if x else "Other")
             )
 
         elif dataset == "acsincome":
 
             def race_cat(race):
                 if race == "white":
-                    return "1"
+                    return "White"
                 elif race == "african_america":
-                    return "2"
+                    return "African-American"
                 elif race == "asian":
-                    return "3"
+                    return "Asian"
                 else:
-                    return "4"
+                    return "Other"
 
-            A = X.RAC1P.apply(race_cat) + "_" + X.SEX.astype(str)
+            A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat) 
         elif dataset == "enem" or dataset == "enem_reg":
             # transform age into 2 categories
             age = X[[f"TP_FAIXA_ETARIA_{i}" for i in range(1, 10)]].sum(axis=1)
             A = (
                 X.racebin.astype(str)
-                + "_"
-                + X.sexbin.astype(str)
-                + "_"
-                + age.astype(str)
+                + ", "
+                + X.sexbin.astype(str).apply(lambda x : "Male" if x == 1 else "Female")
+                + ", "
+                + age.astype(str) 
             )
 
     elif n_groups > 20:
