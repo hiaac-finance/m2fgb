@@ -41,10 +41,9 @@ CAT_FEATURES = {
         "EDUCATION",
         "MARRIAGE",
     ],
-    "enem" : [
-        "racebin",
-        "sexbin"
-    ]
+    "enem": ["racebin", "sexbin"],
+    "enem_reg": ["racebin", "sexbin"],
+    "enem_large": ["racebin", "sexbin"],
 }
 
 
@@ -151,8 +150,33 @@ def load_acsincome():
             X[col] = X[col].astype(float)
     return X, Y
 
+
 def load_enem():
     df = pd.read_pickle("../data/enem-50000-20.pkl").reset_index(drop=True)
+    Y = df["gradebin"].astype(int)
+    X = df.drop(columns=["gradebin"])
+    for col in X.columns:
+        if col in CAT_FEATURES["enem"]:
+            X[col] = X[col].astype("category")
+        else:
+            X[col] = X[col].astype(float)
+    return X, Y
+
+
+def load_enem_reg():
+    df = pd.read_csv("../data/enem_reg_preprocessed.csv").reset_index(drop=True)
+    Y = df["gradescore"].astype(float)
+    X = df.drop(columns=["gradescore"])
+    for col in X.columns:
+        if col in CAT_FEATURES["enem"]:
+            X[col] = X[col].astype("category")
+        else:
+            X[col] = X[col].astype(float)
+    return X, Y
+
+
+def load_enem_large():
+    df = pd.read_csv("../data/enem_large_preprocessed.csv").reset_index(drop=True)
     Y = df["gradebin"].astype(int)
     X = df.drop(columns=["gradebin"])
     for col in X.columns:
@@ -176,14 +200,20 @@ def load_dataset(dataset):
         return load_acsincome()
     elif dataset == "enem":
         return load_enem()
+    elif dataset == "enem_reg":
+        return load_enem_reg()
+    elif dataset == "enem_large":
+        return load_enem_large()
     else:
         raise ValueError(f"Unknown dataset {dataset}")
 
 
 def preprocess_dataset(dataset, X_train, X_val, X_test):
     if dataset not in NUM_FEATURES:
-        NUM_FEATURES[dataset] = [col for col in X_train.columns if col not in CAT_FEATURES[dataset]]
-        
+        NUM_FEATURES[dataset] = [
+            col for col in X_train.columns if col not in CAT_FEATURES[dataset]
+        ]
+
     col_trans = ColumnTransformer(
         [
             ("numeric", StandardScaler(), NUM_FEATURES[dataset]),
@@ -207,7 +237,7 @@ def preprocess_dataset(dataset, X_train, X_val, X_test):
 
 
 def get_subgroup_feature(dataset, X, n_groups=2):
-    assert n_groups in [2, 4, 8]
+    # assert n_groups in [2, 4, 8]
     if n_groups == 2:
         if dataset == "german":
             A = X.Gender.astype(str)
@@ -219,7 +249,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
             A = X.SEX.astype(str)
         elif dataset == "taiwan":
             A = X.SEX.astype(str)
-        elif dataset == "enem":
+        elif dataset == "enem" or dataset == "enem_reg":
             A = X.racebin.astype(str)
 
     elif n_groups == 4:
@@ -248,7 +278,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                     return "4"
 
             A = X.RAC1P.apply(race_cat)
-        elif dataset == "enem":
+        elif dataset == "enem" or dataset == "enem_reg":
             A = X.racebin.astype(str) + "_" + X.sexbin.astype(str)
 
     elif n_groups == 8:
@@ -324,10 +354,22 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                     return "4"
 
             A = X.RAC1P.apply(race_cat) + "_" + X.SEX.astype(str)
-        elif dataset == "enem":
+        elif dataset == "enem" or dataset == "enem_reg":
             # transform age into 2 categories
             age = X[[f"TP_FAIXA_ETARIA_{i}" for i in range(1, 10)]].sum(axis=1)
-            A = X.racebin.astype(str) + "_" + X.sexbin.astype(str) + "_" + age.astype(str)
+            A = (
+                X.racebin.astype(str)
+                + "_"
+                + X.sexbin.astype(str)
+                + "_"
+                + age.astype(str)
+            )
+
+    elif n_groups > 20:
+        assert dataset == "enem_large"
+        sg_columns = [col for col in X.columns if "SG_UF_PROVA" in col]
+        # A is the index of the non zero column
+        A = X[sg_columns].idxmax(axis=1)
 
     sensitive_map = dict([(attr, i) for i, attr in enumerate(A.unique())])
     print(sensitive_map)
@@ -338,8 +380,11 @@ def get_subgroup_feature(dataset, X, n_groups=2):
 def get_fold(dataset, fold, n_folds=10, n_groups=2, random_state=None):
     X, Y = load_dataset(dataset)
     A = get_subgroup_feature(dataset, X, n_groups)
-    kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
-    for i, (train_index, test_index) in enumerate(kf.split(X, Y, A)):
+    if dataset == "enem_reg":
+        kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+    else:
+        kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+    for i, (train_index, test_index) in enumerate(kf.split(X, Y)):
         if i == fold:
             X_train, A_train, Y_train = (
                 X.iloc[train_index],
@@ -380,8 +425,10 @@ def get_fold_holdout(dataset, fold, n_folds=10, n_groups=2, random_state=None):
     X_train, X_test, Y_train, Y_test, A_train, A_test = train_test_split(
         X, Y, A, test_size=0.2, random_state=random_state
     )
-
-    kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=random_state)
+    if dataset == "enem_reg":
+        kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+    else:
+        kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
     for i, (train_index, val_index) in enumerate(kf.split(X_train, Y_train)):
         if i == fold:
             X_train, X_val = X_train.iloc[train_index], X_train.iloc[val_index]
