@@ -592,10 +592,14 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         fair_weight=0.5,
         dual_learning="gradient_norm",
         multiplier_learning_rate=0.1,
-        n_estimators=10,
+        n_estimators=100,
         learning_rate=0.1,
+        num_leaves=31,
         max_depth=-1,
+        min_child_samples=20,
         min_child_weight=1e-3,
+        colsample_bytree=1.0,
+        reg_alpha=0.0,
         reg_lambda=0.0,
         random_state=None,
     ):
@@ -615,8 +619,12 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         self.fair_weight = fair_weight
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
+        self.num_leaves = num_leaves
         self.max_depth = max_depth
+        self.min_child_samples = min_child_samples
         self.min_child_weight = min_child_weight
+        self.colsample_bytree = colsample_bytree
+        self.reg_alpha = reg_alpha
         self.reg_lambda = reg_lambda
         self.random_state = random_state
 
@@ -671,8 +679,12 @@ class M2FGB(BaseEstimator, ClassifierMixin):
                 self.multiplier_learning_rate,
             ),
             "learning_rate": self.learning_rate,
+            "num_leaves": self.num_leaves,
             "max_depth": self.max_depth,
+            "min_child_samples": self.min_child_samples,
             "min_child_weight": min_child_weight,
+            "colsample_bytree": self.colsample_bytree,
+            "reg_alpha": self.reg_alpha,
             "reg_lambda": self.reg_lambda,
             "verbose": -1,
         }
@@ -708,20 +720,28 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         return preds
 
 
-class LGBMClassifier():
+class LGBMClassifier:
     def __init__(
         self,
-        n_estimators=10,
+        n_estimators=100,
         learning_rate=0.1,
+        num_leaves=31,
         max_depth=-1,
+        min_child_samples=20,
         min_child_weight=1e-3,
+        colsample_bytree=1.0,
+        reg_alpha=0.0,
         reg_lambda=0.0,
         random_state=None,
-        ):
+    ):
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
+        self.num_leaves = num_leaves
         self.max_depth = max_depth
+        self.min_child_samples = min_child_samples
         self.min_child_weight = min_child_weight
+        self.colsample_bytree = colsample_bytree
+        self.reg_alpha = reg_alpha
         self.reg_lambda = reg_lambda
         self.random_state = random_state
 
@@ -746,8 +766,12 @@ class LGBMClassifier():
         params = {
             "objective": "binary",
             "learning_rate": self.learning_rate,
+            "num_leaves": self.num_leaves,
             "max_depth": self.max_depth,
+            "min_child_samples": self.min_child_samples,
             "min_child_weight": self.min_child_weight,
+            "colsample_bytree": self.colsample_bytree,
+            "reg_alpha": self.reg_alpha,
             "reg_lambda": self.reg_lambda,
             "verbose": -1,
         }
@@ -978,6 +1002,7 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
         X = check_array(X)
         return self.model.predict_proba(X)
 
+
 class M2FGBRegressor(BaseEstimator, RegressorMixin):
     """Classifier that modifies LGBM to incorporate min-max fairness optimization.
     It shares many of the parameters with LGBM to control learning and decision trees.
@@ -1013,10 +1038,14 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
         fair_weight=0.5,
         dual_learning="gradient_norm",
         multiplier_learning_rate=0.1,
-        n_estimators=10,
+        n_estimators=100,
         learning_rate=0.1,
+        num_leaves=31,
         max_depth=-1,
+        min_child_samples=20,
         min_child_weight=1e-3,
+        colsample_bytree=1.0,
+        reg_alpha=0.0,
         reg_lambda=0.0,
         random_state=None,
     ):
@@ -1033,8 +1062,12 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
         self.fair_weight = fair_weight
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
+        self.num_leaves = num_leaves
         self.max_depth = max_depth
+        self.min_child_samples = min_child_samples
         self.min_child_weight = min_child_weight
+        self.colsample_bytree = colsample_bytree
+        self.reg_alpha = reg_alpha
         self.reg_lambda = reg_lambda
         self.random_state = random_state
 
@@ -1064,7 +1097,7 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
 
         n_g = len(np.unique(sensitive_attribute))
         min_child_weight = self.min_child_weight
-        min_child_weight *= (1 - self.fair_weight) + self.fair_weight/n_g # trick to scale min_child_weight with hessian
+        # min_child_weight *= (1 - self.fair_weight) + self.fair_weight/n_g # trick to scale min_child_weight with hessian
 
         # sort based in sensitive_attribute
         idx = np.argsort(sensitive_attribute)
@@ -1089,8 +1122,12 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
                 self.multiplier_learning_rate,
             ),
             "learning_rate": self.learning_rate,
+            "num_leaves": self.num_leaves,
             "max_depth": self.max_depth,
+            "min_child_samples": self.min_child_samples,
             "min_child_weight": min_child_weight,
+            "colsample_bytree": self.colsample_bytree,
+            "reg_alpha": self.reg_alpha,
             "reg_lambda": self.reg_lambda,
             "verbose": -1,
         }
@@ -1203,7 +1240,8 @@ def dual_obj_reg(
 
     return custom_obj
 
-def squaredloss_group(y_pred, y_true, subgroup, fairness_constraint = "equalized_loss"):
+
+def squaredloss_group(y_pred, y_true, subgroup, fairness_constraint="equalized_loss"):
     """For each subgroup, calculates the mean log loss of the samples."""
     loss = (y_true - y_pred) ** 2
 
@@ -1215,11 +1253,13 @@ def squaredloss_group(y_pred, y_true, subgroup, fairness_constraint = "equalized
     loss = np.array([np.mean(l) for l in loss])
     return loss
 
-def squaredloss_grad(y_pred, y_true, fairness_constraint = ""):
+
+def squaredloss_grad(y_pred, y_true, fairness_constraint=""):
     grad = 2 * (y_pred - y_true)
     return grad
 
-def squaredloss_hess(y_pred, y_true, fairness_constraint = ""):
+
+def squaredloss_hess(y_pred, y_true, fairness_constraint=""):
     hess = 2 * np.ones(y_pred.shape[0])
     return hess
 
@@ -1227,18 +1267,28 @@ def squaredloss_hess(y_pred, y_true, fairness_constraint = ""):
 class LGBMRegressor(BaseEstimator, RegressorMixin):
     def __init__(
         self,
-        n_estimators=10,
+        n_estimators=100,
         learning_rate=0.1,
+        num_leaves=31,
         max_depth=-1,
+        min_child_samples=20,
         min_child_weight=1e-3,
+        colsample_bytree=1.0,
+        reg_alpha=0.0,
         reg_lambda=0.0,
+        min_gain_to_split=0.0,
         random_state=None,
-        ):
+    ):
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
+        self.num_leaves = num_leaves
         self.max_depth = max_depth
+        self.min_child_samples = min_child_samples
         self.min_child_weight = min_child_weight
+        self.colsample_bytree = colsample_bytree
+        self.reg_alpha = reg_alpha
         self.reg_lambda = reg_lambda
+        self.min_gain_to_split = min_gain_to_split
         self.random_state = random_state
 
     def fit(self, X, y, sensitive_attribute):
@@ -1262,9 +1312,14 @@ class LGBMRegressor(BaseEstimator, RegressorMixin):
         params = {
             "objective": "regression",
             "learning_rate": self.learning_rate,
+            "num_leaves": self.num_leaves,
             "max_depth": self.max_depth,
+            "min_child_samples": self.min_child_samples,
             "min_child_weight": self.min_child_weight,
+            "colsample_bytree": self.colsample_bytree,
+            "reg_alpha": self.reg_alpha,
             "reg_lambda": self.reg_lambda,
+            "min_gain_to_split": self.min_gain_to_split,
             "verbose": -1,
         }
         if self.random_state is not None:
@@ -1283,6 +1338,7 @@ class LGBMRegressor(BaseEstimator, RegressorMixin):
         X = check_array(X)
         preds = self.model_.predict(X)
         return preds
+
 
 class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
     def __init__(
@@ -1306,21 +1362,21 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         X, y = check_X_y(X, y)
         self.range_ = [np.min(y), np.max(y)]
 
-        error_type = "Log-Loss"
+        error_type = "MSE"
 
         # train a logistic model to get min and max logloss
         model = LinearRegression()
         model.fit(X, y)
         y_pred = model.predict(X)
-        min_logloss = np.inf
-        max_logloss = -np.inf
+        min_mse = np.inf
+        max_mse = -np.inf
         for g in np.unique(sensitive_attribute):
             idx = sensitive_attribute == g
-            logloss = np.sum((y[idx] -  y_pred[idx])**2)
-            min_logloss = min(min_logloss, logloss)
-            max_logloss = max(max_logloss, logloss)
+            mse = np.sum((y[idx] - y_pred[idx]) ** 2)
+            min_mse = min(min_mse, mse)
+            max_mse = max(mse, mse)
 
-        gamma_hat = min_logloss + self.gamma * (max_logloss - min_logloss)
+        gamma_hat = min_mse + self.gamma * (max_mse - min_mse)
 
         (
             group_error,
@@ -1394,7 +1450,7 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         X = check_array(X)
         predictions = np.zeros((X.shape[0]))
         for i in range(X.shape[0]):
-            predictions[i] = self.model[
-                np.random.choice(len(self.model))
-            ].predict(X[i].reshape(1, -1))
+            predictions[i] = self.model[np.random.choice(len(self.model))].predict(
+                X[i].reshape(1, -1)
+            )
         return predictions
