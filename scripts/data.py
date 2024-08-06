@@ -357,14 +357,15 @@ def get_subgroup_feature(dataset, X, n_groups=2):
 
             A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat) 
         elif dataset == "enem" or dataset == "enem_reg":
-            # transform age into 2 categories
-            age = X[[f"TP_FAIXA_ETARIA_{i}" for i in range(1, 10)]].sum(axis=1)
+            def race_cat(race):
+                if race in ["White", "Black", "Brown"]:
+                    return race
+                else:
+                    return "Other"
             A = (
-                X.racebin.astype(str)
+                X.racebin.apply(race_cat)
                 + ", "
-                + X.sexbin.astype(str).apply(lambda x : "Male" if x == 1 else "Female")
-                + ", "
-                + age.astype(str) 
+                + X.sexbin.astype(str).apply(lambda x : "Male" if x=="1.0" else "Female")
             )
 
     elif n_groups > 20:

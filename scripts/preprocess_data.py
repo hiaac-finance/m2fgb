@@ -310,7 +310,7 @@ def preprocess_enem(
     grade_attribute=["NU_NOTA_CH"],
     n_sample=50000,
     n_sample_large=500000,
-    multigroup=False,
+    multigroup=True,
     n_classes=2,
 ):
     from sklearn.preprocessing import MinMaxScaler
@@ -323,11 +323,11 @@ def preprocess_enem(
 
     def construct_race(df, protected_attribute):
         race_dict = {
-            "Branca": 1,
-            "Preta": 2,
-            "Parda": 3,
-            "Amarela": 4,
-            "Indigena": 5,
+            "Branca": "White",
+            "Preta": "Black",
+            "Parda": "Brown",
+            "Amarela": "Asian",
+            "Indigena": "Native",
         }  # changed to match ENEM 2020 numbering
         return df[protected_attribute].map(race_dict)
 
@@ -389,7 +389,7 @@ def preprocess_enem(
             (df["TP_COR_RACA"] == "Branca").values,
             (df["TP_COR_RACA"] == "Amarela").values,
         ).astype(int)
-    df["sexbin"] = (df["TP_SEXO"] == "M").astype(int)
+    df["sexbin"] = df["TP_SEXO"].apply(lambda x : 1 if x == "M" else 0)
 
     df.drop([grade_attribute[0], "TP_COR_RACA", "TP_SEXO"], axis=1, inplace=True)
 
