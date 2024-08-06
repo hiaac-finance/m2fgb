@@ -513,7 +513,8 @@ def dual_obj_1(
 
         elif dual_learning == "gradient_norm":
             if mu_opt_list[0] is None:
-                mu_opt = np.ones(loss_group.shape[0])
+                mu_opt = loss_group
+                #mu_opt = np.ones(loss_group.shape[0])
             else:
                 mu_opt = mu_opt_list[-1].copy()
 
@@ -1204,7 +1205,7 @@ def dual_obj_reg(
 
         elif dual_learning == "gradient_norm":
             if mu_opt_list[0] is None:
-                mu_opt = np.ones(loss_group.shape[0])
+                mu_opt = loss_group
             else:
                 mu_opt = mu_opt_list[-1].copy()
 
