@@ -38,61 +38,24 @@ np.random.seed(SEED)
 
 def get_model(model_name, random_state=None):
     """Helper function to get model class from model name."""
-    if model_name == "M2FGB":
+    if model_name == "M2FGBClassifier":
 
         def model(**params):
-            return models.M2FGB(random_state=random_state, **params)
+            return models.M2FGBClassifier(random_state=random_state, **params)
 
-    elif model_name == "M2FGB_grad":
-
-        def model(**params):
-            return models.M2FGB(
-                dual_learning="gradient_norm", random_state=random_state, **params
-            )
-
-    elif model_name == "M2FGB_onlyfair":
+    elif model_name == "M2FGBClassifier_tpr":
 
         def model(**params):
-            return models.M2FGB(
-                dual_learning="gradient_norm",
-                fair_weight=1,
+            return models.M2FGBClassifier(
+                fairness_constraint="true_positive_rate",
                 random_state=random_state,
                 **params,
             )
 
-    elif model_name == "M2FGB_eod":
+    elif model_name == "M2FGBClassifier_pr":
 
         def model(**params):
-            return models.M2FGB(
-                fairness_constraint="equal_opportunity",
-                random_state=random_state,
-                **params,
-            )
-
-    elif model_name == "M2FGB_grad_tpr":
-
-        def model(**params):
-            return models.M2FGB(
-                dual_learning="gradient",
-                fairness_constraint="equal_opportunity",
-                random_state=random_state,
-                **params,
-            )
-
-    elif model_name == "M2FGB_pr":
-
-        def model(**params):
-            return models.M2FGB(
-                fairness_constraint="positive_rate",
-                random_state=random_state,
-                **params,
-            )
-
-    elif model_name == "M2FGB_grad_pr":
-
-        def model(**params):
-            return models.M2FGB(
-                dual_learning="gradient_norm",
+            return models.M2FGBClassifier(
                 fairness_constraint="positive_rate",
                 random_state=random_state,
                 **params,
@@ -151,55 +114,33 @@ def get_model(model_name, random_state=None):
 def get_param_spaces(model_name):
     """Helper function to get parameter space from model name."""
     if model_name not in [
-        "M2FGB_eod",
-        "M2FGB_pr",
-        "M2FGB_grad_tpr",
-        "M2FGB_grad_pr",
-        "M2FGB_onlyfair",
+        "M2FGBClassifier_tpr",
+        "M2FGBClassifier_pr",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
-        "M2FGBRegressor",
-        "LGBMRegressor",
     ]:
         return models.PARAM_SPACES[model_name]
-    elif model_name == "M2FGB_eod" or model_name == "M2FGB_pr":
-        return models.PARAM_SPACES["M2FGB"]
-    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_pr" or model_name == "M2FGBRegressor":
-        return models.PARAM_SPACES["M2FGB_grad"]
+    elif model_name == "M2FGBClassifier_tpr" or model_name == "M2FGBClassifier_pr":
+        return models.PARAM_SPACES["M2FGBClassifier"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES["FairGBMClassifier"]
-    elif model_name == "FairClassifier_spd":
-        return models.PARAM_SPACES["FairClassifier"]
     elif model_name == "MinMaxFair_tpr":
         return models.PARAM_SPACES["MinMaxFair"]
-    elif model_name == "M2FGB_onlyfair":
-        param_space = models.PARAM_SPACES["M2FGB_grad"].copy()
-        del param_space["fair_weight"]
-        return param_space
-    elif model_name == "LGBMRegressor":
-        return models.PARAM_SPACES["LGBMClassifier"]
-        
 
 
 def get_param_spaces_acsincome(model_name):
     """Helper function to get parameter space from model name."""
     if model_name not in [
-        "M2FGB_eod",
-        "M2FGB_pr",
-        "M2FGB_grad_tpr",
-        "M2FGB_grad_pr",
+        "M2FGBClassifier_tpr",
+        "M2FGBClassifier_pr",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
     ]:
         return models.PARAM_SPACES_ACSINCOME[model_name]
-    elif model_name == "M2FGB_tpr" or model_name == "M2FGB_pr":
-        return models.PARAM_SPACES_ACSINCOME["M2FGB"]
-    elif model_name == "M2FGB_grad_tpr" or model_name == "M2FGB_grad_pr":
-        return models.PARAM_SPACES_ACSINCOME["M2FGB_grad"]
+    elif model_name == "M2FGBClassifier_tpr" or model_name == "M2FGBClassifier_pr":
+        return models.PARAM_SPACES_ACSINCOME["M2FGBClassifier"]
     elif model_name == "FairGBMClassifier_eod":
         return models.PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
-    elif model_name == "FairClassifier_spd":
-        return models.PARAM_SPACES_ACSINCOME["FairClassifier"]
     elif model_name == "MinMaxFair_tpr":
         return models.PARAM_SPACES_ACSINCOME["MinMaxFair"]
 
@@ -261,6 +202,7 @@ def eval_model(
     A_test,
 ):
     """Evaluate model performance and fairness metrics."""
+    results_train = []
     results_val = []
     results_test = []
 
@@ -303,9 +245,18 @@ def eval_model(
             else:
                 thresh = 0.5
 
+            y_train_pred = model.predict_proba(X_train)[:, 1] > thresh
             y_val_pred = model.predict_proba(X_val)[:, 1] > thresh
             y_test_pred = model.predict_proba(X_test)[:, 1] > thresh
 
+            results_train.append(
+                {
+                    "model": m,
+                    "thresh": thresh,
+                    **get_classif_metrics(Y_train, y_train_pred, A_train),
+                    "duration": duration,
+                }
+            )
             results_val.append(
                 {
                     "model": m,
@@ -324,9 +275,18 @@ def eval_model(
             )
 
         else:
+            y_train_pred = model.predict(X_train)
             y_val_pred = model.predict(X_val)
             y_test_pred = model.predict(X_test)
             thresh = 0.5
+            results_train.append(
+                {
+                    "model": m,
+                    "thresh": thresh,
+                    **get_reg_metrics(Y_train, y_train_pred, A_train),
+                    "duration": duration,
+                }
+            )
             results_val.append(
                 {
                     "model": m,
@@ -344,9 +304,10 @@ def eval_model(
                 }
             )
 
+    results_train = pd.DataFrame(results_train)
     results_val = pd.DataFrame(results_val)
     results_test = pd.DataFrame(results_test)
-    return results_val, results_test
+    return results_train, results_val, results_test
 
 
 def run_trial(trial, X_train, Y_train, A_train, model_class, param_space, model_list):
@@ -415,7 +376,7 @@ def run_subgroup_experiment(args):
             os.path.join(args["output_dir"], f"trials_fold_{i}.csv"), index=False
         )
 
-        results_val, results_test = eval_model(
+        results_train, results_val, results_test = eval_model(
             model_list,
             trials_df,
             args["thresh"],
@@ -431,6 +392,9 @@ def run_subgroup_experiment(args):
         )
 
         # save results of fold
+        results_train.to_csv(
+            os.path.join(args["output_dir"], f"train_fold_{i}.csv"), index=False
+        )
         results_val.to_csv(
             os.path.join(args["output_dir"], f"validation_fold_{i}.csv"), index=False
         )
@@ -439,26 +403,30 @@ def run_subgroup_experiment(args):
         )
 
 
-def experiment1(fair_metric):
+def experiment1(args):
     """Equalized loss experiment."""
     n_folds = 10
     thresh = "ks"
     n_jobs = 10
 
     datasets = ["german", "compas", "taiwan", "adult", "enem"]
+    datasets = ["adult"]
     n_groups_list = [8]  # 2, 4, 8]
     model_name_list = [
-        "M2FGB_grad_tpr",
-        # "M2FGB_grad",
-        "FairGBMClassifier",
+        # "M2FGB_grad_tpr",
+        "M2FGBClassifier",
+        # "FairGBMClassifier",
         # "MinMaxFair",
         "LGBMClassifier",
         # "MinimaxPareto",
     ]
 
-    n_params = 100
+    n_params = args.n_params
     for dataset in datasets:
         for n_groups in n_groups_list:
+            if dataset == "enem_large":
+                n_groups = 27
+
             for model_name in model_name_list:
                 if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
                     if (
@@ -472,8 +440,8 @@ def experiment1(fair_metric):
                     now = datetime.datetime.now() - datetime.timedelta(hours=3)
                     f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-                output_dir = f"../results_aaai/experiment_{n_groups}g_{fair_metric}/{dataset}/{model_name}"
-                args = {
+                output_dir = f"../results_aaai/experiment_{args.fair_metric}/{dataset}_{n_groups}g/{model_name}"
+                config = {
                     "dataset": dataset,
                     "output_dir": output_dir,
                     "model_name": model_name,
@@ -483,7 +451,7 @@ def experiment1(fair_metric):
                     "n_jobs": n_jobs,
                     "thresh": thresh,
                 }
-                run_subgroup_experiment(args)
+                run_subgroup_experiment(config)
 
                 with open("log.txt", "a+") as f:
                     now = datetime.datetime.now() - datetime.timedelta(hours=3)
@@ -499,8 +467,8 @@ def experiment_many_groups(fair_metric):
     dataset = "enem_large"
     n_groups = 27
     model_name_list = [
-        "M2FGB_grad_tpr",
-        # "M2FGB_grad",
+        "M2FGBClassifier_tpr",
+        # "M2FGBClassifier",
         "FairGBMClassifier",
         # "MinMaxFair",
         "LGBMClassifier",
@@ -535,7 +503,7 @@ def experiment_many_groups(fair_metric):
             f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
-def experiment_regression():
+def experiment_regression(args):
     """Equalized loss experiment."""
     n_folds = 10
     thresh = "ks"
@@ -545,22 +513,19 @@ def experiment_regression():
     dataset = "enem_reg"
     n_groups = 8
     model_name_list = [
-        #"LGBMRegressor",
+        # "MinMaxFairRegressor",
+        "LGBMRegressor",
         "M2FGBRegressor",
-        "MinMaxFairRegressor",
     ]
 
-    n_params = 2
+    n_params = args.n_params
     for model_name in model_name_list:
-        if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
-            if dataset == "acsincome" or dataset == "taiwan" or dataset == "adult":
-                n_params = 25
 
         with open("log.txt", "a+") as f:
             now = datetime.datetime.now() - datetime.timedelta(hours=3)
             f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-        output_dir = f"../results_aaai/experiment_{n_groups}g_{fair_metric}/{dataset}/{model_name}"
+        output_dir = f"../results_aaai/experiment_{fair_metric}/{dataset}_{n_groups}/{model_name}"
         args = {
             "dataset": dataset,
             "output_dir": output_dir,
@@ -585,13 +550,15 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--fair_metric", type=str, default="min_acc")
+    parser.add_argument("--n_params", type=int, default=100)
 
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
     # experiment1(parser.parse_args().fair_metric)
-    #experiment_many_groups(parser.parse_args().fair_metric)
-    experiment_regression()
+    # experiment_many_groups(parser.parse_args().fair_metric)
+    # experiment_regression(parser.parse_args())
+    experiment1(parser.parse_args())
 
 
 if __name__ == "__main__":

@@ -22,13 +22,7 @@ lgb.register_logger(utils.CustomLogger())
 fairgbm.register_logger(utils.CustomLogger())
 
 PARAM_SPACES = {
-    "M2FGB": {
-        "max_depth": {"type": "int", "low": 2, "high": 7},
-        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
-        "fair_weight": {"type": "float", "low": 1e-3, "high": 1, "log": True},
-    },
-    "M2FGB_grad": {
+    "M2FGBClassifier": {
         "n_estimators": {"type": "int", "low": 250, "high": 5000, "log": True},
         "num_leaves": {"type": "int", "low": 10, "high": 100, "log" : True},
         "min_child_samples" : {"type" : "int", "low" : 5, "high" : 500, "log" : True},
@@ -151,7 +145,7 @@ def logloss_group(y_pred, y_true, subgroup, fairness_constraint):
     if fairness_constraint == "positive_rate":
         y_ = np.ones(y_true.shape[0])  # all positive class
         loss = -(y_ * np.log(y_pred) + (1 - y_) * np.log(1 - y_pred))
-    elif fairness_constraint == "equal_opportunity":
+    elif fairness_constraint == "true_positive_rate":
         loss = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
         loss[y_true == 0] = 0  # only consider the loss of the positive class
     elif fairness_constraint == "true_negative_rate":
@@ -171,7 +165,7 @@ def logloss_group_grad(y_pred, y_true, fairness_constraint):
     """Create an array with the gradient of fairness metrics."""
     if fairness_constraint == "equalized_loss":
         grad = -(y_true - y_pred)
-    elif fairness_constraint == "positive_rate":
+    elif fairness_constraint == "true_positive_rate":
         y_ = np.ones(y_true.shape[0])  # all positive class
         grad = -(y_ - y_pred)
     elif fairness_constraint == "equal_opportunity":
@@ -190,7 +184,7 @@ def logloss_group_hess(y_pred, y_true, fairness_constraint):
         hess = y_pred * (1 - y_pred)
     elif (
         fairness_constraint == "positive_rate"
-        or fairness_constraint == "equal_opportunity"
+        or fairness_constraint == "true_positive_rate"
     ):
         hess = y_pred * (1 - y_pred)
         hess[y_true == 0] = 0  # only consider the loss of the positive class
@@ -216,7 +210,7 @@ def get_subgroup_indicator(subgroup):
     return I
 
 
-def dual_obj_1(
+def dual_obj_cls(
     subgroup,
     fair_weight,
     group_losses,
@@ -315,7 +309,7 @@ def dual_obj_1(
     return custom_obj
 
 
-class M2FGB(BaseEstimator, ClassifierMixin):
+class M2FGBClassifier(BaseEstimator, ClassifierMixin):
     """Classifier that modifies LGBM to incorporate min-max fairness optimization.
     It shares many of the parameters with LGBM to control learning and decision trees.
     The fairness metrics impelemented are "equalized_loss", "equal_opportunity", and "demographic_parity".
@@ -363,7 +357,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
     ):
         assert fairness_constraint in [
             "equalized_loss",
-            "equal_opportunity",
+            "true_positive_rate",
             "positive_rate",
             "true_negative_rate",
         ]
@@ -434,7 +428,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
             return "max_logloss", utils.max_logloss_score(labels, preds, sensitive_attribute_val), False
 
         params = {
-            "objective": dual_obj_1(
+            "objective": dual_obj_cls(
                 sensitive_attribute,
                 self.fair_weight,
                 self.group_losses,
