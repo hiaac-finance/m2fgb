@@ -3,7 +3,6 @@ import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.metrics import log_loss
-import xgboost as xgb
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from scipy.sparse import csr_matrix
 
@@ -23,28 +22,6 @@ lgb.register_logger(utils.CustomLogger())
 fairgbm.register_logger(utils.CustomLogger())
 
 PARAM_SPACES = {
-    "M2FGB_XGB": {
-        "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
-        "eta": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
-        "max_depth": {"type": "int", "low": 2, "high": 10},
-        "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
-    },
-    "M2FGB_XGB_grad": {
-        "min_child_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "n_estimators": {"type": "int", "low": 10, "high": 1000, "log": True},
-        "eta": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
-        "max_depth": {"type": "int", "low": 2, "high": 10},
-        "l2_weight": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
-        "multiplier_learning_rate": {
-            "type": "float",
-            "low": 0.005,
-            "high": 0.5,
-            "log": True,
-        },
-    },
     "M2FGB": {
         "max_depth": {"type": "int", "low": 2, "high": 7},
         "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
@@ -52,24 +29,20 @@ PARAM_SPACES = {
         "fair_weight": {"type": "float", "low": 1e-3, "high": 1, "log": True},
     },
     "M2FGB_grad": {
-        "max_depth": {"type": "int", "low": 2, "high": 7},
-        "min_child_weight" : {"type": "float", "low": 1e-3, "high": 100, "log": True},
-        "reg_lambda": {"type": "float", "low": 1e-3, "high": 1000, "log": True},
-        #"colsample_bytree" : {"type" : "category", "choices" : [0.5, 0.75, 1]},
-        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
-        "fair_weight": {"type": "float", "low": 1e-2, "high": 1, "log": True},
-        "multiplier_learning_rate": {
-            "type": "float",
-            "low": 1e-3,
-            "high": 0.5,
-            "log": True,
-        },
+        "n_estimators": {"type": "int", "low": 250, "high": 5000, "log": True},
+        "num_leaves": {"type": "int", "low": 10, "high": 100, "log" : True},
+        "min_child_samples" : {"type" : "int", "low" : 5, "high" : 500, "log" : True},
+        "max_depth": {"type": "int", "low": 2, "high": 20},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.2, "log": True},
+        "reg_alpha": {"type": "float", "low": 1e-4, "high": 0.1, "log": True},
+        "reg_lambda": {"type": "float", "low": 1e-4, "high": 0.1, "log": True},
+        "multiplier_learning_rate" : {"type" : "float", "low" : 0.01, "high" : 0.2, "log" : True},
+        "fair_weight" : {"type" : "float", "low" : 0.25, "high" : 1.0, "step" : 0.25 }
     },
     "FairGBMClassifier": {
         "max_depth": {"type": "int", "low": 2, "high": 7},
-        "min_child_weight" : {"type": "float", "low": 1e-3, "high": 100, "log": True},
-        #"colsample_bytree" : {"type" : "category", "choices" : [0.5, 0.75, 1]},
+        "min_child_weight": {"type": "float", "low": 1e-3, "high": 100, "log": True},
+        # "colsample_bytree" : {"type" : "category", "choices" : [0.5, 0.75, 1]},
         "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
         "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
         "multiplier_learning_rate": {
@@ -86,12 +59,13 @@ PARAM_SPACES = {
         },
     },
     "LGBMClassifier": {
-        "max_depth": {"type": "int", "low": 2, "high": 7},
-        "min_child_weight" : {"type": "float", "low": 1e-3, "high": 100, "log": True},
-        "reg_lambda": {"type": "float", "low": 1e-3, "high": 1000, "log": True},
-        #"colsample_bytree" : {"type" : "category", "choices" : [0.5, 0.75, 1]},
-        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "n_estimators": {"type": "int", "low": 250, "high": 5000, "log": True},
+        "num_leaves": {"type": "int", "low": 10, "high": 100, "log" : True},
+        "min_child_samples" : {"type" : "int", "low" : 5, "high" : 500, "log" : True},
+        "max_depth": {"type": "int", "low": 2, "high": 20},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.2, "log": True},
+        "reg_alpha": {"type": "float", "low": 1e-4, "high": 0.1, "log": True},
+        "reg_lambda": {"type": "float", "low": 1e-4, "high": 0.1, "log": True},
     },
     "MinMaxFair": {
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
@@ -101,11 +75,31 @@ PARAM_SPACES = {
         "a": {"type": "float", "low": 0.1, "high": 1},
         "b": {"type": "float", "low": 1e-2, "high": 1},
     },
+    "MinMaxFairRegressor": {
+        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
+        "gamma": {"type": "float", "low": 0, "high": 1},
+        "a": {"type": "float", "low": 0.1, "high": 1},
+        "b": {"type": "float", "low": 1e-2, "high": 1},
+    },
     "MinimaxPareto": {
         "n_iterations": {"type": "int", "low": 10, "high": 500, "log": True},
         "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
         "alpha": {"type": "float", "low": 0.1, "high": 0.9},
         "Kmin": {"type": "int", "low": 10, "high": 50},
+    },
+    "LGBMRegressor": {
+        "max_depth": {"type": "int", "low": 2, "high": 5},
+        "min_child_weight": {"type": "float", "low": 1, "high": 1e4, "log": True},
+        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
+        "learning_rate": {"type": "float", "low": 0.05, "high": 0.5, "log": True},
+    },
+    "M2FGBRegressor": {
+        "max_depth": {"type": "int", "low": 2, "high": 5},
+        "min_child_weight": {"type": "float", "low": 1, "high": 1e4, "log": True},
+        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
+        "learning_rate": {"type": "float", "low": 0.05, "high": 0.5, "log": True},
+        "multiplier_learning_rate" : {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
+        "fair_weight" : {"type" : "float", "low" : 0.25, "high" : 1.0, "step" : 0.25 }
     },
 }
 
@@ -208,243 +202,6 @@ def logloss_group_hess(y_pred, y_true, fairness_constraint):
 
 
 def get_subgroup_indicator(subgroup):
-    """Return matrix with a column for each subgroup.
-    Each column has value 1/n_g for the samples in the subgroup and 0 otherwise.
-    """
-    groups = np.unique(subgroup)
-    subgroup_ind = np.zeros((len(subgroup), len(groups)))
-
-    for i, group in enumerate(groups):
-        subgroup_ind[:, i] = subgroup == group
-        n_g = np.sum(subgroup_ind[:, i])
-        subgroup_ind[:, i] = subgroup_ind[:, i] / n_g
-    return subgroup_ind
-
-
-def dual_obj(
-    subgroup,
-    fair_weight,
-    group_losses,
-    fairness_constraint="equalized_loss",
-    dual_learning="optim",
-    multiplier_learning_rate=0.1,
-):
-    """This helper function will define a custom objective function for XGBoost using the fair_weight parameter.
-
-    Parameters
-    ----------
-    soubgroup : ndarray
-        Array with the subgroup labels.
-    fair_weight : float
-        Weight of the fairness term in the loss function.
-    group_losses : list
-        List where the losses for each subgroup will be stored.
-    fairness_constraint: str, optional
-        Fairness constraint used in learning.
-    dual_learning : str, optional
-        Method used to learn the dual problem, by default "optim"
-    multiplier_learning_rate: float, optional
-        Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
-    """
-    mu_opt_list = [None]
-    n = len(subgroup)
-    n_g = get_subgroup_indicator(subgroup)
-
-    def custom_obj(predt, dtrain):
-        loss_group = logloss_group(predt, dtrain, subgroup, fairness_constraint)
-        group_losses.append(loss_group)
-        if fair_weight > 0:
-            if dual_learning == "optim":
-                # dual problem solved analytically
-                idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
-                # if is more than one, randomly choose one
-                idx_biggest_loss = np.random.choice(idx_biggest_loss)
-                mu_opt = np.zeros(loss_group.shape[0])
-                mu_opt[idx_biggest_loss] = fair_weight
-                if mu_opt_list[0] is None:
-                    mu_opt_list[0] = mu_opt
-                else:
-                    mu_opt_list.append(mu_opt)
-
-            elif dual_learning == "gradient":
-                if mu_opt_list[0] is None:
-                    mu_opt = np.zeros(loss_group.shape[0])
-                    # mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
-                    mu_opt_list[0] = mu_opt
-
-                else:
-                    mu_opt = mu_opt_list[-1]
-                    mu_opt += multiplier_learning_rate * fair_weight * loss_group
-                    mu_opt_list.append(mu_opt)
-
-        else:
-            mu_opt = np.zeros(len(np.unique(subgroup)))
-
-        grad = logloss_grad(predt, dtrain) / n
-        hess = logloss_hessian(predt, dtrain) / n
-        if fair_weight > 0:
-            grad += (
-                logloss_group_grad(predt, dtrain, subgroup, fairness_constraint)
-                * n_g
-                @ mu_opt
-            )
-            hess += (
-                logloss_group_hess(predt, dtrain, subgroup, fairness_constraint)
-                * n_g
-                @ mu_opt
-            )
-
-        grad *= n / (1 + fair_weight)
-        hess *= n / (1 + fair_weight)
-        return grad, hess
-
-    return custom_obj
-
-
-class M2FGB_XGB(BaseEstimator, ClassifierMixin):
-    """Classifier that modifies XGBoost to incorporate fairness into the loss function.
-    It shares many of the parameters with XGBoost to control learning and decision trees.
-    The fairness metrics impelemented are "equalized_loss", "equal_opportunity", and "demographic_parity".
-
-
-    Parameters
-    ----------
-    fairness_constraint : str, optional
-        Fairness constraint used in learning, currently only supports "equalized_loss", by default "equalized_loss"
-    fair_weight : int, optional
-        Weight for fairness in loss formulation, by default 1
-    dual_learning : str, optional
-        Method used to learn the dual problem, by default "optim"
-    multiplier_learning_rate: float, optional
-        Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
-    n_estimators : int, optional
-        Number of estimators used in XGB, by default 10
-    eta : float, optional
-        Learning rate of XGB, by default 0.3
-    colsample_bytree : float, optional
-        Size of sample of of the columns used in each estimator, by default 1
-    max_depth : int, optional
-        Max depth of decision trees of XGB, by default 6
-    min_child_weight : int, optional
-        Weight used to choose partition of tree nodes, by default 1
-    max_leaves : int, optional
-        Max number of leaves of trees, by default 0
-    l2_weight : int, optional
-        Weight of L2 regularization, by default 1
-    random_state : int, optional
-        Random seed used in learning, by default None
-    """
-
-    def __init__(
-        self,
-        fairness_constraint="equalized_loss",
-        fair_weight=1,
-        dual_learning="optim",
-        multiplier_learning_rate=0.1,
-        n_estimators=10,
-        eta=0.3,
-        colsample_bytree=1,
-        max_depth=6,
-        min_child_weight=1,
-        max_leaves=0,
-        l2_weight=1,
-        random_state=None,
-    ):
-        assert fairness_constraint in [
-            "equalized_loss",
-            "equal_opportunity",
-            "demographic_parity",
-        ]
-        assert dual_learning in ["optim", "gradient"]
-
-        self.fairness_constraint = fairness_constraint
-        self.dual_learning = dual_learning
-        self.multiplier_learning_rate = multiplier_learning_rate
-        self.fair_weight = fair_weight
-        self.n_estimators = n_estimators
-        self.eta = eta
-        self.colsample_bytree = colsample_bytree
-        self.max_depth = max_depth
-        self.min_child_weight = min_child_weight
-        self.max_leaves = max_leaves
-        self.l2_weight = l2_weight
-        self.random_state = random_state
-        self.group_losses = []
-
-    def fit(self, X, y, sensitive_attribute=None):
-        """Fit the model to the data.
-
-
-        Parameters
-        ----------
-        X : pandas.DataFrame
-            Dataframe of shape (n_samples, n_features)
-        y : pandas.Series or numpy.ndarray
-            Labels array-like of shape (n_samples), must be (0 or 1)
-        sensitive_attribute : pandas.Series or numpy.ndarray
-            Sensitive attribute array-like of shape (n_samples)
-
-        Returns
-        -------
-        M2FGB
-            Fitted model
-        """
-        if sensitive_attribute is None:
-            sensitive_attribute = np.ones(X.shape[0])
-        X, y = check_X_y(X, y)
-        self.classes_ = np.unique(y)
-        dtrain = xgb.DMatrix(X, label=y)
-
-        params = {
-            "tree_method": "hist",
-            "objective": "binary:logistic",
-            "eta": self.eta,
-            "colsample_bytree": self.colsample_bytree,
-            "max_depth": self.max_depth,
-            "min_child_weight": self.min_child_weight,
-            "max_leaves": self.max_leaves,
-            "lambda": self.l2_weight,
-        }
-        if self.random_state is not None:
-            params["seed"] = self.random_state
-
-        self.model_ = xgb.train(
-            params,
-            dtrain,
-            num_boost_round=self.n_estimators,
-            obj=dual_obj(
-                sensitive_attribute,
-                self.fair_weight,
-                self.group_losses,
-                self.fairness_constraint,
-                self.dual_learning,
-                self.multiplier_learning_rate,
-            ),
-        )
-        self.group_losses = np.array(self.group_losses)
-        return self
-
-    def predict(self, X):
-        """Predict the labels of the data."""
-        check_is_fitted(self)
-        X = check_array(X)
-        dtest = xgb.DMatrix(X)
-        preds = self.model_.predict(dtest)
-        return (preds > 0.5).astype(int)
-
-    def predict_proba(self, X):
-        """Predict the probabilities of the data."""
-        check_is_fitted(self)
-        X = check_array(X)
-        dtest = xgb.DMatrix(X)
-        preds_pos = self.model_.predict(dtest)
-        preds = np.ones((preds_pos.shape[0], 2))
-        preds[:, 1] = preds_pos
-        preds[:, 0] -= preds_pos
-        return preds
-
-
-def get_subgroup_indicator_test(subgroup):
     groups = np.unique(subgroup)
     n = len(subgroup)
     I = np.zeros((subgroup.shape[0], len(groups)))
@@ -487,7 +244,7 @@ def dual_obj_1(
     multiplier_learning_rate: float, optional
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
-    I = get_subgroup_indicator_test(subgroup)
+    I = get_subgroup_indicator(subgroup)
 
     def custom_obj(predt, dtrain):
         y_true = dtrain.get_label()
@@ -608,7 +365,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
             "equalized_loss",
             "equal_opportunity",
             "positive_rate",
-            "true_negative_rate"
+            "true_negative_rate",
         ]
         assert dual_learning in ["optim", "gradient", "gradient_norm", "gradient_norm2"]
 
@@ -629,7 +386,7 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         self.reg_lambda = reg_lambda
         self.random_state = random_state
 
-    def fit(self, X, y, sensitive_attribute):
+    def fit(self, X, y, sensitive_attribute, X_val = None, Y_val = None, sensitive_attribute_val = None):
         """Fit the model to the data.
 
         Parameters
@@ -668,6 +425,13 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         self.group_losses = []
         self.mu_opt_list = [None]
         dtrain = lgb.Dataset(X, label=y)
+        if X_val is not None:
+            dval = lgb.Dataset(X_val.values, label=Y_val.values)
+
+        def custom_metric(preds, val_data):
+            preds = 1 / (1 + np.exp(-preds))
+            labels = val_data.get_label()
+            return "max_logloss", utils.max_logloss_score(labels, preds, sensitive_attribute_val), False
 
         params = {
             "objective": dual_obj_1(
@@ -692,11 +456,23 @@ class M2FGB(BaseEstimator, ClassifierMixin):
         if self.random_state is not None:
             params["random_seed"] = self.random_state
 
-        self.model_ = lgb.train(
-            params,
-            dtrain,
-            num_boost_round=self.n_estimators,
-        )
+        if X_val is not None:
+            self.model_ = lgb.train(
+                params,
+                dtrain,
+                valid_sets = [dval],
+                num_boost_round=self.n_estimators,
+                feval = custom_metric,
+                callbacks=[
+                    lgb.early_stopping(stopping_rounds=25),
+                ]
+            )
+        else:
+            self.model_ = lgb.train(
+                params,
+                dtrain,
+                num_boost_round=self.n_estimators,
+            )
         self.group_losses = np.array(self.group_losses)
         self.mu_opt_list = np.array(self.mu_opt_list)
         return self
@@ -746,7 +522,7 @@ class LGBMClassifier:
         self.reg_lambda = reg_lambda
         self.random_state = random_state
 
-    def fit(self, X, y, sensitive_attribute):
+    def fit(self, X, y, sensitive_attribute, X_val = None, Y_val = None, sensitive_attribute_val = None):
         if isinstance(X, pd.DataFrame):
             X = X.values
         if isinstance(y, pd.Series):
@@ -779,11 +555,31 @@ class LGBMClassifier:
         if self.random_state is not None:
             params["random_seed"] = self.random_state
 
-        self.model_ = lgb.train(
-            params,
-            dtrain,
-            num_boost_round=self.n_estimators,
-        )
+        
+        def custom_metric(preds, val_data):
+            preds = 1 / (1 + np.exp(-preds))
+            labels = val_data.get_label()
+            return "max_logloss", utils.max_logloss_score(labels, preds, sensitive_attribute_val), False
+        
+        if X_val is not None:
+            dval = lgb.Dataset(X_val.values, label = Y_val.values)
+            self.model_ = lgb.train(
+                params,
+                dtrain,
+                valid_sets = [dval],
+                num_boost_round=self.n_estimators,
+                feval = custom_metric,
+                callbacks=[
+                    lgb.early_stopping(stopping_rounds=5),
+                ]
+            )
+
+        else:
+            self.model_ = lgb.train(
+                params,
+                dtrain,
+                num_boost_round=self.n_estimators,
+            )
         return self
 
     def predict(self, X):
@@ -1180,7 +976,7 @@ def dual_obj_reg(
     multiplier_learning_rate: float, optional
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
-    I = get_subgroup_indicator_test(subgroup)
+    I = get_subgroup_indicator(subgroup)
 
     def custom_obj(predt, dtrain):
         y_true = dtrain.get_label()
