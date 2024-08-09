@@ -152,7 +152,8 @@ def load_acsincome():
 
 
 def load_enem():
-    df = pd.read_pickle("../data/enem-50000-20.pkl").reset_index(drop=True)
+    #df = pd.read_pickle("../data/enem-50000-20.pkl").reset_index(drop=True)
+    df = pd.read_csv("../data/enem_classif_preprocessed.csv").reset_index(drop = True)
     Y = df["gradebin"].astype(int)
     X = df.drop(columns=["gradebin"])
     for col in X.columns:
