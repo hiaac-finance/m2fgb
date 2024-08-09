@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
@@ -152,8 +153,8 @@ def load_acsincome():
 
 
 def load_enem():
-    #df = pd.read_pickle("../data/enem-50000-20.pkl").reset_index(drop=True)
-    df = pd.read_csv("../data/enem_classif_preprocessed.csv").reset_index(drop = True)
+    # df = pd.read_pickle("../data/enem-50000-20.pkl").reset_index(drop=True)
+    df = pd.read_csv("../data/enem_classif_preprocessed.csv").reset_index(drop=True)
     Y = df["gradebin"].astype(int)
     X = df.drop(columns=["gradebin"])
     for col in X.columns:
@@ -341,7 +342,9 @@ def get_subgroup_feature(dataset, X, n_groups=2):
             A = (
                 X.race.apply(race_cat)
                 + ", "
-                + ((X.age_cat == "25 - 45")).apply(lambda x : "Between 25 and 45" if x else "Other")
+                + ((X.age_cat == "25 - 45")).apply(
+                    lambda x: "Between 25 and 45" if x else "Other"
+                )
             )
 
         elif dataset == "acsincome":
@@ -356,17 +359,21 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                 else:
                     return "Other"
 
-            A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat) 
+            A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat)
         elif dataset == "enem" or dataset == "enem_reg":
+
             def race_cat(race):
                 if race in ["White", "Black", "Brown"]:
                     return race
                 else:
                     return "Other"
+
             A = (
                 X.racebin.apply(race_cat)
                 + ", "
-                + X.sexbin.astype(str).apply(lambda x : "Male" if x=="1.0" else "Female")
+                + X.sexbin.astype(str).apply(
+                    lambda x: "Male" if x == "1.0" else "Female"
+                )
             )
 
     elif n_groups > 20:
