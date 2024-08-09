@@ -23,15 +23,18 @@ fairgbm.register_logger(utils.CustomLogger())
 
 PARAM_SPACES = {
     "M2FGBClassifier": {
-        "n_estimators": {"type": "int", "low": 250, "high": 5000, "log": True},
-        "num_leaves": {"type": "int", "low": 10, "high": 100, "log" : True},
-        "min_child_samples" : {"type" : "int", "low" : 5, "high" : 500, "log" : True},
-        "max_depth": {"type": "int", "low": 2, "high": 20},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.2, "log": True},
-        "reg_alpha": {"type": "float", "low": 1e-4, "high": 0.1, "log": True},
-        "reg_lambda": {"type": "float", "low": 1e-4, "high": 0.1, "log": True},
-        "multiplier_learning_rate" : {"type" : "float", "low" : 0.01, "high" : 0.2, "log" : True},
-        "fair_weight" : {"type" : "float", "low" : 0.25, "high" : 1.0, "step" : 0.25 }
+        "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
+        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "max_depth": {"type": "int", "low": 2, "high": 7},
+        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
+        "fair_weight": {"type": "float", "low": 1e-2, "high": 1},
+        "multiplier_learning_rate": {
+            "type": "float",
+            "low": 0.005,
+            "high": 0.5,
+            "log": True,
+        },
     },
     "FairGBMClassifier": {
         "max_depth": {"type": "int", "low": 2, "high": 7},
@@ -53,19 +56,16 @@ PARAM_SPACES = {
         },
     },
     "LGBMClassifier": {
-        "n_estimators": {"type": "int", "low": 250, "high": 5000, "log": True},
-        "num_leaves": {"type": "int", "low": 10, "high": 100, "log" : True},
-        "min_child_samples" : {"type" : "int", "low" : 5, "high" : 500, "log" : True},
-        "max_depth": {"type": "int", "low": 2, "high": 20},
-        "learning_rate": {"type": "float", "low": 0.01, "high": 0.2, "log": True},
-        "reg_alpha": {"type": "float", "low": 1e-4, "high": 0.1, "log": True},
-        "reg_lambda": {"type": "float", "low": 1e-4, "high": 0.1, "log": True},
+        "min_child_weight": {"type": "float", "low": 0.001, "high": 10, "log": True},
+        "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 0.01, "high": 0.5, "log": True},
+        "max_depth": {"type": "int", "low": 2, "high": 7},
+        "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
     },
     "MinMaxFair": {
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "gamma": {"type": "float", "low": 0, "high": 1},
-        "penalty": {"type": "categorical", "choices": [None, "l2"]},
-        "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
+        "C": {"type": "float", "low": 1e-4, "high": 1e4, "log": True},  
         "a": {"type": "float", "low": 0.1, "high": 1},
         "b": {"type": "float", "low": 1e-2, "high": 1},
     },
@@ -77,7 +77,7 @@ PARAM_SPACES = {
     },
     "MinimaxPareto": {
         "n_iterations": {"type": "int", "low": 10, "high": 500, "log": True},
-        "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
+        "C": {"type": "float", "low": 1e-4, "high": 1e4, "log": True},
         "alpha": {"type": "float", "low": 0.1, "high": 0.9},
         "Kmin": {"type": "int", "low": 10, "high": 50},
     },
@@ -274,7 +274,7 @@ def dual_obj_cls(
 
         elif dual_learning == "gradient_norm2":
             if mu_opt_list[0] is None:
-                mu_opt = np.ones(loss_group.shape[0])
+                mu_opt = loss_group
             else:
                 mu_opt = mu_opt_list[-1].copy()
 
@@ -342,7 +342,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
         self,
         fairness_constraint="equalized_loss",
         fair_weight=0.5,
-        dual_learning="gradient_norm",
+        dual_learning="gradient_norm2",
         multiplier_learning_rate=0.1,
         n_estimators=100,
         learning_rate=0.1,
@@ -420,12 +420,15 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
         self.mu_opt_list = [None]
         dtrain = lgb.Dataset(X, label=y)
         if X_val is not None:
+            sensitive_attribute_val = sensitive_attribute_val.values
             dval = lgb.Dataset(X_val.values, label=Y_val.values)
 
         def custom_metric(preds, val_data):
             preds = 1 / (1 + np.exp(-preds))
             labels = val_data.get_label()
-            return "max_logloss", utils.max_logloss_score(labels, preds, sensitive_attribute_val), False
+            l1 = log_loss(labels, preds)
+            l2 = utils.max_logloss_score(labels, preds, sensitive_attribute_val)
+            return "obj_function", (1 - self.fair_weight) * l1 + self.fair_weight * l2, False
 
         params = {
             "objective": dual_obj_cls(
@@ -553,7 +556,8 @@ class LGBMClassifier:
         def custom_metric(preds, val_data):
             preds = 1 / (1 + np.exp(-preds))
             labels = val_data.get_label()
-            return "max_logloss", utils.max_logloss_score(labels, preds, sensitive_attribute_val), False
+            l1 = log_loss(labels, preds)
+            return "obj_function", l1, False
         
         if X_val is not None:
             dval = lgb.Dataset(X_val.values, label = Y_val.values)
@@ -564,7 +568,7 @@ class LGBMClassifier:
                 num_boost_round=self.n_estimators,
                 feval = custom_metric,
                 callbacks=[
-                    lgb.early_stopping(stopping_rounds=5),
+                    lgb.early_stopping(stopping_rounds=25),
                 ]
             )
 
