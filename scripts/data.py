@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
@@ -152,8 +153,8 @@ def load_acsincome():
 
 
 def load_enem():
-    #df = pd.read_pickle("../data/enem-50000-20.pkl").reset_index(drop=True)
-    df = pd.read_csv("../data/enem_classif_preprocessed.csv").reset_index(drop = True)
+    # df = pd.read_pickle("../data/enem-50000-20.pkl").reset_index(drop=True)
+    df = pd.read_csv("../data/enem_classif_preprocessed.csv").reset_index(drop=True)
     Y = df["gradebin"].astype(int)
     X = df.drop(columns=["gradebin"])
     for col in X.columns:
@@ -341,7 +342,9 @@ def get_subgroup_feature(dataset, X, n_groups=2):
             A = (
                 X.race.apply(race_cat)
                 + ", "
-                + ((X.age_cat == "25 - 45")).apply(lambda x : "Between 25 and 45" if x else "Other")
+                + ((X.age_cat == "25 - 45")).apply(
+                    lambda x: "Between 25 and 45" if x else "Other"
+                )
             )
 
         elif dataset == "acsincome":
@@ -356,17 +359,21 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                 else:
                     return "Other"
 
-            A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat) 
+            A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat)
         elif dataset == "enem" or dataset == "enem_reg":
+
             def race_cat(race):
                 if race in ["White", "Black", "Brown"]:
                     return race
                 else:
                     return "Other"
+
             A = (
                 X.racebin.apply(race_cat)
                 + ", "
-                + X.sexbin.astype(str).apply(lambda x : "Male" if x=="1.0" else "Female")
+                + X.sexbin.astype(str).apply(
+                    lambda x: "Male" if x == "1.0" else "Female"
+                )
             )
 
     elif n_groups > 20:
@@ -450,3 +457,81 @@ def get_fold_holdout(dataset, fold, n_folds=10, n_groups=2, random_state=None):
                 A_test,
                 Y_test,
             )
+
+
+def get_strat_split(dataset, n_groups=2, test_size=20, random_state=None):
+    X, Y = load_dataset(dataset)
+    A = get_subgroup_feature(dataset, X, n_groups)
+    X_train = []
+    X_val = []
+    X_test = []
+    Y_train = []
+    Y_val = []
+    Y_test = []
+    A_train = []
+    A_val = []
+    A_test = []
+
+    # Stratified split for each subgroup
+    for a in np.unique(A):
+        X_a = X[A == a]
+        Y_a = Y[A == a]
+        A_a = A[A == a]
+        test_size_ = int(len(X_a) * test_size / 100)
+        X_train_a, X_test_a, Y_train_a, Y_test_a, A_train_a, A_test_a = (
+            train_test_split(
+                X_a,
+                Y_a,
+                A_a,
+                test_size=test_size_,
+                random_state=random_state,
+                stratify=Y_a,
+            )
+        )
+        X_train_a, X_val_a, Y_train_a, Y_val_a, A_train_a, A_val_a = train_test_split(
+            X_train_a,
+            Y_train_a,
+            A_train_a,
+            test_size=test_size_,
+            random_state=random_state,
+            stratify=Y_train_a,
+        )
+        X_train.append(X_train_a)
+        X_val.append(X_val_a)
+        X_test.append(X_test_a)
+        Y_train.append(Y_train_a)
+        Y_val.append(Y_val_a)
+        Y_test.append(Y_test_a)
+        A_train.append(A_train_a)
+        A_val.append(A_val_a)
+        A_test.append(A_test_a)
+
+    X_train = pd.concat(X_train)
+    X_val = pd.concat(X_val)
+    X_test = pd.concat(X_test)
+    Y_train = pd.concat(Y_train)
+    Y_val = pd.concat(Y_val)
+    Y_test = pd.concat(Y_test)
+    A_train = pd.concat(A_train)
+    A_val = pd.concat(A_val)
+    A_test = pd.concat(A_test)
+
+    X_train, X_val, X_test = preprocess_dataset(dataset, X_train, X_val, X_test)
+
+    # shuffle
+    idx = np.arange(len(X_train))
+    np.random.shuffle(idx)
+    X_train = X_train.iloc[idx]
+    Y_train = Y_train.iloc[idx]
+    A_train = A_train.iloc[idx]
+    return (
+        X_train,
+        A_train,
+        Y_train,
+        X_val,
+        A_val,
+        Y_val,
+        X_test,
+        A_test,
+        Y_test,
+    )
