@@ -462,6 +462,7 @@ def get_fold_holdout(dataset, fold, n_folds=10, n_groups=2, random_state=None):
 def get_strat_split(dataset, n_groups=2, test_size=20, random_state=None):
     X, Y = load_dataset(dataset)
     A = get_subgroup_feature(dataset, X, n_groups)
+    is_clf = Y.nunique() == 2
     X_train = []
     X_val = []
     X_test = []
@@ -485,7 +486,7 @@ def get_strat_split(dataset, n_groups=2, test_size=20, random_state=None):
                 A_a,
                 test_size=test_size_,
                 random_state=random_state,
-                stratify=Y_a,
+                stratify=Y_a if is_clf else None,
             )
         )
         X_train_a, X_val_a, Y_train_a, Y_val_a, A_train_a, A_val_a = train_test_split(
@@ -494,7 +495,7 @@ def get_strat_split(dataset, n_groups=2, test_size=20, random_state=None):
             A_train_a,
             test_size=test_size_,
             random_state=random_state,
-            stratify=Y_train_a,
+            stratify=Y_train_a if is_clf else None,
         )
         X_train.append(X_train_a)
         X_val.append(X_val_a)
