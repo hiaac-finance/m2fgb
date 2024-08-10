@@ -82,18 +82,18 @@ PARAM_SPACES = {
         "Kmin": {"type": "int", "low": 10, "high": 50},
     },
     "LGBMRegressor": {
-        "max_depth": {"type": "int", "low": 2, "high": 5},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
         "min_child_weight": {"type": "float", "low": 1, "high": 1e4, "log": True},
-        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
-        "learning_rate": {"type": "float", "low": 0.05, "high": 0.5, "log": True},
+        "n_estimators": {"type": "int", "low": 20, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
     },
     "M2FGBRegressor": {
-        "max_depth": {"type": "int", "low": 2, "high": 5},
+        "max_depth": {"type": "int", "low": 2, "high": 10},
         "min_child_weight": {"type": "float", "low": 1, "high": 1e4, "log": True},
-        "n_estimators": {"type": "int", "low": 200, "high": 1000, "log": True},
-        "learning_rate": {"type": "float", "low": 0.05, "high": 0.5, "log": True},
+        "n_estimators": {"type": "int", "low": 20, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
         "multiplier_learning_rate" : {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
-        "fair_weight" : {"type" : "float", "low" : 0.25, "high" : 1.0, "step" : 0.25 }
+        "fair_weight" : {"type" : "float", "low" : 1e-3, "high" : 1.0, "log" : True}
     },
 }
 
