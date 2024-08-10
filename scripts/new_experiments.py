@@ -4,6 +4,7 @@ from tqdm import tqdm
 from multiprocessing import Pool
 import joblib
 import datetime
+import pickle as pkl
 
 import optuna
 from optuna.samplers import RandomSampler
@@ -331,7 +332,8 @@ def run_trial(trial, X_train, Y_train, A_train, X_val, Y_val, A_val, model_class
             params[name] = trial.suggest_float(name, **values_cp)
     print(params)
     model = model_class(**params)
-    model.fit(X_train, Y_train, A_train, X_val, Y_val, A_val)
+    #model.fit(X_train, Y_train, A_train, X_val, Y_val, A_val)
+    model.fit(X_train, Y_train, A_train)
     model_list.append(model)
     return 0.5
 
@@ -351,7 +353,7 @@ def run_subgroup_experiment(args):
     param_list = get_param_list(param_space, args["n_params"])
     # Load data
     X_train, A_train, Y_train, X_val, A_val, Y_val, X_test, A_test, Y_test = (
-        data.get_fold(args["dataset"], 0, 10, args["n_groups"], SEED)
+        data.get_strat_split(args["dataset"], args["n_groups"], 20, SEED)
     )
 
     study = optuna.create_study(direction="maximize")
@@ -399,22 +401,29 @@ def run_subgroup_experiment(args):
     results_val.to_csv(os.path.join(args["output_dir"], f"val.csv"), index=False)
     results_test.to_csv(os.path.join(args["output_dir"], f"test.csv"), index=False)
 
+    # save model
+    with open(os.path.join(args["output_dir"], f"model.pkl"), "wb") as f:
+        pkl.dump(model_list, f)
+
+
 
 def experiment1(args):
     """Equalized loss experiment."""
     thresh = "ks"
     n_jobs = 10
 
-    datasets = ["compas", "taiwan", "adult", "enem"]
+    datasets = ["german", "compas", "enem"]
     n_groups_list = [8]
     model_name_list = [
-        "M2FGBClassifier",
         #"M2FGBClassifier",
-        # "M2FGBClassifier_tpr",
-        # "FairGBMClassifier",
-        # "MinMaxFair",
-        "LGBMClassifier",
-        # "MinimaxPareto",
+        #"M2FGBClassifier",
+        "M2FGBClassifier_tpr",
+        #"FairGBMClassifier",
+        #"MinMaxFair",
+        "FairGBMClassifier_eod",
+        #"MinMaxFair_tpr",
+        #"LGBMClassifier",
+        #"MinimaxPareto",
     ]
 
     n_params = args.n_params
@@ -502,17 +511,15 @@ def experiment_many_groups(fair_metric):
 
 def experiment_regression(args):
     """Equalized loss experiment."""
-    n_folds = 10
     thresh = "ks"
     n_jobs = 10
-    fair_metric = "max_mse"
 
     dataset = "enem_reg"
     n_groups = 8
     model_name_list = [
-        # "MinMaxFairRegressor",
-        "LGBMRegressor",
-        "M2FGBRegressor",
+        "MinMaxFairRegressor",
+        #"LGBMRegressor",
+        #"M2FGBRegressor",
     ]
 
     n_params = args.n_params
@@ -522,12 +529,11 @@ def experiment_regression(args):
             now = datetime.datetime.now() - datetime.timedelta(hours=3)
             f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-        output_dir = f"../results_aaai/experiment_{fair_metric}/{dataset}_{n_groups}/{model_name}"
+        output_dir = f"../results_aaai/experiment_new/{dataset}_{n_groups}/{model_name}"
         args = {
             "dataset": dataset,
             "output_dir": output_dir,
             "model_name": model_name,
-            "n_folds": n_folds,
             "n_groups": n_groups,
             "n_params": n_params,
             "n_jobs": n_jobs,
@@ -553,7 +559,7 @@ def main():
 
     # experiment1(parser.parse_args().fair_metric)
     # experiment_many_groups(parser.parse_args().fair_metric)
-    # experiment_regression(parser.parse_args())
+    #experiment_regression(parser.parse_args())
     experiment1(parser.parse_args())
 
 
