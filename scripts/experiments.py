@@ -410,11 +410,11 @@ def experiment1(args):
     n_jobs = 10
 
     datasets = ["german", "compas", "taiwan", "adult", "enem"]
-    datasets = ["adult"]
+    datasets = ["german", "enem", "adult", "taiwan", "enem"]
     n_groups_list = [8]  # 2, 4, 8]
     model_name_list = [
-        # "M2FGB_grad_tpr",
         "M2FGBClassifier",
+        "M2FGBClassifier_tpr",
         # "FairGBMClassifier",
         # "MinMaxFair",
         "LGBMClassifier",

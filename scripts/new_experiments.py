@@ -346,7 +346,7 @@ def run_subgroup_experiment(args):
     if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
         os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
 
-    if args["dataset"] not in ["taiwan", "adult", "acsincome"]:
+    if args["dataset"] not in ["taiwan", "adult", "acsincome", "enem", "enem_large", "enem_reg"]:
         param_space = get_param_spaces(args["model_name"])
     else:
         param_space = get_param_spaces_acsincome(args["model_name"])
@@ -407,110 +407,50 @@ def run_subgroup_experiment(args):
 
 
 
-def experiment1(args):
-    """Equalized loss experiment."""
+def experiment_classification(args):
     thresh = "ks"
     n_jobs = 10
 
-    datasets = ["german", "compas", "enem"]
-    n_groups_list = [8]
+    datasets = ["enem"]
+    n_groups = 8
     model_name_list = [
+        "LGBMClassifier",
         #"M2FGBClassifier",
-        #"M2FGBClassifier",
-        "M2FGBClassifier_tpr",
-        #"FairGBMClassifier",
-        #"MinMaxFair",
+        #"M2FGBClassifier_tpr",
+        "FairGBMClassifier",
         "FairGBMClassifier_eod",
-        #"MinMaxFair_tpr",
-        #"LGBMClassifier",
-        #"MinimaxPareto",
+        "MinMaxFair",
+        "MinMaxFair_tpr",
+        "MinimaxPareto",
     ]
 
     n_params = args.n_params
     for dataset in datasets:
-        for n_groups in n_groups_list:
-            if dataset == "enem_large":
-                n_groups = 27
+        for model_name in model_name_list:
+            with open("log.txt", "a+") as f:
+                now = datetime.datetime.now() - datetime.timedelta(hours=3)
+                f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-            for model_name in model_name_list:
-                if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
-                    if (
-                        dataset == "acsincome"
-                        or dataset == "taiwan"
-                        or dataset == "adult"
-                    ):
-                        n_params = 25
+            output_dir = (
+                f"../results_aaai/experiment_new/{dataset}_{n_groups}g/{model_name}"
+            )
+            config = {
+                "dataset": dataset,
+                "output_dir": output_dir,
+                "model_name": model_name,
+                "n_groups": n_groups,
+                "n_params": n_params,
+                "n_jobs": n_jobs,
+                "thresh": thresh,
+            }
+            run_subgroup_experiment(config)
 
-                with open("log.txt", "a+") as f:
-                    now = datetime.datetime.now() - datetime.timedelta(hours=3)
-                    f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
-
-                output_dir = (
-                    f"../results_aaai/experiment_new/{dataset}_{n_groups}g/{model_name}"
-                )
-                config = {
-                    "dataset": dataset,
-                    "output_dir": output_dir,
-                    "model_name": model_name,
-                    "n_groups": n_groups,
-                    "n_params": n_params,
-                    "n_jobs": n_jobs,
-                    "thresh": thresh,
-                }
-                run_subgroup_experiment(config)
-
-                with open("log.txt", "a+") as f:
-                    now = datetime.datetime.now() - datetime.timedelta(hours=3)
-                    f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
-
-
-def experiment_many_groups(fair_metric):
-    """Equalized loss experiment."""
-    n_folds = 10
-    thresh = "ks"
-    n_jobs = 10
-
-    dataset = "enem_large"
-    n_groups = 27
-    model_name_list = [
-        "M2FGBClassifier_tpr",
-        # "M2FGBClassifier",
-        "FairGBMClassifier",
-        # "MinMaxFair",
-        "LGBMClassifier",
-        # "MinimaxPareto",
-    ]
-
-    n_params = 5
-    for model_name in model_name_list:
-        if model_name == "MinMaxFair" or model_name == "MinimaxPareto":
-            if dataset == "acsincome" or dataset == "taiwan" or dataset == "adult":
-                n_params = 25
-
-        with open("log.txt", "a+") as f:
-            now = datetime.datetime.now() - datetime.timedelta(hours=3)
-            f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
-
-        output_dir = f"../results_aaai/experiment_{n_groups}g_{fair_metric}/{dataset}/{model_name}"
-        args = {
-            "dataset": dataset,
-            "output_dir": output_dir,
-            "model_name": model_name,
-            "n_folds": n_folds,
-            "n_groups": n_groups,
-            "n_params": n_params,
-            "n_jobs": n_jobs,
-            "thresh": thresh,
-        }
-        run_subgroup_experiment(args)
-
-        with open("log.txt", "a+") as f:
-            now = datetime.datetime.now() - datetime.timedelta(hours=3)
-            f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
+            with open("log.txt", "a+") as f:
+                now = datetime.datetime.now() - datetime.timedelta(hours=3)
+                f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
 def experiment_regression(args):
-    """Equalized loss experiment."""
     thresh = "ks"
     n_jobs = 10
 
@@ -557,10 +497,9 @@ def main():
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
-    # experiment1(parser.parse_args().fair_metric)
-    # experiment_many_groups(parser.parse_args().fair_metric)
-    #experiment_regression(parser.parse_args())
-    experiment1(parser.parse_args())
+    args = parser.parse_args()
+    experiment_classification(args)
+    experiment_regression(args)
 
 
 if __name__ == "__main__":

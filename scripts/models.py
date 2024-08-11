@@ -27,7 +27,7 @@ PARAM_SPACES = {
         "min_child_weight": {"type": "float", "low": 1, "high": 1e4, "log": True},
         "n_estimators": {"type": "int", "low": 20, "high": 500, "log": True},
         "learning_rate": {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
-        "multiplier_learning_rate" : {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
+        "multiplier_learning_rate" : {"type": "float", "low": 1e-3, "high": 0.5 , "log": True},
         "fair_weight" : {"type" : "float", "low" : 1e-3, "high" : 1.0, "log" : True}
     },
     "FairGBMClassifier": {
@@ -91,15 +91,19 @@ PARAM_SPACES = {
 
 PARAM_SPACES_ACSINCOME = PARAM_SPACES.copy()
 PARAM_SPACES_ACSINCOME["MinMaxFair"] = {
-    "n_estimators": {"type": "int", "low": 10, "high": 50},
+    "n_estimators": {"type": "int", "low": 10, "high": 50, "log": True},
     "gamma": {"type": "float", "low": 0, "high": 1},
-    "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
-    "max_iter": {"type": "int", "low": 10, "high": 10},
+    "C": {"type": "float", "low": 1e-4, "high": 1e4, "log": True},  
+    "a": {"type": "float", "low": 0.1, "high": 1},
+    "b": {"type": "float", "low": 1e-2, "high": 1},
+    "max_iter": {"type": "int", "low": 10, "high": 11},
 }
 PARAM_SPACES_ACSINCOME["MinimaxPareto"] = {
-    "n_iterations": {"type": "int", "low": 10, "high": 50},
-    "C": {"type": "float", "low": 0.1, "high": 1000, "log": True},
-    "max_iter": {"type": "int", "low": 10, "high": 10},
+    "n_iterations": {"type": "int", "low": 10, "high": 50, "log": True},
+    "C": {"type": "float", "low": 1e-4, "high": 1e4, "log": True},
+    "alpha": {"type": "float", "low": 0.1, "high": 0.9},
+    "Kmin": {"type": "int", "low": 10, "high": 50},
+    "max_iter": {"type": "int", "low": 10, "high": 11},
 }
 
 
