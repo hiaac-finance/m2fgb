@@ -42,9 +42,9 @@ CAT_FEATURES = {
         "EDUCATION",
         "MARRIAGE",
     ],
-    "enem": ["racebin", "sexbin"],
-    "enem_reg": ["racebin", "sexbin"],
-    "enem_large": ["racebin", "sexbin"],
+    "enem": ["all"],
+    "enem_reg": ["all"],
+    "enem_large": ["all"],
 }
 
 
@@ -88,6 +88,9 @@ NUM_FEATURES = {
         "PAY_5",
         "PAY_6",
     ],
+    "enem": ["none"],
+    "enem_reg": ["none"],
+    "enem_large": ["none"],
 }
 
 
@@ -181,11 +184,11 @@ def load_enem_large():
     df = pd.read_csv("../data/enem_large_preprocessed.csv").reset_index(drop=True)
     Y = df["gradebin"].astype(int)
     X = df.drop(columns=["gradebin"])
-    for col in X.columns:
-        if col in CAT_FEATURES["enem"]:
-            X[col] = X[col].astype("category")
-        else:
-            X[col] = X[col].astype(float)
+    # for col in X.columns:
+    #     if col in CAT_FEATURES["enem"]:
+    #         X[col] = X[col].astype("category")
+    #     else:
+    #         X[col] = X[col].astype(float)
     return X, Y
 
 
@@ -211,20 +214,31 @@ def load_dataset(dataset):
 
 
 def preprocess_dataset(dataset, X_train, X_val, X_test):
-    if dataset not in NUM_FEATURES:
-        NUM_FEATURES[dataset] = [
-            col for col in X_train.columns if col not in CAT_FEATURES[dataset]
-        ]
+    if CAT_FEATURES[dataset][0] == "all":
+        cat_feat = X_train.columns
+    elif CAT_FEATURES[dataset][0] == "none":
+        cat_feat = []
+    else:
+        cat_feat = CAT_FEATURES[dataset]
+
+    if NUM_FEATURES[dataset][0] == "all":
+        num_feat = X_train.columns
+    elif NUM_FEATURES[dataset][0] == "none":
+        num_feat = []
+    else:
+        num_feat = NUM_FEATURES[dataset]
+
+
 
     col_trans = ColumnTransformer(
         [
-            ("numeric", StandardScaler(), NUM_FEATURES[dataset]),
+            ("numeric", StandardScaler(), num_feat),
             (
                 "categorical",
                 OneHotEncoder(
                     drop="if_binary", sparse_output=False, handle_unknown="ignore"
                 ),
-                CAT_FEATURES[dataset],
+                cat_feat,
             ),
         ],
         verbose_feature_names_out=False,
