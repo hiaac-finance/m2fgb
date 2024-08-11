@@ -160,11 +160,6 @@ def load_enem():
     df = pd.read_csv("../data/enem_classif_preprocessed.csv").reset_index(drop=True)
     Y = df["gradebin"].astype(int)
     X = df.drop(columns=["gradebin"])
-    for col in X.columns:
-        if col in CAT_FEATURES["enem"]:
-            X[col] = X[col].astype("category")
-        else:
-            X[col] = X[col].astype(float)
     return X, Y
 
 
@@ -172,11 +167,6 @@ def load_enem_reg():
     df = pd.read_csv("../data/enem_reg_preprocessed.csv").reset_index(drop=True)
     Y = df["gradescore"].astype(float)
     X = df.drop(columns=["gradescore"])
-    for col in X.columns:
-        if col in CAT_FEATURES["enem"]:
-            X[col] = X[col].astype("category")
-        else:
-            X[col] = X[col].astype(float)
     return X, Y
 
 
@@ -184,11 +174,6 @@ def load_enem_large():
     df = pd.read_csv("../data/enem_large_preprocessed.csv").reset_index(drop=True)
     Y = df["gradebin"].astype(int)
     X = df.drop(columns=["gradebin"])
-    # for col in X.columns:
-    #     if col in CAT_FEATURES["enem"]:
-    #         X[col] = X[col].astype("category")
-    #     else:
-    #         X[col] = X[col].astype(float)
     return X, Y
 
 
