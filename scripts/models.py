@@ -23,12 +23,12 @@ fairgbm.register_logger(utils.CustomLogger())
 
 PARAM_SPACES = {
     "M2FGBClassifier": {
-        "max_depth": {"type": "int", "low": 2, "high": 10},
-        "min_child_weight": {"type": "float", "low": 1, "high": 1e4, "log": True},
-        "n_estimators": {"type": "int", "low": 20, "high": 500, "log": True},
-        "learning_rate": {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
-        "multiplier_learning_rate" : {"type": "float", "low": 1e-3, "high": 0.5 , "log": True},
-        "fair_weight" : {"type" : "float", "low" : 1e-3, "high" : 1.0, "log" : True}
+        "max_depth": {"type": "int", "low": 2, "high": 5},
+        "min_child_weight": {"type": "float", "low": 1e2, "high": 1e4, "log": True},
+        "n_estimators": {"type": "int", "low": 20, "high": 2000, "log": True},
+        "learning_rate": {"type": "float", "low": 1e-3, "high": 0.1, "log": True},
+        "multiplier_learning_rate" : {"type": "float", "low": 1e-4, "high": 0.5 , "log": True},
+        "fair_weight" : {"type" : "float", "low" : 1e-4, "high" : 1.0, "log" : True}
     },
     "FairGBMClassifier": {
         "max_depth": {"type": "int", "low": 2, "high": 10},
@@ -727,12 +727,12 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
     def predict_proba(self, X):
         check_is_fitted(self)
         X = check_array(X)
-        # random select a model for each line of X
-        predictions = np.zeros((X.shape[0], 2))
-        for i in range(X.shape[0]):
-            predictions[i] = self.model[
-                np.random.choice(len(self.model))
-            ].predict_proba(X[i].reshape(1, -1))
+        def rand_pred(row):
+            idx = np.random.choice(len(self.model))
+            return self.model[idx].predict_proba(row.reshape(1, -1))
+        
+        predictions = np.apply_along_axis(rand_pred, 1, X)
+        predictions = np.squeeze(predictions, axis=1) # remove the extra dimension
         return predictions
 
 
