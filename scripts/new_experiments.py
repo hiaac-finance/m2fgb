@@ -233,12 +233,17 @@ def eval_model(
             "min_pr": 1 - utils.min_positive_rate(y_true, y_pred, A),
             "min_bal_acc": 1 - utils.min_balanced_accuracy(y_true, y_pred, A),
             "min_acc": 1 - utils.min_accuracy(y_true, y_pred, A),
+            **utils.group_level_acc(y_true, y_pred, A),
+            **utils.group_level_bacc(y_true, y_pred, A),
+            **utils.group_level_tpr(y_true, y_pred, A),
+            **utils.group_level_pr(y_true, y_pred, A),
         }
 
     def get_reg_metrics(y_true, y_pred, A):
         return {
             "mse": np.mean((y_true - y_pred) ** 2),
             "max_mse": utils.max_mse(y_true, y_pred, A),
+            **utils.group_level_mse(y_true, y_pred, A),
         }
 
     for m, model in tqdm(enumerate(model_list), total=len(model_list)):

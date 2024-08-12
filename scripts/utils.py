@@ -43,12 +43,14 @@ def fnr_score(y_ground, y_pred):
     fnr = fn / (fn + tp)
     return fnr
 
+
 def fpr_score(y_ground, y_pred):
     """Calculates the false positive rate"""
     fp = ((y_pred == 1) & (y_ground == 0)).sum()
     tn = ((y_pred == 0) & (y_ground == 0)).sum()
     fpr = fp / (fp + tn)
     return fpr
+
 
 def tpr_score(y_ground, y_pred):
     """Calculates the true positive rate"""
@@ -114,6 +116,14 @@ def min_true_positive_rate(y_ground, y_pred, A):
         min_tpr = min(min_tpr, tpr)
     return 1 - min_tpr
 
+
+def group_level_tpr(y_ground, y_pred, A):
+    m = {}
+    for a in np.unique(A):
+        m[f"tpr_g={a}"] = np.mean(y_pred[(A == a) & (y_ground == 1)])
+    return m
+
+
 def max_fnr_score(y_ground, y_pred, A):
     max_fnr = -np.inf
     for a in np.unique(A):
@@ -124,6 +134,7 @@ def max_fnr_score(y_ground, y_pred, A):
         max_fnr = max(max_fnr, fnr)
     return max_fnr
 
+
 def max_fpr_score(y_ground, y_pred, A):
     max_fpr = -np.inf
     for a in np.unique(A):
@@ -133,6 +144,7 @@ def max_fpr_score(y_ground, y_pred, A):
         fpr = fpr_score(y_ground[A == a], y_pred[A == a])
         max_fpr = max(max_fpr, fpr)
     return max_fpr
+
 
 def statistical_parity_score(y_ground, y_pred, A):
     """Calculate the difference between probability of true outcome of the groups.
@@ -189,6 +201,13 @@ def min_positive_rate(y_ground, y_pred, A):
     return 1 - min_pr
 
 
+def group_level_pr(y_ground, y_pred, A):
+    m = {}
+    for a in np.unique(A):
+        m[f"pr_g={a}"] = np.mean(y_pred[A == a])
+    return m
+
+
 def min_balanced_accuracy(y_ground, y_pred, A):
     """Calculate the minimum balanced accuracy among groups.
     It will return 1 - bal_acc so that values close to 0 are better.
@@ -215,6 +234,13 @@ def min_balanced_accuracy(y_ground, y_pred, A):
     return 1 - min_bal_acc
 
 
+def group_level_bacc(y_ground, y_pred, A):
+    m = {}
+    for a in np.unique(A):
+        m[f"bacc_g={a}"] = balanced_accuracy_score(y_ground[A == a], y_pred[A == a])
+    return m
+
+
 def min_accuracy(y_ground, y_pred, A):
     """Calculate the minimum accuracy among groups.
     It will return 1 - acc so that values close to 0 are better.
@@ -239,6 +265,13 @@ def min_accuracy(y_ground, y_pred, A):
         acc = accuracy_score(y_ground[A == a], y_pred[A == a])
         min_acc = min(min_acc, acc)
     return 1 - min_acc
+
+
+def group_level_acc(y_ground, y_pred, A):
+    m = {}
+    for a in np.unique(A):
+        m[f"acc_g={a}"] = accuracy_score(y_ground[A == a], y_pred[A == a])
+    return m
 
 
 def get_combined_metrics_scorer(
@@ -384,9 +417,17 @@ def max_logloss_score(y_ground, y_prob, A):
 def logloss_score(y_ground, y_pred):
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
 
+
 def max_mse(y_ground, y_pred, A):
     max_mse = -np.inf
     for a in np.unique(A):
         mse = np.mean((y_ground[A == a] - y_pred[A == a]) ** 2)
         max_mse = max(max_mse, mse)
     return max_mse
+
+
+def group_level_mse(y_ground, y_pred, A):
+    r = {}
+    for a in np.unique(A):
+        r[f"mse_g={a}"] = np.mean((y_ground[A == a] - y_pred[A == a]) ** 2)
+    return r
