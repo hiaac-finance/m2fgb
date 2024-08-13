@@ -1,13 +1,10 @@
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from multiprocessing import Pool
-import joblib
 import datetime
 import pickle as pkl
 
 import optuna
-from optuna.samplers import RandomSampler
 
 import os
 import data
@@ -15,7 +12,6 @@ import models
 from hyperparam_spaces import PARAM_SPACES_ACSINCOME, PARAM_SPACES
 import utils
 from sklearn.metrics import (
-    roc_auc_score,
     accuracy_score,
     balanced_accuracy_score,
     precision_score,
@@ -44,11 +40,13 @@ def get_model(model_name, random_state=None):
 
         def model(**params):
             return models.M2FGBClassifier(random_state=random_state, **params)
-        
+
     elif model_name == "M2FGBClassifier_v1":
 
         def model(**params):
-            return models.M2FGBClassifier(dual_learning="gradient_norm", random_state=random_state, **params)
+            return models.M2FGBClassifier(
+                dual_learning="gradient_norm", random_state=random_state, **params
+            )
 
     elif model_name == "M2FGBClassifier_tpr":
 
@@ -227,7 +225,7 @@ def eval_model(
             "precision": precision_score(y_true, y_pred),
             "acc": accuracy_score(y_true, y_pred),
             "recall": recall_score(y_true, y_pred),
-            "logloss" : log_loss(y_true, y_score),
+            "logloss": log_loss(y_true, y_score),
             # fair metrics
             "eod": utils.equal_opportunity_score(y_true, y_pred, A),
             "spd": utils.statistical_parity_score(y_true, y_pred, A),
@@ -235,12 +233,18 @@ def eval_model(
             "min_pr": 1 - utils.min_positive_rate(y_true, y_pred, A),
             "min_bal_acc": 1 - utils.min_balanced_accuracy(y_true, y_pred, A),
             "min_acc": 1 - utils.min_accuracy(y_true, y_pred, A),
-            "max_logloss" : utils.max_logloss_score(y_true, y_score, A),
-            **utils.group_ratio(A),
-            **utils.group_level_acc(y_true, y_pred, A),
-            **utils.group_level_bacc(y_true, y_pred, A),
-            **utils.group_level_tpr(y_true, y_pred, A),
-            **utils.group_level_pr(y_true, y_pred, A),
+            "max_logloss": utils.max_logloss_score(y_true, y_score, A),
+            "max_logloss_tpr": utils.max_logloss_score(
+                y_true, y_score, A, "true_positive_rate"
+            ),
+            "max_logloss_pr": utils.max_logloss_score(
+                y_true, y_score, A, "positive_rate"
+            ),
+            # **utils.group_ratio(A),
+            # **utils.group_level_acc(y_true, y_pred, A),
+            # **utils.group_level_bacc(y_true, y_pred, A),
+            # **utils.group_level_tpr(y_true, y_pred, A),
+            # **utils.group_level_pr(y_true, y_pred, A),
         }
 
     def get_reg_metrics(y_true, y_pred, A):
@@ -273,7 +277,9 @@ def eval_model(
                 {
                     "model": m,
                     "thresh": thresh,
-                    **get_classif_metrics(Y_train, y_train_pred, y_train_score, A_train),
+                    **get_classif_metrics(
+                        Y_train, y_train_pred, y_train_score, A_train
+                    ),
                     "duration": duration,
                 }
             )
@@ -330,7 +336,18 @@ def eval_model(
     return results_train, results_val, results_test
 
 
-def run_trial(trial, X_train, Y_train, A_train, X_val, Y_val, A_val, model_class, param_space, model_list):
+def run_trial(
+    trial,
+    X_train,
+    Y_train,
+    A_train,
+    X_val,
+    Y_val,
+    A_val,
+    model_class,
+    param_space,
+    model_list,
+):
     """Function to run a single trial of optuna."""
     params = {}
     for name, values in param_space.items():
@@ -345,7 +362,7 @@ def run_trial(trial, X_train, Y_train, A_train, X_val, Y_val, A_val, model_class
             params[name] = trial.suggest_float(name, **values_cp)
     print(params)
     model = model_class(**params)
-    #model.fit(X_train, Y_train, A_train, X_val, Y_val, A_val)
+    # model.fit(X_train, Y_train, A_train, X_val, Y_val, A_val)
     model.fit(X_train, Y_train, A_train)
     model_list.append(model)
     return 0.5
@@ -359,7 +376,14 @@ def run_subgroup_experiment(args):
     if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
         os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
 
-    if args["dataset"] not in ["taiwan", "adult", "acsincome", "enem", "enem_large", "enem_reg"]:
+    if args["dataset"] not in [
+        "taiwan",
+        "adult",
+        "acsincome",
+        "enem",
+        "enem_large",
+        "enem_reg",
+    ]:
         param_space = get_param_spaces(args["model_name"])
     else:
         param_space = get_param_spaces_acsincome(args["model_name"])
@@ -378,8 +402,8 @@ def run_subgroup_experiment(args):
         X_train,
         Y_train,
         A_train,
-        X_val, 
-        Y_val, 
+        X_val,
+        Y_val,
         A_val,
         get_model(args["model_name"], random_state=SEED),
         param_space,
@@ -535,17 +559,17 @@ def experiment_classification(args):
     thresh = "ks"
     n_jobs = 10
 
-    datasets = ["enem"]
-    n_groups = 8
+    datasets = ["compas", "enem"]
+    n_groups = 6
     model_name_list = [
         "LGBMClassifier",
-        #"M2FGBClassifier",
-        #"M2FGBClassifier_tpr",
-        "FairGBMClassifier",
-        "FairGBMClassifier_eod",
-        "MinMaxFair",
-        "MinMaxFair_tpr",
-        "MinimaxPareto",
+        "M2FGBClassifier",
+        # "M2FGBClassifier_tpr",
+        # "FairGBMClassifier",
+        # "FairGBMClassifier_eod",
+        # "MinMaxFair",
+        # "MinMaxFair_tpr",
+        # "MinimaxPareto",
     ]
 
     n_params = args.n_params
@@ -582,8 +606,8 @@ def experiment_regression(args):
     n_groups = 8
     model_name_list = [
         "MinMaxFairRegressor",
-        #"LGBMRegressor",
-        #"M2FGBRegressor",
+        # "LGBMRegressor",
+        # "M2FGBRegressor",
     ]
 
     n_params = args.n_params
@@ -622,8 +646,9 @@ def main():
     fairgbm.register_logger(utils.CustomLogger())
 
     args = parser.parse_args()
-    experiment_classification(args)
-    experiment_regression(args)
+    # experiment_classification(args)
+    experiment_fair_weight(args)
+    # experiment_regression(args)
 
 
 if __name__ == "__main__":
