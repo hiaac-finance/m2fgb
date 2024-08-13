@@ -309,7 +309,7 @@ def preprocess_taiwan():
 def preprocess_enem(
     grade_attribute=["NU_NOTA_CH"],
     n_sample=50000,
-    n_sample_large=500000,
+    n_sample_large=1000000,
     multigroup=True,
     n_classes=2,
 ):
