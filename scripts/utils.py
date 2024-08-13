@@ -431,3 +431,9 @@ def group_level_mse(y_ground, y_pred, A):
     for a in np.unique(A):
         r[f"mse_g={a}"] = np.mean((y_ground[A == a] - y_pred[A == a]) ** 2)
     return r
+
+def group_ratio(A):
+    r = {}
+    for a in np.unique(A):
+        r[f"ratio_g={a}"] =  len(A) / np.sum(A == a)
+    return r
