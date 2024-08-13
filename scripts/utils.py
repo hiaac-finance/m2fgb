@@ -381,10 +381,10 @@ def logloss_group(y_ground, y_prob, A, fairness_constraint):
     y_prob = np.clip(y_prob, eps, 1 - eps)
     if fairness_constraint == "equalized_loss":
         loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
-    if fairness_constraint == "demographic_parity":
+    if fairness_constraint == "positive_rate":
         y_ = np.ones(y_ground.shape[0])  # all positive class
         loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
-    elif fairness_constraint == "equal_opportunity":
+    elif fairness_constraint == "true_positive_rate":
         loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
         loss[y_ground == 0] = 0  # only consider the loss of the positive class
 
@@ -392,7 +392,7 @@ def logloss_group(y_ground, y_prob, A, fairness_constraint):
     return loss
 
 
-def max_logloss_score(y_ground, y_prob, A):
+def max_logloss_score(y_ground, y_prob, A, fairness_constraint = "equalized_loss"):
     """Calculate the minimum mean loss of the groups. The loss is binary cross entropy.
     It work with multiple groups.
 
@@ -410,7 +410,7 @@ def max_logloss_score(y_ground, y_prob, A):
     float
         Minimum mean loss of groups
     """
-    logloss = logloss_group(y_ground, y_prob, A, "equalized_loss")
+    logloss = logloss_group(y_ground, y_prob, A, fairness_constraint)
     return max(logloss)
 
 

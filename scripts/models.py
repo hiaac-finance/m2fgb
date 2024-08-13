@@ -161,10 +161,10 @@ def logloss_group_grad(y_pred, y_true, fairness_constraint):
     """Create an array with the gradient of fairness metrics."""
     if fairness_constraint == "equalized_loss":
         grad = -(y_true - y_pred)
-    elif fairness_constraint == "true_positive_rate":
+    elif fairness_constraint == "positive_rate":
         y_ = np.ones(y_true.shape[0])  # all positive class
         grad = -(y_ - y_pred)
-    elif fairness_constraint == "equal_opportunity":
+    elif fairness_constraint == "true_positive_rate":
         grad = -(y_true - y_pred)
         grad[y_true == 0] = 0  # only consider the loss of the positive class
     elif fairness_constraint == "true_negative_rate":
@@ -176,12 +176,12 @@ def logloss_group_grad(y_pred, y_true, fairness_constraint):
 
 def logloss_group_hess(y_pred, y_true, fairness_constraint):
     """Create an array with the hessian of fairness metrics."""
-    if fairness_constraint == "equalized_loss":
-        hess = y_pred * (1 - y_pred)
-    elif (
-        fairness_constraint == "positive_rate"
-        or fairness_constraint == "true_positive_rate"
+    if (
+        fairness_constraint == "equalized_loss"
+        or fairness_constraint == "positive_rate"
     ):
+        hess = y_pred * (1 - y_pred)
+    elif fairness_constraint == "true_positive_rate":
         hess = y_pred * (1 - y_pred)
         hess[y_true == 0] = 0  # only consider the loss of the positive class
     elif fairness_constraint == "true_negative_rate":
