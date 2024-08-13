@@ -219,13 +219,14 @@ def eval_model(
     else:
         is_classification = False
 
-    def get_classif_metrics(y_true, y_pred, A):
+    def get_classif_metrics(y_true, y_pred, y_score, A):
         return {
             # perf metrics
             "bal_acc": balanced_accuracy_score(y_true, y_pred),
             "precision": precision_score(y_true, y_pred),
             "acc": accuracy_score(y_true, y_pred),
             "recall": recall_score(y_true, y_pred),
+            "logloss" : log_loss(y_true, y_score),
             # fair metrics
             "eod": utils.equal_opportunity_score(y_true, y_pred, A),
             "spd": utils.statistical_parity_score(y_true, y_pred, A),
@@ -233,6 +234,8 @@ def eval_model(
             "min_pr": 1 - utils.min_positive_rate(y_true, y_pred, A),
             "min_bal_acc": 1 - utils.min_balanced_accuracy(y_true, y_pred, A),
             "min_acc": 1 - utils.min_accuracy(y_true, y_pred, A),
+            "max_logloss" : utils.max_logloss_score(y_true, y_score, A),
+            **utils.group_ratio(A),
             **utils.group_level_acc(y_true, y_pred, A),
             **utils.group_level_bacc(y_true, y_pred, A),
             **utils.group_level_tpr(y_true, y_pred, A),
@@ -243,6 +246,7 @@ def eval_model(
         return {
             "mse": np.mean((y_true - y_pred) ** 2),
             "max_mse": utils.max_mse(y_true, y_pred, A),
+            **utils.group_ratio(A),
             **utils.group_level_mse(y_true, y_pred, A),
         }
 
@@ -257,15 +261,18 @@ def eval_model(
             else:
                 thresh = 0.5
 
-            y_train_pred = model.predict_proba(X_train)[:, 1] > thresh
-            y_val_pred = model.predict_proba(X_val)[:, 1] > thresh
-            y_test_pred = model.predict_proba(X_test)[:, 1] > thresh
+            y_train_score = model.predict_proba(X_train)[:, 1]
+            y_val_score = model.predict_proba(X_val)[:, 1]
+            y_test_score = model.predict_proba(X_test)[:, 1]
+            y_train_pred = y_train_score > thresh
+            y_val_pred = y_val_score > thresh
+            y_test_pred = y_test_score > thresh
 
             results_train.append(
                 {
                     "model": m,
                     "thresh": thresh,
-                    **get_classif_metrics(Y_train, y_train_pred, A_train),
+                    **get_classif_metrics(Y_train, y_train_pred, y_train_score, A_train),
                     "duration": duration,
                 }
             )
@@ -273,7 +280,7 @@ def eval_model(
                 {
                     "model": m,
                     "thresh": thresh,
-                    **get_classif_metrics(Y_val, y_val_pred, A_val),
+                    **get_classif_metrics(Y_val, y_val_pred, y_val_score, A_val),
                     "duration": duration,
                 }
             )
@@ -281,7 +288,7 @@ def eval_model(
                 {
                     "model": m,
                     "thresh": thresh,
-                    **get_classif_metrics(Y_test, y_test_pred, A_test),
+                    **get_classif_metrics(Y_test, y_test_pred, y_test_score, A_test),
                     "duration": duration,
                 }
             )
@@ -409,6 +416,112 @@ def run_subgroup_experiment(args):
     # save model
     with open(os.path.join(args["output_dir"], f"model.pkl"), "wb") as f:
         pkl.dump(model_list, f)
+
+
+def run_fair_weight_experiment(args):
+    # create output directory if not exists
+    if not os.path.exists(args["output_dir"]):
+        os.makedirs(args["output_dir"])
+    # clear best_params.txt if exists
+    if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
+        os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
+
+    if args["dataset"] not in ["taiwan", "adult", "acsincome", "enem", "enem_large", "enem_reg"]:
+        param_space = get_param_spaces(args["model_name"])
+    else:
+        param_space = get_param_spaces_acsincome(args["model_name"])
+    del param_space["fair_weight"]
+    param_list_ = get_param_list(param_space, args["n_params"])
+    param_list = []
+    for param in param_list_:
+        for fair_weight in [1e-3, 1e-2] + [i/10 for i in range(1, 10)] + [0.99, 1]:
+            param["fair_weight"] = fair_weight
+            param_list.append(param)
+
+    # Load data
+    X_train, A_train, Y_train, X_val, A_val, Y_val, X_test, A_test, Y_test = (
+        data.get_strat_split(args["dataset"], args["n_groups"], 20, SEED)
+    )
+
+    study = optuna.create_study(direction="maximize")
+    for param in param_list:
+        study.enqueue_trial(param)
+    model_list = []
+    objective = lambda trial: run_trial(
+        trial,
+        X_train,
+        Y_train,
+        A_train,
+        X_val, 
+        Y_val, 
+        A_val,
+        get_model(args["model_name"], random_state=SEED),
+        param_space,
+        model_list,
+    )
+    study.optimize(
+        objective,
+        n_trials=args["n_params"],
+        n_jobs=args["n_jobs"],
+        show_progress_bar=True,
+    )
+    trials_df = study.trials_dataframe(attrs=("number", "duration", "params"))
+    trials_df.to_csv(os.path.join(args["output_dir"], f"trials.csv"), index=False)
+
+    results_train, results_val, results_test = eval_model(
+        model_list,
+        trials_df,
+        args["thresh"],
+        X_train,
+        Y_train,
+        A_train,
+        X_val,
+        Y_val,
+        A_val,
+        X_test,
+        Y_test,
+        A_test,
+    )
+
+    # save results of fold
+    results_train.to_csv(os.path.join(args["output_dir"], f"train.csv"), index=False)
+    results_val.to_csv(os.path.join(args["output_dir"], f"val.csv"), index=False)
+    results_test.to_csv(os.path.join(args["output_dir"], f"test.csv"), index=False)
+
+    # save model
+    with open(os.path.join(args["output_dir"], f"model.pkl"), "wb") as f:
+        pkl.dump(model_list, f)
+
+
+def experiment_fair_weight(args):
+    thresh = "ks"
+    n_jobs = 10
+    model_name = "M2FGBClassifier"
+    datasets = ["german", "compas", "enem", "acsincome"]
+    n_groups = 8
+    n_params = args.n_params
+    for dataset in datasets:
+        with open("log.txt", "a+") as f:
+            now = datetime.datetime.now() - datetime.timedelta(hours=3)
+            f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
+
+        output_dir = (
+            f"../results_aaai/experiment_new/{dataset}_{n_groups}g/fair_weight/{model_name}"
+        )
+        config = {
+            "dataset": dataset,
+            "output_dir": output_dir,
+            "model_name": model_name,
+            "n_groups": n_groups,
+            "n_params": n_params,
+            "n_jobs": n_jobs,
+            "thresh": thresh,
+        }
+        run_subgroup_experiment(config)
+
+        with open("log.txt", "a+") as f:
+            now = datetime.datetime.now() - datetime.timedelta(hours=3)
+            f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
 
 
 
