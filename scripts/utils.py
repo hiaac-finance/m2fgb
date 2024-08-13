@@ -437,3 +437,34 @@ def group_ratio(A):
     for a in np.unique(A):
         r[f"ratio_g={a}"] =  len(A) / np.sum(A == a)
     return r
+
+
+def get_minmax_metrics(y_true, y_score, y_pred, A):
+    min_acc = []
+    min_bal_acc = []
+    min_tpr = []
+    min_pr = []
+    max_logloss = []
+
+    for a in np.unique(A):
+        y_true_a = y_true[A == a]
+        y_score_a = y_score[A == a]
+        y_pred_a = y_pred[A == a]
+
+        min_acc.append(accuracy_score(y_true_a, y_pred_a))
+        min_bal_acc.append(balanced_accuracy_score(y_true_a, y_pred_a))
+        min_tpr.append(tpr_score(y_true_a, y_pred_a))
+        min_pr.append(np.mean(y_pred_a))
+        max_logloss.append(logloss_score(y_true_a, y_score_a))
+
+    
+    return {
+        "min_acc": min(min_acc),
+        "min_bal_acc": min(min_bal_acc),
+        "min_tpr": min(min_tpr),
+        "min_pr": min(min_pr),
+        "max_logloss": max(max_logloss),
+        "eod" : max(min_tpr) - min(min_tpr),
+        "spd" : max(min_pr) - min(min_pr),
+        "eq_loss" : max(max_logloss) - min(max_logloss)
+    }
