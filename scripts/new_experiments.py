@@ -419,111 +419,116 @@ def run_subgroup_experiment(args):
         pkl.dump(model_list, f)
 
 
-def run_fair_weight_experiment(args):
-    # create output directory if not exists
-    if not os.path.exists(args["output_dir"]):
-        os.makedirs(args["output_dir"])
-    # clear best_params.txt if exists
-    if os.path.exists(os.path.join(args["output_dir"], f"best_params.txt")):
-        os.remove(os.path.join(args["output_dir"], f"best_params.txt"))
-
-    if args["dataset"] not in ["taiwan", "adult", "acsincome", "enem", "enem_large", "enem_reg"]:
-        param_space = get_param_spaces(args["model_name"])
-    else:
-        param_space = get_param_spaces_acsincome(args["model_name"])
-    del param_space["fair_weight"]
-    param_list_ = get_param_list(param_space, args["n_params"])
-    param_list = []
-    for param in param_list_:
-        for fair_weight in [1e-3, 1e-2] + [i/10 for i in range(1, 10)] + [0.99, 1]:
-            param["fair_weight"] = fair_weight
-            param_list.append(param)
-
-    # Load data
-    X_train, A_train, Y_train, X_val, A_val, Y_val, X_test, A_test, Y_test = (
-        data.get_strat_split(args["dataset"], args["n_groups"], 20, SEED)
-    )
-
-    study = optuna.create_study(direction="maximize")
-    for param in param_list:
-        study.enqueue_trial(param)
-    model_list = []
-    objective = lambda trial: run_trial(
-        trial,
-        X_train,
-        Y_train,
-        A_train,
-        X_val, 
-        Y_val, 
-        A_val,
-        get_model(args["model_name"], random_state=SEED),
-        param_space,
-        model_list,
-    )
-    study.optimize(
-        objective,
-        n_trials=args["n_params"],
-        n_jobs=args["n_jobs"],
-        show_progress_bar=True,
-    )
-    trials_df = study.trials_dataframe(attrs=("number", "duration", "params"))
-    trials_df.to_csv(os.path.join(args["output_dir"], f"trials.csv"), index=False)
-
-    results_train, results_val, results_test = eval_model(
-        model_list,
-        trials_df,
-        args["thresh"],
-        X_train,
-        Y_train,
-        A_train,
-        X_val,
-        Y_val,
-        A_val,
-        X_test,
-        Y_test,
-        A_test,
-    )
-
-    # save results of fold
-    results_train.to_csv(os.path.join(args["output_dir"], f"train.csv"), index=False)
-    results_val.to_csv(os.path.join(args["output_dir"], f"val.csv"), index=False)
-    results_test.to_csv(os.path.join(args["output_dir"], f"test.csv"), index=False)
-
-    # save model
-    with open(os.path.join(args["output_dir"], f"model.pkl"), "wb") as f:
-        pkl.dump(model_list, f)
-
-
-def experiment_fair_weight(args):
+def run_fair_weight_experiment():
     thresh = "ks"
     n_jobs = 10
-    model_name = "M2FGBClassifier"
-    datasets = ["german", "compas", "enem", "acsincome"]
-    n_groups = 8
-    n_params = args.n_params
+    n_params = 100
+    model_name = "M2FGBClassifier_tpr"
+    fair_weight_list = [
+        0.01,
+        0.025,
+        0.05,
+        0.075,
+        0.1,
+        0.15,
+        0.2,
+        0.25,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.8,
+        1,
+    ]
+
+    datasets = ["german_4", "compas_4", "enem_8", "acsincome_8"]
+
     for dataset in datasets:
+        n_groups = int(dataset.split("_")[-1])
+        dataset = dataset.split("_")[0]
+
         with open("log.txt", "a+") as f:
             now = datetime.datetime.now() - datetime.timedelta(hours=3)
             f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-        output_dir = (
-            f"../results_aaai/experiment_new/{dataset}_{n_groups}g/fair_weight/{model_name}"
+        output_dir = f"../results_aaai/experiment_new/fair_weight/{dataset}_{n_groups}g/{model_name}"
+
+        # create output directory if not exists
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        if dataset not in [
+            "taiwan",
+            "adult",
+            "acsincome",
+            "enem",
+            "enem_large",
+            "enem_reg",
+        ]:
+            param_space = get_param_spaces(model_name)
+        else:
+            param_space = get_param_spaces_acsincome(model_name)
+
+        param_list_ = get_param_list(param_space, n_params)
+        param_list = []
+        for param in param_list_:
+            for fair_weight in fair_weight_list:
+                param["fair_weight"] = fair_weight
+                param_list.append(param.copy())
+
+        # Load data
+        X_train, A_train, Y_train, X_val, A_val, Y_val, X_test, A_test, Y_test = (
+            data.get_strat_split(dataset, n_groups, 20, SEED)
         )
-        config = {
-            "dataset": dataset,
-            "output_dir": output_dir,
-            "model_name": model_name,
-            "n_groups": n_groups,
-            "n_params": n_params,
-            "n_jobs": n_jobs,
-            "thresh": thresh,
-        }
-        run_subgroup_experiment(config)
 
-        with open("log.txt", "a+") as f:
-            now = datetime.datetime.now() - datetime.timedelta(hours=3)
-            f.write(f"Finished: {dataset}, {n_groups}, {model_name} at {now}\n")
+        study = optuna.create_study(direction="maximize")
+        for param in param_list:
+            study.enqueue_trial(param)
+        model_list = []
+        objective = lambda trial: run_trial(
+            trial,
+            X_train,
+            Y_train,
+            A_train,
+            X_val,
+            Y_val,
+            A_val,
+            get_model(model_name, random_state=SEED),
+            param_space,
+            model_list,
+        )
+        study.optimize(
+            objective,
+            n_trials=len(param_list),
+            n_jobs=n_jobs,
+            show_progress_bar=True,
+        )
+        trials_df = study.trials_dataframe(attrs=("number", "duration", "params"))
+        trials_df.to_csv(os.path.join(output_dir, f"trials.csv"), index=False)
 
+        results_train, results_val, results_test = eval_model(
+            model_list,
+            trials_df,
+            thresh,
+            X_train,
+            Y_train,
+            A_train,
+            X_val,
+            Y_val,
+            A_val,
+            X_test,
+            Y_test,
+            A_test,
+        )
+
+        # save results of fold
+        results_train.to_csv(os.path.join(output_dir, f"train.csv"), index=False)
+        results_val.to_csv(os.path.join(output_dir, f"val.csv"), index=False)
+        results_test.to_csv(os.path.join(output_dir, f"test.csv"), index=False)
+
+        # save model
+        with open(os.path.join(output_dir, f"model.pkl"), "wb") as f:
+            pkl.dump(model_list, f)
 
 
 def experiment_classification(args):
