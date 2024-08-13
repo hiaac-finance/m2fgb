@@ -238,7 +238,6 @@ def preprocess_dataset(dataset, X_train, X_val, X_test):
 
 
 def get_subgroup_feature(dataset, X, n_groups=2):
-    # assert n_groups in [2, 4, 8]
     if n_groups == 2:
         if dataset == "german":
             A = X.Gender.astype(str)
@@ -255,17 +254,13 @@ def get_subgroup_feature(dataset, X, n_groups=2):
 
     elif n_groups == 4:
         if dataset == "german":
-            A = X.Gender.astype(str) + "_" + (X.Age > 50).astype(str)
+            A = X.Gender.astype(str) + "," + (X.Age > 30).apply(lambda x : "Older 30" if x else "Under 30")
         elif dataset == "compas":
             def race_cat(race):
-                if race == "African-American":
-                    return "1"
-                elif race == "Caucasian":
-                    return "2"
-                elif race == "Hispanic":
-                    return "3"
+                if race in ["African-American", "Caucasian", "Hispanic"]:
+                    return race
                 else:
-                    return "4"
+                    return "Other"
 
             A = X.race.apply(race_cat).astype(str)
         elif dataset == "adult":
