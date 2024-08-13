@@ -12,6 +12,7 @@ from optuna.samplers import RandomSampler
 import os
 import data
 import models
+from hyperparam_spaces import PARAM_SPACES_ACSINCOME, PARAM_SPACES
 import utils
 from sklearn.metrics import (
     roc_auc_score,
@@ -126,13 +127,13 @@ def get_param_spaces(model_name):
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
     ]:
-        return models.PARAM_SPACES[model_name]
+        return PARAM_SPACES[model_name]
     elif "M2FGBClassifier" in model_name:
-        return models.PARAM_SPACES["M2FGBClassifier"]
+        return PARAM_SPACES["M2FGBClassifier"]
     elif model_name == "FairGBMClassifier_eod":
-        return models.PARAM_SPACES["FairGBMClassifier"]
+        return PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "MinMaxFair_tpr":
-        return models.PARAM_SPACES["MinMaxFair"]
+        return PARAM_SPACES["MinMaxFair"]
 
 
 def get_param_spaces_acsincome(model_name):
@@ -143,13 +144,13 @@ def get_param_spaces_acsincome(model_name):
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
     ]:
-        return models.PARAM_SPACES_ACSINCOME[model_name]
+        return PARAM_SPACES_ACSINCOME[model_name]
     elif model_name == "M2FGBClassifier_tpr" or model_name == "M2FGBClassifier_pr":
-        return models.PARAM_SPACES_ACSINCOME["M2FGBClassifier"]
+        return PARAM_SPACES_ACSINCOME["M2FGBClassifier"]
     elif model_name == "FairGBMClassifier_eod":
-        return models.PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
+        return PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
     elif model_name == "MinMaxFair_tpr":
-        return models.PARAM_SPACES_ACSINCOME["MinMaxFair"]
+        return PARAM_SPACES_ACSINCOME["MinMaxFair"]
 
 
 def get_param_list(param_space, n_params):
