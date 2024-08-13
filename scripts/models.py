@@ -176,7 +176,6 @@ def dual_obj_cls(
         elif dual_learning == "gradient_norm":
             if mu_opt_list[0] is None:
                 mu_opt = loss_group
-                #mu_opt = np.ones(loss_group.shape[0])
             else:
                 mu_opt = mu_opt_list[-1].copy()
 
@@ -291,7 +290,15 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
         self.reg_lambda = reg_lambda
         self.random_state = random_state
 
-    def fit(self, X, y, sensitive_attribute, X_val = None, Y_val = None, sensitive_attribute_val = None):
+    def fit(
+        self,
+        X,
+        y,
+        sensitive_attribute,
+        X_val=None,
+        Y_val=None,
+        sensitive_attribute_val=None,
+    ):
         """Fit the model to the data.
 
         Parameters
@@ -315,10 +322,6 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
         if isinstance(sensitive_attribute, pd.Series):
             sensitive_attribute = sensitive_attribute.values
 
-        n_g = len(np.unique(sensitive_attribute))
-        min_child_weight = self.min_child_weight
-        #min_child_weight *= (1 - self.fair_weight) + self.fair_weight/n_g # trick to scale min_child_weight with hessian
-
         # sort based in sensitive_attribute
         idx = np.argsort(sensitive_attribute)
         X = X[idx]
@@ -339,7 +342,11 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
             labels = val_data.get_label()
             l1 = log_loss(labels, preds)
             l2 = utils.max_logloss_score(labels, preds, sensitive_attribute_val)
-            return "obj_function", (1 - self.fair_weight) * l1 + self.fair_weight * l2, False
+            return (
+                "obj_function",
+                (1 - self.fair_weight) * l1 + self.fair_weight * l2,
+                False,
+            )
 
         params = {
             "objective": dual_obj_cls(
@@ -355,7 +362,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
             "num_leaves": self.num_leaves,
             "max_depth": self.max_depth,
             "min_child_samples": self.min_child_samples,
-            "min_child_weight": min_child_weight,
+            "min_child_weight": self.min_child_weight,
             "colsample_bytree": self.colsample_bytree,
             "reg_alpha": self.reg_alpha,
             "reg_lambda": self.reg_lambda,
@@ -368,12 +375,12 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
             self.model_ = lgb.train(
                 params,
                 dtrain,
-                valid_sets = [dval],
+                valid_sets=[dval],
                 num_boost_round=self.n_estimators,
-                feval = custom_metric,
+                feval=custom_metric,
                 callbacks=[
                     lgb.early_stopping(stopping_rounds=25),
-                ]
+                ],
             )
         else:
             self.model_ = lgb.train(
@@ -430,7 +437,15 @@ class LGBMClassifier:
         self.reg_lambda = reg_lambda
         self.random_state = random_state
 
-    def fit(self, X, y, sensitive_attribute, X_val = None, Y_val = None, sensitive_attribute_val = None):
+    def fit(
+        self,
+        X,
+        y,
+        sensitive_attribute,
+        X_val=None,
+        Y_val=None,
+        sensitive_attribute_val=None,
+    ):
         if isinstance(X, pd.DataFrame):
             X = X.values
         if isinstance(y, pd.Series):
@@ -463,24 +478,23 @@ class LGBMClassifier:
         if self.random_state is not None:
             params["random_seed"] = self.random_state
 
-        
         def custom_metric(preds, val_data):
             preds = 1 / (1 + np.exp(-preds))
             labels = val_data.get_label()
             l1 = log_loss(labels, preds)
             return "obj_function", l1, False
-        
+
         if X_val is not None:
-            dval = lgb.Dataset(X_val.values, label = Y_val.values)
+            dval = lgb.Dataset(X_val.values, label=Y_val.values)
             self.model_ = lgb.train(
                 params,
                 dtrain,
-                valid_sets = [dval],
+                valid_sets=[dval],
                 num_boost_round=self.n_estimators,
-                feval = custom_metric,
+                feval=custom_metric,
                 callbacks=[
                     lgb.early_stopping(stopping_rounds=25),
-                ]
+                ],
             )
 
         else:
@@ -642,12 +656,13 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
     def predict_proba(self, X):
         check_is_fitted(self)
         X = check_array(X)
+
         def rand_pred(row):
             idx = np.random.choice(len(self.model))
             return self.model[idx].predict_proba(row.reshape(1, -1))
-        
+
         predictions = np.apply_along_axis(rand_pred, 1, X)
-        predictions = np.squeeze(predictions, axis=1) # remove the extra dimension
+        predictions = np.squeeze(predictions, axis=1)  # remove the extra dimension
         return predictions
 
 
