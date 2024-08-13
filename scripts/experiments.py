@@ -641,14 +641,17 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_params", type=int, default=1000)
+    parser.add_argument("--experiment", type=str, default="clf")
 
     lgb.register_logger(utils.CustomLogger())
     fairgbm.register_logger(utils.CustomLogger())
 
     args = parser.parse_args()
-    # experiment_classification(args)
-    experiment_fair_weight(args)
-    # experiment_regression(args)
+    if args.experiment == "clf":
+        experiment_classification(args)
+    elif args.experiment == "fair_weight":
+        run_fair_weight_experiment()
+    
 
 
 if __name__ == "__main__":
