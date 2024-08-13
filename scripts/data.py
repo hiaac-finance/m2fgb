@@ -287,6 +287,85 @@ def get_subgroup_feature(dataset, X, n_groups=2):
             A = X.RAC1P.apply(race_cat)
         elif dataset == "enem" or dataset == "enem_reg":
             A = X.racebin.astype(str) + "_" + X.sexbin.astype(str)
+    
+    elif n_groups == 6:
+        if dataset == "german":
+
+            def age_cat(age):
+                if age < 30:
+                    return "Under 30"
+                elif age < 40:
+                    return "Under 40"
+                else:
+                    return "Older 40"
+
+            A = X.Gender.astype(str) + ", " + X.Age.apply(age_cat).astype(str)
+        elif dataset == "adult":
+
+            def age_cat(age):
+                if age < 30:
+                    return "Under 30"
+                elif age < 40:
+                    return "Under 40"
+                else:
+                    return "Older 40"
+
+            A = X.sex.astype(str) + ", " + X.age.apply(age_cat).astype(str)
+
+        elif dataset == "taiwan":
+
+            def age_cat(age):
+                if age < 30:
+                    return "Under 30"
+                elif age < 40:
+                    return "Under 40"
+                else:
+                    return "Older 40"
+
+            A = X.SEX.astype(str) + ", " + X.AGE.apply(age_cat).astype(str)
+
+        elif dataset == "compas":
+
+            def race_cat(race):
+                if race in ["African-American", "Caucasian"]:
+                    return race
+                else:
+                    return "Other"
+
+            A = (
+                X.race.apply(race_cat)
+                + ", "
+                + ((X.age_cat == "25 - 45")).apply(
+                    lambda x: "Between 25 and 45" if x else "Other"
+                )
+            )
+
+        elif dataset == "acsincome":
+
+            def race_cat(race):
+                if race == "white":
+                    return "White"
+                elif race == "african_america":
+                    return "African-American"
+                else:
+                    return "Other"
+
+            A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat)
+        elif dataset == "enem" or dataset == "enem_reg":
+
+            def race_cat(race):
+                if race in ["White", "Brown"]:
+                    return race
+                else:
+                    return "Other"
+
+            A = (
+                X.racebin.apply(race_cat)
+                + ", "
+                + X.sexbin.astype(str).apply(
+                    lambda x: "Male" if x == "1.0" else "Female"
+                )
+            )
 
     elif n_groups == 8:
         if dataset == "german":
