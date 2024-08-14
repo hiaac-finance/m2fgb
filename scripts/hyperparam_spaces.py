@@ -1,11 +1,11 @@
 PARAM_SPACES = {
     "M2FGBClassifier": {
         "min_child_weight": {"type": "float", "low": 1e-3, "high": 1e3, "log": True},
-        "n_estimators": {"type": "int", "low": 50, "high": 500, "log": True},
-        "learning_rate": {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
-        "num_leaves": {"type": "int", "low": 2, "high": 100},
+        "n_estimators": {"type": "int", "low": 20, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 1e-2, "high": 0.5, "log": True},
+        "num_leaves": {"type": "int", "low": 2, "high": 64},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 1e-2, "high": 1},
+        "fair_weight": {"type": "float", "low": 1e-3, "high": 1},
         "multiplier_learning_rate": {
             "type": "float",
             "low": 1e-3,
@@ -15,9 +15,9 @@ PARAM_SPACES = {
     },
     "FairGBMClassifier": {
         "min_child_weight": {"type": "float", "low": 1e-3, "high": 1e3, "log": True},
-        "n_estimators": {"type": "int", "low": 50, "high": 500, "log": True},
-        "learning_rate": {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
-        "num_leaves": {"type": "int", "low": 2, "high": 100},
+        "n_estimators": {"type": "int", "low": 20, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 1e-2, "high": 0.5, "log": True},
+        "num_leaves": {"type": "int", "low": 2, "high": 64},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
         "multiplier_learning_rate": {
             "type": "float",
@@ -34,9 +34,9 @@ PARAM_SPACES = {
     },
     "LGBMClassifier": {
         "min_child_weight": {"type": "float", "low": 1e-3, "high": 1e3, "log": True},
-        "n_estimators": {"type": "int", "low": 50, "high": 500, "log": True},
-        "learning_rate": {"type": "float", "low": 1e-3, "high": 0.5, "log": True},
-        "num_leaves": {"type": "int", "low": 2, "high": 100},
+        "n_estimators": {"type": "int", "low": 20, "high": 500, "log": True},
+        "learning_rate": {"type": "float", "low": 1e-2, "high": 0.5, "log": True},
+        "num_leaves": {"type": "int", "low": 2, "high": 64},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
     },
     "MinMaxFair": {

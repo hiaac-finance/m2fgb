@@ -30,7 +30,7 @@ if not sys.warnoptions:
     os.environ["PYTHONWARNINGS"] = "ignore"
 
 
-SEED = 0
+SEED = 1234
 np.random.seed(SEED)
 
 
@@ -227,19 +227,20 @@ def eval_model(
             "recall": recall_score(y_true, y_pred),
             "logloss": log_loss(y_true, y_score),
             # fair metrics
-            "eod": utils.equal_opportunity_score(y_true, y_pred, A),
-            "spd": utils.statistical_parity_score(y_true, y_pred, A),
-            "min_tpr": 1 - utils.min_true_positive_rate(y_true, y_pred, A),
-            "min_pr": 1 - utils.min_positive_rate(y_true, y_pred, A),
-            "min_bal_acc": 1 - utils.min_balanced_accuracy(y_true, y_pred, A),
-            "min_acc": 1 - utils.min_accuracy(y_true, y_pred, A),
-            "max_logloss": utils.max_logloss_score(y_true, y_score, A),
-            "max_logloss_tpr": utils.max_logloss_score(
-                y_true, y_score, A, "true_positive_rate"
-            ),
-            "max_logloss_pr": utils.max_logloss_score(
-                y_true, y_score, A, "positive_rate"
-            ),
+            **utils.get_fairness_metrics(y_true, y_pred, y_score, A),
+            # "eod": utils.equal_opportunity_score(y_true, y_pred, A),
+            # "spd": utils.statistical_parity_score(y_true, y_pred, A),
+            # "min_tpr": 1 - utils.min_true_positive_rate(y_true, y_pred, A),
+            # "min_pr": 1 - utils.min_positive_rate(y_true, y_pred, A),
+            # "min_bal_acc": 1 - utils.min_balanced_accuracy(y_true, y_pred, A),
+            # "min_acc": 1 - utils.min_accuracy(y_true, y_pred, A),
+            # "max_logloss": utils.max_logloss_score(y_true, y_score, A),
+            # "max_logloss_tpr": utils.max_logloss_score(
+            #    y_true, y_score, A, "true_positive_rate"
+            # ),
+            # "max_logloss_pr": utils.max_logloss_score(
+            #    y_true, y_score, A, "positive_rate"
+            # ),
             # **utils.group_ratio(A),
             # **utils.group_level_acc(y_true, y_pred, A),
             # **utils.group_level_bacc(y_true, y_pred, A),
@@ -456,16 +457,12 @@ def run_fair_weight_experiment():
         0.1,
         0.15,
         0.2,
-        0.25,
-        0.3,
-        0.4,
         0.5,
-        0.6,
-        0.8,
+        0.75,
         1,
     ]
 
-    datasets = ["german_4", "compas_4", "enem_8", "acsincome_8"]
+    datasets = ["german_4", "compas_4", "enem_8"]  # , "acsincome_8"]
 
     for dataset in datasets:
         n_groups = int(dataset.split("_")[-1])
@@ -481,17 +478,25 @@ def run_fair_weight_experiment():
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        if dataset not in [
-            "taiwan",
-            "adult",
-            "acsincome",
-            "enem",
-            "enem_large",
-            "enem_reg",
-        ]:
-            param_space = get_param_spaces(model_name)
-        else:
-            param_space = get_param_spaces_acsincome(model_name)
+        param_space = {
+            "min_child_weight": {
+                "type": "float",
+                "low": 1e-2,
+                "high": 1e3,
+                "log": True,
+            },
+            "n_estimators": {"type": "int", "low": 100, "high": 500, "log": True},
+            "learning_rate": {"type": "float", "low": 1e-2, "high": 0.5, "log": True},
+            "num_leaves": {"type": "int", "low": 2, "high": 64},
+            "reg_lambda": {"type": "float", "low": 1e-1, "high": 1000, "log": True},
+            "fair_weight": {"type": "float", "low": 0.01, "high": 1},
+            "multiplier_learning_rate": {
+                "type": "float",
+                "low": 1e-3,
+                "high": 0.5,
+                "log": True,
+            },
+        }
 
         param_list_ = get_param_list(param_space, n_params)
         param_list = []
@@ -651,7 +656,6 @@ def main():
         experiment_classification(args)
     elif args.experiment == "fair_weight":
         run_fair_weight_experiment()
-    
 
 
 if __name__ == "__main__":

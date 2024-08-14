@@ -439,12 +439,13 @@ def group_ratio(A):
     return r
 
 
-def get_minmax_metrics(y_true, y_score, y_pred, A):
+def get_fairness_metrics(y_true, y_pred, y_score, A):
     min_acc = []
     min_bal_acc = []
     min_tpr = []
     min_pr = []
     max_logloss = []
+    max_logloss_tpr = []
 
     for a in np.unique(A):
         y_true_a = y_true[A == a]
@@ -456,6 +457,10 @@ def get_minmax_metrics(y_true, y_score, y_pred, A):
         min_tpr.append(tpr_score(y_true_a, y_pred_a))
         min_pr.append(np.mean(y_pred_a))
         max_logloss.append(logloss_score(y_true_a, y_score_a))
+        max_logloss_tpr.append(logloss_score(
+            y_true_a[y_true_a == 1], y_score_a[y_true_a == 1]
+        ))
+
 
     
     return {
@@ -464,6 +469,7 @@ def get_minmax_metrics(y_true, y_score, y_pred, A):
         "min_tpr": min(min_tpr),
         "min_pr": min(min_pr),
         "max_logloss": max(max_logloss),
+        "max_logloss_tpr": max(max_logloss_tpr),
         "eod" : max(min_tpr) - min(min_tpr),
         "spd" : max(min_pr) - min(min_pr),
         "eq_loss" : max(max_logloss) - min(max_logloss)
