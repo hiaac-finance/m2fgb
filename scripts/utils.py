@@ -386,9 +386,9 @@ def logloss_group(y_ground, y_prob, A, fairness_constraint):
         loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
     elif fairness_constraint == "true_positive_rate":
         loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
-        loss[y_ground == 0] = 0  # only consider the loss of the positive class
+        loss[y_ground == 0] = np.nan  # only consider the loss of the positive class
 
-    loss = np.array([np.mean(loss[A == a]) for a in np.unique(A)])
+    loss = np.array([np.nanmean(loss[A == a]) for a in np.unique(A)])
     return loss
 
 

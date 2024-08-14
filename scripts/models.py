@@ -58,17 +58,17 @@ def logloss_group(y_pred, y_true, subgroup, fairness_constraint):
         loss = -(y_ * np.log(y_pred) + (1 - y_) * np.log(1 - y_pred))
     elif fairness_constraint == "true_positive_rate":
         loss = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
-        loss[y_true == 0] = 0  # only consider the loss of the positive class
+        loss[y_true == 0] = np.nan  # only consider the loss of the positive class
     elif fairness_constraint == "true_negative_rate":
         loss = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
-        loss[y_true == 1] = 0  # only consider the loss of the positive class
+        loss[y_true == 1] = np.nan  # only consider the loss of the positive class
 
     # TODO LATER: use I (indicator) to calculate averages
 
     # smart numpy groupby that assumes that subgroup is sorted
     loss = np.column_stack((loss, subgroup))
     loss = np.split(loss[:, 0], np.unique(loss[:, 1], return_index=True)[1][1:])
-    loss = np.array([np.mean(l) for l in loss])
+    loss = np.array([np.nanmean(l) for l in loss])
     return loss
 
 
