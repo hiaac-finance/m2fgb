@@ -657,18 +657,24 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         check_is_fitted(self)
         X = check_array(X)
 
-        def rand_pred(row):
-            idx = np.random.choice(len(self.model))
-            return self.model[idx].predict_proba(row.reshape(1, -1))
+        predictions = np.stack([model.predict_proba(X)[:, 1] for model in self.model])
+        idx = np.random.choice(predictions.shape[0], predictions.shape[1], replace=True).reshape(1, -1)
+        predictions = np.take_along_axis(predictions, idx, axis=0)
+        predictions = np.squeeze(predictions, axis=0)  # remove the extra dimension
+        predictions = np.stack([1-predictions, predictions], axis=1)
+        
+        # def rand_pred(row):
+        #     idx = np.random.choice(len(self.model))
+        #     return self.model[idx].predict_proba(row.reshape(1, -1))
 
-        predictions = np.apply_along_axis(rand_pred, 1, X)
-        predictions = np.squeeze(predictions, axis=1)  # remove the extra dimension
+        # predictions = np.apply_along_axis(rand_pred, 1, X)
+        # predictions = np.squeeze(predictions, axis=1)  # remove the extra dimension
         return predictions
 
 
 class MinimaxPareto(BaseEstimator, ClassifierMixin):
     def __init__(
-        self, n_iterations=100, C=1.0, Kini=1, Kmin=20, alpha=0.5, max_iter=100
+        self, n_iterations=100, C=1.0, Kini=1, Kmin=20, alpha=0.5, max_iter=100, fairness_constraint = "equalized_loss"
     ):
         self.n_iterations = n_iterations
         self.C = C
@@ -676,6 +682,7 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
         self.Kmin = Kmin
         self.alpha = alpha
         self.max_iter = max_iter
+        self.fairness_constraint = fairness_constraint
 
     def fit(self, X, y, sensitive_attribute):
         X, y = check_X_y(X, y)
@@ -691,6 +698,7 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
             sensitive_attribute,
             C_reg=self.C,
             max_iter=self.max_iter,
+            fairness_constraint=self.fairness_constraint
         )
 
         mu_ini = np.ones(len(sensitive_attribute.unique()))
@@ -704,7 +712,7 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
             Kini=1,
             Kmin=self.Kmin,
             alpha=self.alpha,
-            verbose=True,
+            verbose=False,
         )
 
         mu_best = results["mu_best_list"][-1]
