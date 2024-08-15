@@ -574,10 +574,19 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         max_logloss = -np.inf
         for g in np.unique(sensitive_attribute):
             idx = sensitive_attribute == g
-            logloss = log_loss(y[idx], y_pred[idx])
+            if error_type == "Log-Loss":
+                logloss = log_loss(y[idx], y_pred[idx])
+            elif error_type == "FN-Log-Loss":
+                y_ = y[idx]
+                y_pred_ = y_pred[idx]
+                y_pred_hat = y_pred_ > 0.5
+                logloss = (y_ == 1.0) * (-(y_ * np.log(y_pred_) + (1 - y_) * np.log(1 - y_pred_)))
+                logloss = np.mean(logloss)
+
             min_logloss = min(min_logloss, logloss)
             max_logloss = max(max_logloss, logloss)
 
+        print(min_logloss, max_logloss)
         gamma_hat = min_logloss + self.gamma * (max_logloss - min_logloss)
 
         (
@@ -1186,9 +1195,16 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
     def predict(self, X):
         check_is_fitted(self)
         X = check_array(X)
-        predictions = np.zeros((X.shape[0]))
-        for i in range(X.shape[0]):
-            predictions[i] = self.model[np.random.choice(len(self.model))].predict(
-                X[i].reshape(1, -1)
-            )
+
+        predictions = np.stack([model.predict(X) for model in self.model])
+        idx = np.random.choice(predictions.shape[0], predictions.shape[1], replace=True).reshape(1, -1)
+        predictions = np.take_along_axis(predictions, idx, axis=0)
+        predictions = np.squeeze(predictions, axis=0)  # remove the extra dimension
+        
+        # def rand_pred(row):
+        #     idx = np.random.choice(len(self.model))
+        #     return self.model[idx].predict_proba(row.reshape(1, -1))
+
+        # predictions = np.apply_along_axis(rand_pred, 1, X)
+        # predictions = np.squeeze(predictions, axis=1)  # remove the extra dimension
         return predictions

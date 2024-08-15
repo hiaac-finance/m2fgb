@@ -456,6 +456,7 @@ def do_learning(
                     penalty=penalty,
                     C=C,
                     verbose=0,
+                    # class_weight="balanced",
                 ).fit(X_train, y_train, avg_sampleweights)
                 # except Warning:
                 #    raise Exception(f'Logistic regression did not converge with {max_logi_iters} iterations.')
@@ -934,7 +935,7 @@ def compute_model_errors(modelhat, X, y, t, errors, error_type, penalty="none", 
     elif (
         error_type == "FN-Log-Loss"
     ):  # Computes the log loss, but replaces loss with 0 unless an instance was a FN
-        errors[t, :] = (y > yhat) * compute_logloss(y, modelhat.predict_proba(X))
+        errors[t, :] = (y == 1.0) * compute_logloss(y, modelhat.predict_proba(X))
     else:
         raise ValueError(f"'{error_type}' is an invalid error type")
     # Compute the regularization penalty if necessary and add it to the log loss
