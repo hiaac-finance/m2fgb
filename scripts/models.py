@@ -1114,7 +1114,6 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
             min_mse = min(min_mse, mse)
             max_mse = max(mse, mse)
 
-        print(min_mse, max_mse, self.gamma)
         gamma_hat = min_mse + self.gamma * (max_mse - min_mse)
 
         (
