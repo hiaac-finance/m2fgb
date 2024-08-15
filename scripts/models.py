@@ -1110,10 +1110,11 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         max_mse = -np.inf
         for g in np.unique(sensitive_attribute):
             idx = sensitive_attribute == g
-            mse = np.sum((y[idx] - y_pred[idx]) ** 2)
+            mse = np.mean((y[idx] - y_pred[idx]) ** 2)
             min_mse = min(min_mse, mse)
             max_mse = max(mse, mse)
 
+        print(min_mse, max_mse, self.gamma)
         gamma_hat = min_mse + self.gamma * (max_mse - min_mse)
 
         (
@@ -1169,7 +1170,7 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
             hidden_sizes=(2 / 3,),
             # parameters related to output
             display_plots=False,
-            verbose=False,
+            verbose=True,
             use_input_commands=False,
             show_legend=False,
             save_models=False,
