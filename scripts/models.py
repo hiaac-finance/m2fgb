@@ -1170,7 +1170,7 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
             hidden_sizes=(2 / 3,),
             # parameters related to output
             display_plots=False,
-            verbose=True,
+            verbose=False,
             use_input_commands=False,
             show_legend=False,
             save_models=False,
