@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.metrics import log_loss
-from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
 from scipy.sparse import csr_matrix
 
 import utils
@@ -1078,6 +1078,8 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         b=0.5,
         gamma=0.0,
         relaxed=False,
+        C = 1.0,
+        max_iter = 100,
     ):
         assert fairness_constraint in ["equalized_loss"]
         self.fairness_constraint = fairness_constraint
@@ -1086,6 +1088,8 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         self.b = b
         self.gamma = gamma
         self.relaxed = relaxed
+        self.C = C
+        self.max_iter = max_iter
 
     def fit(self, X, y, sensitive_attribute):
         X, y = check_X_y(X, y)
@@ -1094,7 +1098,12 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         error_type = "MSE"
 
         # train a logistic model to get min and max logloss
-        model = LinearRegression()
+        model = Ridge(
+            solver="saga",
+            max_iter=self.max_iter,
+            alpha = self.C
+
+        )
         model.fit(X, y)
         y_pred = model.predict(X)
         min_mse = np.inf
@@ -1144,14 +1153,14 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
             test_size=0.0,
             random_split_seed=0,
             # model selection
-            model_type="LinearRegression",
+            model_type="Ridge",
             # parameters related to LR model
-            # max_logi_iters=self.max_iter,
-            # tol=1e-8,
-            # fit_intercept=True,
-            # logistic_solver="saga",
-            # penalty=self.penalty,
-            # C=self.C,
+            max_logi_iters=self.max_iter,
+            tol=1e-8,
+            fit_intercept=True,
+            logistic_solver="saga",
+            penalty="l2",
+            C=self.C,
             # parameters related to MLP
             lr=0.01,
             momentum=0.9,
