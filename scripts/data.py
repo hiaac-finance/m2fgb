@@ -43,8 +43,8 @@ CAT_FEATURES = {
         "MARRIAGE",
     ],
     "enem": ["all"],
-    "enem_reg": ["all"],
-    "enem_large": ["all"],
+    "enemreg": ["all"],
+    "enemlarge": ["all"],
 }
 
 
@@ -89,8 +89,8 @@ NUM_FEATURES = {
         "PAY_6",
     ],
     "enem": ["none"],
-    "enem_reg": ["none"],
-    "enem_large": ["none"],
+    "enemreg": ["none"],
+    "enemlarge": ["none"],
 }
 
 
@@ -190,9 +190,9 @@ def load_dataset(dataset):
         return load_acsincome()
     elif dataset == "enem":
         return load_enem()
-    elif dataset == "enem_reg":
+    elif dataset == "enemreg":
         return load_enem_reg()
-    elif dataset == "enem_large":
+    elif dataset == "enemlarge":
         return load_enem_large()
     else:
         raise ValueError(f"Unknown dataset {dataset}")
@@ -249,7 +249,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
             A = X.SEX.astype(str)
         elif dataset == "taiwan":
             A = X.SEX.astype(str)
-        elif dataset == "enem" or dataset == "enem_reg":
+        elif dataset == "enem" or dataset == "enemreg":
             A = X.racebin.astype(str)
 
     elif n_groups == 4:
@@ -280,7 +280,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                     return "4"
 
             A = X.RAC1P.apply(race_cat)
-        elif dataset == "enem" or dataset == "enem_reg":
+        elif dataset == "enem" or dataset == "enemreg":
             A = X.racebin.astype(str) + "_" + X.sexbin.astype(str)
     
     elif n_groups == 6:
@@ -346,7 +346,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                     return "Other"
 
             A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat)
-        elif dataset == "enem" or dataset == "enem_reg":
+        elif dataset == "enem" or dataset == "enemreg":
 
             def race_cat(race):
                 if race in ["White", "Brown"]:
@@ -433,7 +433,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
                     return "Other"
 
             A = X.SEX.astype(str).str.capitalize() + ", " + X.RAC1P.apply(race_cat)
-        elif dataset == "enem" or dataset == "enem_reg":
+        elif dataset == "enem" or dataset == "enemreg":
 
             def race_cat(race):
                 if race in ["White", "Black", "Brown"]:
@@ -450,7 +450,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
             )
 
     elif n_groups > 20:
-        assert dataset == "enem_large"
+        assert dataset == "enemlarge"
         sg_columns = [col for col in X.columns if "SG_UF_PROVA" in col]
         # A is the index of the non zero column
         A = X[sg_columns].idxmax(axis=1)
@@ -464,7 +464,7 @@ def get_subgroup_feature(dataset, X, n_groups=2):
 def get_fold(dataset, fold, n_folds=10, n_groups=2, random_state=None):
     X, Y = load_dataset(dataset)
     A = get_subgroup_feature(dataset, X, n_groups)
-    if dataset == "enem_reg":
+    if dataset == "enemreg":
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
     else:
         kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
@@ -509,7 +509,7 @@ def get_fold_holdout(dataset, fold, n_folds=10, n_groups=2, random_state=None):
     X_train, X_test, Y_train, Y_test, A_train, A_test = train_test_split(
         X, Y, A, test_size=0.2, random_state=random_state
     )
-    if dataset == "enem_reg":
+    if dataset == "enemreg":
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
     else:
         kf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)

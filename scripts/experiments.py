@@ -112,6 +112,11 @@ def get_model(model_name, random_state=None):
 
         def model(**params):
             return models.MinimaxPareto(**params)
+        
+    elif model_name == "MinimaxPareto_tpr":
+
+        def model(**params):
+            return models.MinimaxPareto(fairness_constraint="true_positive_rate", **params)
 
     return model
 
@@ -124,6 +129,7 @@ def get_param_spaces(model_name):
         "M2FGBClassifier_pr",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
+        "MinimaxPareto_tpr"
     ]:
         return PARAM_SPACES[model_name]
     elif "M2FGBClassifier" in model_name:
@@ -132,6 +138,8 @@ def get_param_spaces(model_name):
         return PARAM_SPACES["FairGBMClassifier"]
     elif model_name == "MinMaxFair_tpr":
         return PARAM_SPACES["MinMaxFair"]
+    elif model_name == "MinimaxPareto_tpr":
+        return PARAM_SPACES["MinimaxPareto"]
 
 
 def get_param_spaces_acsincome(model_name):
@@ -141,6 +149,7 @@ def get_param_spaces_acsincome(model_name):
         "M2FGBClassifier_pr",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
+        "MinimaxPareto_tpr"
     ]:
         return PARAM_SPACES_ACSINCOME[model_name]
     elif model_name == "M2FGBClassifier_tpr" or model_name == "M2FGBClassifier_pr":
@@ -149,6 +158,8 @@ def get_param_spaces_acsincome(model_name):
         return PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
     elif model_name == "MinMaxFair_tpr":
         return PARAM_SPACES_ACSINCOME["MinMaxFair"]
+    elif model_name == "MinimaxPareto_tpr":
+        return PARAM_SPACES_ACSINCOME["MinimaxPareto"]
 
 
 def get_param_list(param_space, n_params):
@@ -260,30 +271,29 @@ def eval_model(
         duration = trials_df.duration[trials_df.number == m].values[0]
 
         if is_classification:
+            y_train_score = model.predict_proba(X_train)[:, 1]
             # get threshold
             if thresh_type == "ks":
-                y_train_score = model.predict_proba(X_train)[:, 1]
                 thresh = utils.get_best_threshold(Y_train, y_train_score)
             else:
                 thresh = 0.5
 
-            y_train_score = model.predict_proba(X_train)[:, 1]
             y_val_score = model.predict_proba(X_val)[:, 1]
             y_test_score = model.predict_proba(X_test)[:, 1]
-            y_train_pred = y_train_score > thresh
+            #y_train_pred = y_train_score > thresh
             y_val_pred = y_val_score > thresh
             y_test_pred = y_test_score > thresh
 
-            results_train.append(
-                {
-                    "model": m,
-                    "thresh": thresh,
-                    **get_classif_metrics(
-                        Y_train, y_train_pred, y_train_score, A_train
-                    ),
-                    "duration": duration,
-                }
-            )
+            # results_train.append(
+            #     {
+            #         "model": m,
+            #         "thresh": thresh,
+            #         **get_classif_metrics(
+            #             Y_train, y_train_pred, y_train_score, A_train
+            #         ),
+            #         "duration": duration,
+            #     }
+            # )
             results_val.append(
                 {
                     "model": m,
@@ -306,14 +316,14 @@ def eval_model(
             y_val_pred = model.predict(X_val)
             y_test_pred = model.predict(X_test)
             thresh = 0.5
-            results_train.append(
-                {
-                    "model": m,
-                    "thresh": thresh,
-                    **get_reg_metrics(Y_train, y_train_pred, A_train),
-                    "duration": duration,
-                }
-            )
+            # results_train.append(
+            #     {
+            #         "model": m,
+            #         "thresh": thresh,
+            #         **get_reg_metrics(Y_train, y_train_pred, A_train),
+            #         "duration": duration,
+            #     }
+            # )
             results_val.append(
                 {
                     "model": m,
@@ -382,8 +392,8 @@ def run_subgroup_experiment(args):
         "adult",
         "acsincome",
         "enem",
-        "enem_large",
-        "enem_reg",
+        "enemlarge",
+        "enemreg",
     ]:
         param_space = get_param_spaces(args["model_name"])
     else:
@@ -462,7 +472,7 @@ def run_fair_weight_experiment():
         1,
     ]
 
-    datasets = ["german_4", "compas_4", "enem_8"]  # , "acsincome_8"]
+    datasets = ["german_4", "compas_4", "enem_8", "acsincome_8"]
 
     for dataset in datasets:
         n_groups = int(dataset.split("_")[-1])
@@ -481,13 +491,13 @@ def run_fair_weight_experiment():
         param_space = {
             "min_child_weight": {
                 "type": "float",
-                "low": 1e-2,
+                "low": 1,
                 "high": 1e3,
                 "log": True,
             },
-            "n_estimators": {"type": "int", "low": 100, "high": 500, "log": True},
+            "n_estimators": {"type": "int", "low": 20, "high": 500, "log": True},
             "learning_rate": {"type": "float", "low": 1e-2, "high": 0.5, "log": True},
-            "num_leaves": {"type": "int", "low": 2, "high": 64},
+            "max_depth": {"type": "int", "low": 2, "high": 5},
             "reg_lambda": {"type": "float", "low": 1e-1, "high": 1000, "log": True},
             "fair_weight": {"type": "float", "low": 0.01, "high": 1},
             "multiplier_learning_rate": {
@@ -497,6 +507,9 @@ def run_fair_weight_experiment():
                 "log": True,
             },
         }
+
+        if dataset == "german":
+            param_space["min_child_weight"] = {"type": "float", "low": 1e-3, "high": 10, "log": True}
 
         param_list_ = get_param_list(param_space, n_params)
         param_list = []
@@ -564,21 +577,25 @@ def experiment_classification(args):
     thresh = "ks"
     n_jobs = 10
 
-    datasets = ["compas", "enem"]
-    n_groups = 6
+    datasets = ["acsincome_8"]
     model_name_list = [
         "LGBMClassifier",
-        "M2FGBClassifier",
-        # "M2FGBClassifier_tpr",
-        # "FairGBMClassifier",
-        # "FairGBMClassifier_eod",
+        #"M2FGBClassifier",
+        #"FairGBMClassifier",
+        "FairGBMClassifier_eod",
+        "M2FGBClassifier_tpr",
         # "MinMaxFair",
-        # "MinMaxFair_tpr",
+        "MinMaxFair_tpr",
         # "MinimaxPareto",
+        "MinimaxPareto_tpr"
     ]
 
     n_params = args.n_params
     for dataset in datasets:
+        n_groups = int(dataset.split("_")[-1])
+        dataset = dataset.split("_")[0]
+        if dataset == "acsincome":
+            n_params = n_params // 2
         for model_name in model_name_list:
             with open("log.txt", "a+") as f:
                 now = datetime.datetime.now() - datetime.timedelta(hours=3)
@@ -607,7 +624,7 @@ def experiment_regression(args):
     thresh = "ks"
     n_jobs = 10
 
-    dataset = "enem_reg"
+    dataset = "enemreg"
     n_groups = 8
     model_name_list = [
         "MinMaxFairRegressor",
