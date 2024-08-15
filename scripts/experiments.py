@@ -627,9 +627,9 @@ def experiment_regression(args):
     dataset = "enemreg"
     n_groups = 8
     model_name_list = [
+        "LGBMRegressor",
+        "M2FGBRegressor",
         "MinMaxFairRegressor",
-        # "LGBMRegressor",
-        # "M2FGBRegressor",
     ]
 
     n_params = args.n_params
@@ -639,7 +639,7 @@ def experiment_regression(args):
             now = datetime.datetime.now() - datetime.timedelta(hours=3)
             f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-        output_dir = f"../results_aaai/experiment_new/{dataset}_{n_groups}/{model_name}"
+        output_dir = f"../results_aaai/experiment_new/{dataset}_{n_groups}g/{model_name}"
         args = {
             "dataset": dataset,
             "output_dir": output_dir,
@@ -671,6 +671,8 @@ def main():
     args = parser.parse_args()
     if args.experiment == "clf":
         experiment_classification(args)
+    elif args.experiment == "reg":
+        experiment_regression(args)
     elif args.experiment == "fair_weight":
         run_fair_weight_experiment()
 

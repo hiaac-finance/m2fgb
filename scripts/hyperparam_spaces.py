@@ -49,6 +49,7 @@ PARAM_SPACES = {
     "MinMaxFairRegressor": {
         "n_estimators": {"type": "int", "low": 10, "high": 500, "log": True},
         "gamma": {"type": "float", "low": 0, "high": 1},
+        "C": {"type": "float", "low": 1e-4, "high": 1e4, "log": True},
         "a": {"type": "float", "low": 0.1, "high": 1},
         "b": {"type": "float", "low": 1e-2, "high": 1},
     },
@@ -93,5 +94,13 @@ PARAM_SPACES_ACSINCOME["MinimaxPareto"] = {
     "C": {"type": "float", "low": 1e-4, "high": 1e4, "log": True},
     "alpha": {"type": "float", "low": 0.1, "high": 0.9},
     "Kmin": {"type": "int", "low": 10, "high": 50},
+    "max_iter": {"type": "int", "low": 10, "high": 11},
+}
+PARAM_SPACES_ACSINCOME["MinMaxFairRegressor"] = {
+    "n_estimators": {"type": "int", "low": 10, "high": 50, "log": True},
+    "gamma": {"type": "float", "low": 0, "high": 1},
+    "C": {"type": "float", "low": 1e-4, "high": 1e4, "log": True},
+    "a": {"type": "float", "low": 0.1, "high": 1},
+    "b": {"type": "float", "low": 1e-2, "high": 1},
     "max_iter": {"type": "int", "low": 10, "high": 11},
 }
