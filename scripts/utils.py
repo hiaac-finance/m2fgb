@@ -415,6 +415,7 @@ def max_logloss_score(y_ground, y_prob, A, fairness_constraint = "equalized_loss
 
 
 def logloss_score(y_ground, y_pred):
+    y_pred = np.clip(y_pred, 1e-15, 1 - 1e-15)
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
 
 
