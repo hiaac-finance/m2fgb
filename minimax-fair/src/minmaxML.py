@@ -456,7 +456,7 @@ def do_learning(
                     penalty=penalty,
                     C=C,
                     verbose=0,
-                    # class_weight="balanced",
+                    class_weight="balanced",
                 ).fit(X_train, y_train, avg_sampleweights)
                 # except Warning:
                 #    raise Exception(f'Logistic regression did not converge with {max_logi_iters} iterations.')
