@@ -574,20 +574,25 @@ def run_fair_weight_experiment():
 
 
 def experiment_classification(args):
-    thresh = "ks"
+    thresh = 0.5
     n_jobs = 10
 
-    datasets = ["acsincome_8"]
+    datasets = ["german_4", "compas_4", "enem_8", "acsincome_8"]
     model_name_list = [
-        "LGBMClassifier",
-        #"M2FGBClassifier",
-        #"FairGBMClassifier",
-        "FairGBMClassifier_eod",
-        "M2FGBClassifier_tpr",
-        # "MinMaxFair",
-        "MinMaxFair_tpr",
-        # "MinimaxPareto",
-        "MinimaxPareto_tpr"
+        #"LGBMClassifier",
+        #"M2FGBClassifier_tpr",
+        #"FairGBMClassifier_eod",
+        #"MinMaxFair_tpr",
+        #"MinimaxPareto_tpr"
+
+        ###
+        "M2FGBClassifier",
+        "FairGBMClassifier",
+        "MinMaxFair",
+        "MinimaxPareto"
+
+        ###
+        #"M2FGBClassifier_pr",
     ]
 
     n_params = args.n_params
@@ -602,7 +607,7 @@ def experiment_classification(args):
                 f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
             output_dir = (
-                f"../results_aaai/experiment_new/{dataset}_{n_groups}g/{model_name}"
+                f"../results_aaai/experiment/{dataset}_{n_groups}g/{model_name}"
             )
             config = {
                 "dataset": dataset,
