@@ -392,13 +392,19 @@ class SKLearn_Weighted_LLR():
             y_mask = y_val[mask].astype(int)
             x_mask = x_val[mask]
             log_proba = self.model.predict_log_proba(x_mask)
-            running_risk = []
-            for idx in range(len(y_mask)):
-                if self.fairness_constraint == "equalized_loss":
-                    running_risk.append(-log_proba[idx, y_mask[idx]])
-                elif self.fairness_constraint == "true_positive_rate" and y_mask[idx] == 1:
-                    running_risk.append(-log_proba[idx, y_mask[idx]])
-            risks.append(np.mean(running_risk))
+            if self.fairness_constraint == "equalized_loss":
+                risks.append(-np.mean(log_proba[np.arange(len(y_mask)), y_mask]))
+            elif self.fairness_constraint == "true_positive_rate":
+                risks.append(-np.mean(log_proba[np.arange(len(y_mask)), y_mask][y_mask == 1]))
+
+
+            #running_risk = []
+            #for idx in range(len(y_mask)):
+            #    if self.fairness_constraint == "equalized_loss":
+            #        running_risk.append(-log_proba[idx, y_mask[idx]])
+            #    elif self.fairness_constraint == "true_positive_rate" and y_mask[idx] == 1:
+            #        running_risk.append(-log_proba[idx, y_mask[idx]])
+            #risks.append(np.mean(running_risk))
         return np.array(risks)
 
     def __call__(self, mu):
