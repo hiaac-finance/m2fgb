@@ -112,11 +112,13 @@ def get_model(model_name, random_state=None):
 
         def model(**params):
             return models.MinimaxPareto(**params)
-        
+
     elif model_name == "MinimaxPareto_tpr":
 
         def model(**params):
-            return models.MinimaxPareto(fairness_constraint="true_positive_rate", **params)
+            return models.MinimaxPareto(
+                fairness_constraint="true_positive_rate", **params
+            )
 
     return model
 
@@ -129,7 +131,7 @@ def get_param_spaces(model_name):
         "M2FGBClassifier_pr",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
-        "MinimaxPareto_tpr"
+        "MinimaxPareto_tpr",
     ]:
         return PARAM_SPACES[model_name]
     elif "M2FGBClassifier" in model_name:
@@ -149,7 +151,7 @@ def get_param_spaces_acsincome(model_name):
         "M2FGBClassifier_pr",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
-        "MinimaxPareto_tpr"
+        "MinimaxPareto_tpr",
     ]:
         return PARAM_SPACES_ACSINCOME[model_name]
     elif model_name == "M2FGBClassifier_tpr" or model_name == "M2FGBClassifier_pr":
@@ -280,7 +282,7 @@ def eval_model(
 
             y_val_score = model.predict_proba(X_val)[:, 1]
             y_test_score = model.predict_proba(X_test)[:, 1]
-            #y_train_pred = y_train_score > thresh
+            # y_train_pred = y_train_score > thresh
             y_val_pred = y_val_score > thresh
             y_test_pred = y_test_score > thresh
 
@@ -509,7 +511,12 @@ def run_fair_weight_experiment():
         }
 
         if dataset == "german":
-            param_space["min_child_weight"] = {"type": "float", "low": 1e-3, "high": 10, "log": True}
+            param_space["min_child_weight"] = {
+                "type": "float",
+                "low": 1e-3,
+                "high": 10,
+                "log": True,
+            }
 
         param_list_ = get_param_list(param_space, n_params)
         param_list = []
@@ -579,20 +586,18 @@ def experiment_classification(args):
 
     datasets = ["german_4", "compas_4", "enem_8", "acsincome_8"]
     model_name_list = [
-        #"LGBMClassifier",
-        #"M2FGBClassifier_tpr",
-        #"FairGBMClassifier_eod",
-        #"MinMaxFair_tpr",
-        #"MinimaxPareto_tpr"
-
+        "LGBMClassifier",
+        "M2FGBClassifier_tpr",
+        "FairGBMClassifier_eod",
+        "MinMaxFair_tpr",
+        "MinimaxPareto_tpr"
         ###
         "M2FGBClassifier",
         "FairGBMClassifier",
         "MinMaxFair",
         "MinimaxPareto"
-
         ###
-        #"M2FGBClassifier_pr",
+        "M2FGBClassifier_pr",
     ]
 
     n_params = args.n_params
@@ -644,7 +649,9 @@ def experiment_regression(args):
             now = datetime.datetime.now() - datetime.timedelta(hours=3)
             f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-        output_dir = f"../results_aaai/experiment_new/{dataset}_{n_groups}g/{model_name}"
+        output_dir = (
+            f"../results_aaai/experiment_new/{dataset}_{n_groups}g/{model_name}"
+        )
         args = {
             "dataset": dataset,
             "output_dir": output_dir,
