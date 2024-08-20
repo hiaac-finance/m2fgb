@@ -5,7 +5,7 @@ In recent years, fairness in machine learning has emerged as a critical concern 
 
 ## Overview
 
-This repository contains the implementation of M²FGB and executed experiments. The `scripts` directory contains Python scripts for data processing, model training, and evaluation, while the `notebooks` directory contains Jupyter notebooks for model experimentation, and visualization.
+This repository contains the implementation of M²FGB and executed experiments. The `scripts` directory contains Python scripts for data processing, model training, and evaluation, while the `notebooks` directory contains Jupyter notebooks with usage examples and visualization.
 
 ## Installation
 
@@ -40,5 +40,7 @@ The recommend way to run the code is to set a Docker container. The file `Docker
     ```bash
      python scripts/experiments.py
      ```
+
+     You can add the flag `--experiment reg` to run the regression experiment or `--experiment fair_weight` to run the experiment that eval the `fair_weight` parameter.
 
 2. **M²FGB**: Example usage of the propposed technique is present at `notebooks/usage_m2fgb.ipynb`.
