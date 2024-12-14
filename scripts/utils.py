@@ -44,6 +44,14 @@ def fnr_score(y_ground, y_pred):
     return fnr
 
 
+def fpr_score(y_ground, y_pred):
+    """Calculates the false positive rate"""
+    fp = ((y_pred == 1) & (y_ground == 0)).sum()
+    tn = ((y_pred == 0) & (y_ground == 0)).sum()
+    fpr = fp / (fp + tn)
+    return fpr
+
+
 def tpr_score(y_ground, y_pred):
     """Calculates the true positive rate"""
     fn = ((y_pred == 0) & (y_ground == 1)).sum()
@@ -109,6 +117,35 @@ def min_true_positive_rate(y_ground, y_pred, A):
     return 1 - min_tpr
 
 
+def group_level_tpr(y_ground, y_pred, A):
+    m = {}
+    for a in np.unique(A):
+        m[f"tpr_g={a}"] = np.mean(y_pred[(A == a) & (y_ground == 1)])
+    return m
+
+
+def max_fnr_score(y_ground, y_pred, A):
+    max_fnr = -np.inf
+    for a in np.unique(A):
+        # check if the group has any positive class
+        if np.sum(y_ground[A == a]) == 0:
+            continue
+        fnr = fnr_score(y_ground[A == a], y_pred[A == a])
+        max_fnr = max(max_fnr, fnr)
+    return max_fnr
+
+
+def max_fpr_score(y_ground, y_pred, A):
+    max_fpr = -np.inf
+    for a in np.unique(A):
+        # check if the group has any negative class
+        if np.sum(1 - y_ground[A == a]) == 0:
+            continue
+        fpr = fpr_score(y_ground[A == a], y_pred[A == a])
+        max_fpr = max(max_fpr, fpr)
+    return max_fpr
+
+
 def statistical_parity_score(y_ground, y_pred, A):
     """Calculate the difference between probability of true outcome of the groups.
     If A has two values, it must be 0 and 1, and it can also be applied to more than two groups (the result is the difference between the max value and min value).
@@ -164,6 +201,13 @@ def min_positive_rate(y_ground, y_pred, A):
     return 1 - min_pr
 
 
+def group_level_pr(y_ground, y_pred, A):
+    m = {}
+    for a in np.unique(A):
+        m[f"pr_g={a}"] = np.mean(y_pred[A == a])
+    return m
+
+
 def min_balanced_accuracy(y_ground, y_pred, A):
     """Calculate the minimum balanced accuracy among groups.
     It will return 1 - bal_acc so that values close to 0 are better.
@@ -190,6 +234,46 @@ def min_balanced_accuracy(y_ground, y_pred, A):
     return 1 - min_bal_acc
 
 
+def group_level_bacc(y_ground, y_pred, A):
+    m = {}
+    for a in np.unique(A):
+        m[f"bacc_g={a}"] = balanced_accuracy_score(y_ground[A == a], y_pred[A == a])
+    return m
+
+
+def min_accuracy(y_ground, y_pred, A):
+    """Calculate the minimum accuracy among groups.
+    It will return 1 - acc so that values close to 0 are better.
+    It work with multiple groups.
+
+    Parameters
+    ----------
+    y_ground : ndarray
+        Ground truth labels in {0, 1}
+    y_prob : ndarray
+        Predicted class
+    A : ndarray
+        Group labels
+
+    Returns
+    -------
+    float
+        1 - Minimum accuracy
+    """
+    min_acc = np.inf
+    for a in np.unique(A):
+        acc = accuracy_score(y_ground[A == a], y_pred[A == a])
+        min_acc = min(min_acc, acc)
+    return 1 - min_acc
+
+
+def group_level_acc(y_ground, y_pred, A):
+    m = {}
+    for a in np.unique(A):
+        m[f"acc_g={a}"] = accuracy_score(y_ground[A == a], y_pred[A == a])
+    return m
+
+
 def get_combined_metrics_scorer(
     alpha=1, performance_metric="acc", fairness_metric="eod"
 ):
@@ -211,6 +295,8 @@ def get_combined_metrics_scorer(
             fair = min_positive_rate(y_ground, y_pred, A)
         elif fairness_metric == "min_bal_acc":
             fair = min_balanced_accuracy(y_ground, y_pred, A)
+        elif fairness_metric == "min_acc":
+            fair = min_accuracy(y_ground, y_pred, A)
 
         return alpha * perf + (1 - alpha) * (1 - abs(fair))
 
@@ -288,24 +374,25 @@ def equalized_loss_score(y_ground, y_prob, A):
 
     return np.mean(loss[A == 1]) - np.mean(loss[A == 0])
 
+
 def logloss_group(y_ground, y_prob, A, fairness_constraint):
     """For each subgroup, calculates the mean log loss of the samples."""
     eps = 1e-15
     y_prob = np.clip(y_prob, eps, 1 - eps)
     if fairness_constraint == "equalized_loss":
         loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
-    if fairness_constraint == "demographic_parity":
+    if fairness_constraint == "positive_rate":
         y_ = np.ones(y_ground.shape[0])  # all positive class
         loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
-    elif fairness_constraint == "equal_opportunity":
+    elif fairness_constraint == "true_positive_rate":
         loss = -(y_ground * np.log(y_prob) + (1 - y_ground) * np.log(1 - y_prob))
-        loss[y_ground == 0] = 0  # only consider the loss of the positive class
+        loss[y_ground == 0] = np.nan  # only consider the loss of the positive class
 
-    loss = np.array([np.mean(loss[A == a]) for a in np.unique(A)])
+    loss = np.array([np.nanmean(loss[A == a]) for a in np.unique(A)])
     return loss
 
 
-def max_logloss_score(y_ground, y_prob, A):
+def max_logloss_score(y_ground, y_prob, A, fairness_constraint = "equalized_loss"):
     """Calculate the minimum mean loss of the groups. The loss is binary cross entropy.
     It work with multiple groups.
 
@@ -323,9 +410,68 @@ def max_logloss_score(y_ground, y_prob, A):
     float
         Minimum mean loss of groups
     """
-    logloss = logloss_group(y_ground, y_prob, A, "equalized_loss")
+    logloss = logloss_group(y_ground, y_prob, A, fairness_constraint)
     return max(logloss)
 
 
 def logloss_score(y_ground, y_pred):
+    y_pred = np.clip(y_pred, 1e-15, 1 - 1e-15)
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
+
+
+def max_mse(y_ground, y_pred, A):
+    max_mse = -np.inf
+    for a in np.unique(A):
+        mse = np.mean((y_ground[A == a] - y_pred[A == a]) ** 2)
+        max_mse = max(max_mse, mse)
+    return max_mse
+
+
+def group_level_mse(y_ground, y_pred, A):
+    r = {}
+    for a in np.unique(A):
+        r[f"mse_g={a}"] = np.mean((y_ground[A == a] - y_pred[A == a]) ** 2)
+    return r
+
+def group_ratio(A):
+    r = {}
+    for a in np.unique(A):
+        r[f"ratio_g={a}"] =  len(A) / np.sum(A == a)
+    return r
+
+
+def get_fairness_metrics(y_true, y_pred, y_score, A):
+    min_acc = []
+    min_bal_acc = []
+    min_tpr = []
+    min_pr = []
+    max_logloss = []
+    max_logloss_tpr = []
+
+    for a in np.unique(A):
+        y_true_a = y_true[A == a]
+        y_score_a = y_score[A == a]
+        y_pred_a = y_pred[A == a]
+
+        min_acc.append(accuracy_score(y_true_a, y_pred_a))
+        min_bal_acc.append(balanced_accuracy_score(y_true_a, y_pred_a))
+        min_tpr.append(tpr_score(y_true_a, y_pred_a))
+        min_pr.append(np.mean(y_pred_a))
+        max_logloss.append(logloss_score(y_true_a, y_score_a))
+        max_logloss_tpr.append(logloss_score(
+            y_true_a[y_true_a == 1], y_score_a[y_true_a == 1]
+        ))
+
+
+    
+    return {
+        "min_acc": min(min_acc),
+        "min_bal_acc": min(min_bal_acc),
+        "min_tpr": min(min_tpr),
+        "min_pr": min(min_pr),
+        "max_logloss": max(max_logloss),
+        "max_logloss_tpr": max(max_logloss_tpr),
+        "eod" : max(min_tpr) - min(min_tpr),
+        "spd" : max(min_pr) - min(min_pr),
+        "eq_loss" : max(max_logloss) - min(max_logloss)
+    }

@@ -369,7 +369,7 @@ def APSTAR(bs_optimal, mua_ini, niter = 100, max_patience = 20, Kini=1,
 
 class SKLearn_Weighted_LLR():
 
-    def __init__(self, x_train, y_train, a_train, x_val, y_val, a_val, C_reg=1e7, max_iter = 100):
+    def __init__(self, x_train, y_train, a_train, x_val, y_val, a_val, C_reg=1e7, max_iter = 100, fairness_constraint = "equalized_loss"):
         from sklearn.linear_model import LogisticRegression
         self.model = LogisticRegression(solver='saga', max_iter=max_iter, C=C_reg)
         self.x_train = x_train
@@ -378,6 +378,7 @@ class SKLearn_Weighted_LLR():
         self.x_val = x_val
         self.y_val = y_val
         self.a_val = a_val
+        self.fairness_constraint = fairness_constraint
 
     def weighted_fit(self, x, y, a, mu):
         sample_weights = np.take(mu, a)
@@ -388,13 +389,22 @@ class SKLearn_Weighted_LLR():
         risks = []
         for a in np.unique(a_val):
             mask = a_val == a
-            y_mask = y_val[mask]
+            y_mask = y_val[mask].astype(int)
             x_mask = x_val[mask]
             log_proba = self.model.predict_log_proba(x_mask)
-            running_risk = []
-            for idx in range(len(y_mask)):
-                running_risk.append(-log_proba[idx, y_mask[idx]])
-            risks.append(np.mean(running_risk))
+            if self.fairness_constraint == "equalized_loss":
+                risks.append(-np.mean(log_proba[np.arange(len(y_mask)), y_mask]))
+            elif self.fairness_constraint == "true_positive_rate":
+                risks.append(-np.mean(log_proba[np.arange(len(y_mask)), y_mask][y_mask == 1]))
+
+
+            #running_risk = []
+            #for idx in range(len(y_mask)):
+            #    if self.fairness_constraint == "equalized_loss":
+            #        running_risk.append(-log_proba[idx, y_mask[idx]])
+            #    elif self.fairness_constraint == "true_positive_rate" and y_mask[idx] == 1:
+            #        running_risk.append(-log_proba[idx, y_mask[idx]])
+            #risks.append(np.mean(running_risk))
         return np.array(risks)
 
     def __call__(self, mu):

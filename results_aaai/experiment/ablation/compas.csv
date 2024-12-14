@@ -1,0 +1,5 @@
+,acc_train,acc_train,acc_test,acc_test,min_acc_train,min_acc_train,min_acc_test,min_acc_test
+,mean,std,mean,std,mean,std,mean,std
+model,,,,,,,,
+LGBMClassifier,0.565,0.033,0.563,0.028,0.489,0.054,0.491,0.05
+M2FGBClassifier,0.558,0.093,0.554,0.089,0.483,0.138,0.501,0.127
