@@ -281,7 +281,12 @@ def get_subgroup_feature(dataset, X, n_groups=2):
 
             A = X.RAC1P.apply(race_cat)
         elif dataset == "enem" or dataset == "enemreg":
-            A = X.racebin.astype(str) + "_" + X.sexbin.astype(str)
+            def race_cat(race):
+                if race in ["White"]:
+                    return "1"
+                else:
+                    return "0"
+            A = X.racebin.apply(race_cat).astype(str) + "_" + X.sexbin.astype(str)
     
     elif n_groups == 6:
         if dataset == "german":
