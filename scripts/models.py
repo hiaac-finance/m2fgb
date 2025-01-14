@@ -124,8 +124,7 @@ def get_subgroup_indicator(subgroup):
 def dual_obj_cls(
     subgroup,
     fair_weight,
-    group_losses,
-    mu_opt_list,
+    info,
     fairness_constraint="equalized_loss",
     dual_learning="optim",
     multiplier_learning_rate=0.1,
@@ -156,7 +155,7 @@ def dual_obj_cls(
         y_pred = 1 / (1 + np.exp(-predt))
         y_pred = np.clip(y_pred, 1e-7, 1 - 1e-7)  # avoid log(0)
         loss_group = logloss_group(y_pred, y_true, subgroup, fairness_constraint)
-        group_losses.append(loss_group)
+        epsilon = np.max(loss_group)
 
         if dual_learning == "optim":
             # dual problem solved analytically
@@ -167,49 +166,45 @@ def dual_obj_cls(
             mu_opt[idx_biggest_loss] = fair_weight
 
         elif dual_learning == "gradient":
-            if mu_opt_list[0] is None:
+            if len(info) == 0:
                 mu_opt = np.zeros(loss_group.shape[0])
             else:
-                mu_opt = mu_opt_list[-1].copy()
+                mu_opt = info[-1]["mu"].copy()
             mu_opt += multiplier_learning_rate * fair_weight * loss_group
 
         elif dual_learning == "gradient_norm":
-            if mu_opt_list[0] is None:
-                mu_opt = loss_group
+            if len(info) == 0:
+                mu_opt = np.ones(loss_group.shape[0])
             else:
-                mu_opt = mu_opt_list[-1].copy()
-
-            mu_opt += multiplier_learning_rate * loss_group
+                mu_opt = info[-1]["mu"].copy()
+                mu_opt += multiplier_learning_rate * (loss_group - epsilon)
             mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
 
         elif dual_learning == "gradient_norm2":
-            if mu_opt_list[0] is None:
-                mu_opt = loss_group
+            if len(info) == 0:
+                mu_opt = np.ones(loss_group.shape[0])
             else:
-                mu_opt = mu_opt_list[-1].copy()
-
-            mu_opt += multiplier_learning_rate * loss_group
+                mu_opt = info[-1]["mu"].copy()
+                mu_opt += multiplier_learning_rate * (loss_group - epsilon)
+            # to make sure that mu is positive
+            if np.min(mu_opt) < 0:
+                mu_opt = mu_opt - np.min(mu_opt)
             mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
 
-        if mu_opt_list[0] is None:
-            mu_opt_list[0] = mu_opt
-        else:
-            mu_opt_list.append(mu_opt)
 
+        info.append({
+            "loss": loss_group,
+            "mu": mu_opt,
+            "epsilon" : epsilon,
+        })
         grad_fair = logloss_group_grad(y_pred, y_true, fairness_constraint)
-        # grad_fair = I * grad_fair.reshape(-1, 1) @ mu_opt
         grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu_opt
 
         hess_fair = logloss_group_hess(y_pred, y_true, fairness_constraint)
         hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu_opt
-        # hess_fair = I * hess_fair.reshape(-1, 1) @ mu_opt
 
         grad = logloss_grad(y_pred, y_true)
         hess = logloss_hessian(y_pred, y_true)
-
-        # It is not necessary to multiply fairness gradient by fair_weight because it is already included on mu
-        # grad = (1 - fair_weight) * grad + fair_weight * grad_fair
-        # hess = (1 - fair_weight) * hess + fair_weight * hess_fair
 
         grad = (1 - fair_weight) * grad + grad_fair
         hess = (1 - fair_weight) * hess + hess_fair
@@ -330,8 +325,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
 
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
-        self.group_losses = []
-        self.mu_opt_list = [None]
+        self.info = []
         dtrain = lgb.Dataset(X, label=y)
         if X_val is not None:
             if isinstance(X_val, pd.DataFrame):
@@ -357,8 +351,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
             "objective": dual_obj_cls(
                 sensitive_attribute,
                 self.fair_weight,
-                self.group_losses,
-                self.mu_opt_list,
+                self.info,
                 self.fairness_constraint,
                 self.dual_learning,
                 self.multiplier_learning_rate,
@@ -393,8 +386,6 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
                 dtrain,
                 num_boost_round=self.n_estimators,
             )
-        self.group_losses = np.array(self.group_losses)
-        self.mu_opt_list = np.array(self.mu_opt_list)
         return self
 
     def predict(self, X):
