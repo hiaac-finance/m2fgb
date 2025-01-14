@@ -1,0 +1,5 @@
+,log_loss_train,log_loss_train,log_loss_test,log_loss_test,max_log_loss_train,max_log_loss_train,max_log_loss_test,max_log_loss_test
+,mean,std,mean,std,mean,std,mean,std
+model,,,,,,,,
+LGBMClassifier,0.392,0.051,0.507,0.025,0.482,0.058,0.619,0.035
+M2FGBClassifier,0.367,0.077,0.52,0.022,0.419,0.097,0.617,0.042
