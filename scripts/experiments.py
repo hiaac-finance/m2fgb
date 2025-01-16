@@ -457,7 +457,7 @@ def run_subgroup_experiment(args):
 
 
 def run_fair_weight_experiment():
-    thresh = "ks"
+    thresh = 0.5
     n_jobs = 10
     n_params = 100
     model_name = "M2FGBClassifier_tpr"
@@ -484,7 +484,7 @@ def run_fair_weight_experiment():
             now = datetime.datetime.now() - datetime.timedelta(hours=3)
             f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
-        output_dir = f"../results_aaai/experiment_new/fair_weight/{dataset}_{n_groups}g/{model_name}"
+        output_dir = f"../results_aaai/experiment/fair_weight/{dataset}_{n_groups}g/{model_name}"
 
         # create output directory if not exists
         if not os.path.exists(output_dir):
