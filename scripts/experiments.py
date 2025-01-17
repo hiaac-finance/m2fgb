@@ -57,10 +57,30 @@ def get_model(model_name, random_state=None):
                 **params,
             )
 
+    elif model_name == "M2FGBClassifier_v1_tpr":
+
+        def model(**params):
+            return models.M2FGBClassifier(
+                dual_learning="gradient_norm",
+                fairness_constraint="true_positive_rate",
+                random_state=random_state,
+                **params,
+            )
+
     elif model_name == "M2FGBClassifier_pr":
 
         def model(**params):
             return models.M2FGBClassifier(
+                fairness_constraint="positive_rate",
+                random_state=random_state,
+                **params,
+            )
+
+    elif model_name == "M2FGBClassifier_v1_pr":
+
+        def model(**params):
+            return models.M2FGBClassifier(
+                dual_learning="gradient_norm",
                 fairness_constraint="positive_rate",
                 random_state=random_state,
                 **params,
@@ -127,8 +147,11 @@ def get_param_spaces(model_name):
     """Helper function to get parameter space from model name."""
     if model_name not in [
         "M2FGBClassifier_tpr",
-        "M2FGBClassifier_v1",
         "M2FGBClassifier_pr",
+        "M2FGBClassifier_v1",
+        "M2FGBClassifier_v1_tpr",
+        "M2FGBClassifier_v1_pr",
+        "M2FGBRegressor_v1",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
         "MinimaxPareto_tpr",
@@ -149,13 +172,17 @@ def get_param_spaces_acsincome(model_name):
     if model_name not in [
         "M2FGBClassifier_tpr",
         "M2FGBClassifier_pr",
+        "M2FGBClassifier_v1",
+        "M2FGBClassifier_v1_tpr",
+        "M2FGBClassifier_v1_pr",
+        "M2FGBRegressor_v1",
         "FairGBMClassifier_eod",
         "MinMaxFair_tpr",
         "MinimaxPareto_tpr",
     ]:
         return PARAM_SPACES_ACSINCOME[model_name]
-    elif model_name == "M2FGBClassifier_tpr" or model_name == "M2FGBClassifier_pr":
-        return PARAM_SPACES_ACSINCOME["M2FGBClassifier"]
+    elif "M2FGBClassifier" in model_name:
+        return PARAM_SPACES["M2FGBClassifier"]
     elif model_name == "FairGBMClassifier_eod":
         return PARAM_SPACES_ACSINCOME["FairGBMClassifier"]
     elif model_name == "MinMaxFair_tpr":
@@ -282,20 +309,20 @@ def eval_model(
 
             y_val_score = model.predict_proba(X_val)[:, 1]
             y_test_score = model.predict_proba(X_test)[:, 1]
-            # y_train_pred = y_train_score > thresh
+            y_train_pred = y_train_score > thresh
             y_val_pred = y_val_score > thresh
             y_test_pred = y_test_score > thresh
 
-            # results_train.append(
-            #     {
-            #         "model": m,
-            #         "thresh": thresh,
-            #         **get_classif_metrics(
-            #             Y_train, y_train_pred, y_train_score, A_train
-            #         ),
-            #         "duration": duration,
-            #     }
-            # )
+            results_train.append(
+                {
+                    "model": m,
+                    "thresh": thresh,
+                    **get_classif_metrics(
+                        Y_train, y_train_pred, y_train_score, A_train
+                    ),
+                    "duration": duration,
+                }
+            )
             results_val.append(
                 {
                     "model": m,
@@ -318,14 +345,14 @@ def eval_model(
             y_val_pred = model.predict(X_val)
             y_test_pred = model.predict(X_test)
             thresh = 0.5
-            # results_train.append(
-            #     {
-            #         "model": m,
-            #         "thresh": thresh,
-            #         **get_reg_metrics(Y_train, y_train_pred, A_train),
-            #         "duration": duration,
-            #     }
-            # )
+            results_train.append(
+                {
+                    "model": m,
+                    "thresh": thresh,
+                    **get_reg_metrics(Y_train, y_train_pred, A_train),
+                    "duration": duration,
+                }
+            )
             results_val.append(
                 {
                     "model": m,
@@ -460,7 +487,7 @@ def run_fair_weight_experiment():
     thresh = 0.5
     n_jobs = 10
     n_params = 100
-    model_name = "M2FGBClassifier_tpr"
+    model_name = "M2FGBClassifier"
     fair_weight_list = [
         0.01,
         0.025,
@@ -650,7 +677,7 @@ def experiment_regression(args):
             f.write(f"Started: {dataset}, {n_groups}, {model_name} at {now}\n")
 
         output_dir = (
-            f"../results_aaai/experiment_new/{dataset}_{n_groups}g/{model_name}"
+            f"../results_aaai/experiment/{dataset}_{n_groups}g/{model_name}"
         )
         args = {
             "dataset": dataset,

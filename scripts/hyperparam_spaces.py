@@ -5,7 +5,7 @@ PARAM_SPACES = {
         "learning_rate": {"type": "float", "low": 1e-2, "high": 0.5, "log": True},
         "num_leaves": {"type": "int", "low": 2, "high": 64},
         "reg_lambda": {"type": "float", "low": 0.001, "high": 1000, "log": True},
-        "fair_weight": {"type": "float", "low": 1e-3, "high": 1},
+        "fair_weight": {"type": "float", "low": 1e-3, "high": 1, "log" : True},
         "multiplier_learning_rate": {
             "type": "float",
             "low": 1e-3,
