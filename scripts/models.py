@@ -190,6 +190,12 @@ def dual_obj_cls(
             if np.min(mu_opt) < 0:
                 mu_opt = mu_opt - np.min(mu_opt)
             mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
+        elif dual_learning == "fixed":
+            mu_opt = np.ones(loss_group.shape[0])
+            mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
+
+        elif dual_learning == "zero":
+            mu_opt = np.zeros(loss_group.shape[0])
 
 
         info.append({
@@ -208,7 +214,6 @@ def dual_obj_cls(
 
         grad = (1 - fair_weight) * grad + grad_fair
         hess = (1 - fair_weight) * hess + hess_fair
-
         return grad, hess
 
     return custom_obj
@@ -247,7 +252,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
         self,
         fairness_constraint="equalized_loss",
         fair_weight=0.5,
-        dual_learning="gradient_norm2",
+        dual_learning="gradient_norm",
         multiplier_learning_rate=0.1,
         n_estimators=100,
         learning_rate=0.1,
@@ -266,7 +271,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
             "positive_rate",
             "true_negative_rate",
         ]
-        assert dual_learning in ["optim", "gradient", "gradient_norm", "gradient_norm2"]
+        assert dual_learning in ["optim", "gradient", "gradient_norm", "gradient_norm2", "fixed", "zero"]
 
         assert fair_weight >= 0 and fair_weight <= 1
 
@@ -396,11 +401,11 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
         preds = 1 / (1 + np.exp(-log_odds))
         return (preds > 0.5).astype(int)
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, start_iteration = 0, num_iteration = None):
         """Predict the probabilities of the data."""
         check_is_fitted(self)
         X = check_array(X)
-        log_odds = self.model_.predict(X)
+        log_odds = self.model_.predict(X, start_iteration = start_iteration, num_iteration = num_iteration)
         preds_pos = 1 / (1 + np.exp(-log_odds))
         preds = np.ones((preds_pos.shape[0], 2))
         preds[:, 1] = preds_pos
@@ -856,16 +861,14 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
 
         X, y = check_X_y(X, y)
         self.range_ = [np.min(y), np.max(y)]
-        self.group_losses = []
-        self.mu_opt_list = [None]
+        self.info = []
         dtrain = lgb.Dataset(X, label=y)
 
         params = {
             "objective": dual_obj_reg(
                 sensitive_attribute,
                 self.fair_weight,
-                self.group_losses,
-                self.mu_opt_list,
+                self.info,
                 self.fairness_constraint,
                 self.dual_learning,
                 self.multiplier_learning_rate,
@@ -888,8 +891,6 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
             dtrain,
             num_boost_round=self.n_estimators,
         )
-        self.group_losses = np.array(self.group_losses)
-        self.mu_opt_list = np.array(self.mu_opt_list)
         return self
 
     def predict(self, X):
@@ -903,8 +904,7 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
 def dual_obj_reg(
     subgroup,
     fair_weight,
-    group_losses,
-    mu_opt_list,
+    info,
     fairness_constraint="equalized_loss",
     dual_learning="optim",
     multiplier_learning_rate=0.1,
@@ -934,7 +934,7 @@ def dual_obj_reg(
         y_true = dtrain.get_label()
         y_pred = predt
         loss_group = squaredloss_group(y_pred, y_true, subgroup)
-        group_losses.append(loss_group)
+        epsilon = np.max(loss_group)
 
         if dual_learning == "optim":
             # dual problem solved analytically
@@ -945,35 +945,33 @@ def dual_obj_reg(
             mu_opt[idx_biggest_loss] = fair_weight
 
         elif dual_learning == "gradient":
-            if mu_opt_list[0] is None:
+            if len(info) == 0:
                 mu_opt = np.zeros(loss_group.shape[0])
             else:
-                mu_opt = mu_opt_list[-1].copy()
+                mu_opt = info[-1]["mu"].copy()
             mu_opt += multiplier_learning_rate * fair_weight * loss_group
 
         elif dual_learning == "gradient_norm":
-            if mu_opt_list[0] is None:
-                mu_opt = loss_group
+            if len(info) == 0:
+                mu_opt = np.ones(loss_group.shape[0])
             else:
-                mu_opt = mu_opt_list[-1].copy()
-
-            mu_opt += multiplier_learning_rate * loss_group
+                mu_opt = info[-1]["mu"].copy()
+                mu_opt += multiplier_learning_rate * (loss_group - epsilon)
             mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
 
         elif dual_learning == "gradient_norm2":
-            if mu_opt_list[0] is None:
+            if len(info) == 0:
                 mu_opt = np.ones(loss_group.shape[0])
             else:
-                mu_opt = mu_opt_list[-1].copy()
-
-            mu_opt += multiplier_learning_rate * loss_group
+                mu_opt = info[-1]["mu"].copy()
+                mu_opt += multiplier_learning_rate * (loss_group - epsilon)
             mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
-
-        if mu_opt_list[0] is None:
-            mu_opt_list[0] = mu_opt
-        else:
-            mu_opt_list.append(mu_opt)
-
+        
+        info.append({
+            "loss": loss_group,
+            "mu": mu_opt,
+            "epsilon" : epsilon
+        })
         grad_fair = squaredloss_grad(y_pred, y_true, fairness_constraint)
         grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu_opt
 
