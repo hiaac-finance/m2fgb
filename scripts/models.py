@@ -149,6 +149,13 @@ def dual_obj_cls(
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
     I = get_subgroup_indicator(subgroup)
+    mu = np.ones(I.shape[1])
+    mu = mu / np.sum(mu) * fair_weight
+    info.append({
+        "loss": np.ones(I.shape[1]),
+        "mu" : mu,
+        "epsilon" : 1,
+    })
 
     def custom_obj(predt, dtrain):
         y_true = dtrain.get_label()
@@ -156,58 +163,42 @@ def dual_obj_cls(
         y_pred = np.clip(y_pred, 1e-7, 1 - 1e-7)  # avoid log(0)
         loss_group = logloss_group(y_pred, y_true, subgroup, fairness_constraint)
         epsilon = np.max(loss_group)
+        mu = info[-1]["mu"].copy()
 
         if dual_learning == "optim":
             # dual problem solved analytically
             idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
             # if is more than one, randomly choose one
             idx_biggest_loss = np.random.choice(idx_biggest_loss)
-            mu_opt = np.zeros(loss_group.shape[0])
-            mu_opt[idx_biggest_loss] = fair_weight
+            mu_new = np.zeros(loss_group.shape[0])
+            mu_new[idx_biggest_loss] = fair_weight
 
-        elif dual_learning == "gradient":
-            if len(info) == 0:
-                mu_opt = np.zeros(loss_group.shape[0])
-            else:
-                mu_opt = info[-1]["mu"].copy()
-            mu_opt += multiplier_learning_rate * fair_weight * loss_group
+        elif dual_learning == "gradient":            
+            mu_new = mu + multiplier_learning_rate * fair_weight * loss_group
 
         elif dual_learning == "gradient_norm":
-            if len(info) == 0:
-                mu_opt = np.ones(loss_group.shape[0])
-            else:
-                mu_opt = info[-1]["mu"].copy()
-                mu_opt += multiplier_learning_rate * (loss_group - epsilon)
-            mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
+            mu_new = mu + multiplier_learning_rate * fair_weight * (loss_group - epsilon)
+            mu_new = projection_to_simplex(mu_new, z=fair_weight)
 
         elif dual_learning == "gradient_norm2":
-            if len(info) == 0:
-                mu_opt = np.ones(loss_group.shape[0])
-            else:
-                mu_opt = info[-1]["mu"].copy()
-                mu_opt += multiplier_learning_rate * (loss_group - epsilon)
+            mu_new = mu + multiplier_learning_rate * fair_weight * (loss_group - epsilon)
             # to make sure that mu is positive
-            if np.min(mu_opt) < 0:
-                mu_opt = mu_opt - np.min(mu_opt)
-            mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
-        elif dual_learning == "fixed":
-            mu_opt = np.ones(loss_group.shape[0])
-            mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
-
-        elif dual_learning == "zero":
-            mu_opt = np.zeros(loss_group.shape[0])
+            if np.min(mu_new) < 0:
+                mu_new = mu_new - np.min(mu_new)
+            #mu_new = np.clip(mu_new, 0, None)
+            mu_new = mu_new / np.sum(mu_new) * fair_weight
 
 
         info.append({
             "loss": loss_group,
-            "mu": mu_opt,
+            "mu": mu_new,
             "epsilon" : epsilon,
         })
         grad_fair = logloss_group_grad(y_pred, y_true, fairness_constraint)
-        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu_opt
+        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu
 
         hess_fair = logloss_group_hess(y_pred, y_true, fairness_constraint)
-        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu_opt
+        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu
 
         grad = logloss_grad(y_pred, y_true)
         hess = logloss_hessian(y_pred, y_true)
@@ -929,12 +920,20 @@ def dual_obj_reg(
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
     I = get_subgroup_indicator(subgroup)
+    mu = np.ones(I.shape[1])
+    mu = mu / np.sum(mu) * fair_weight
+    info.append({
+        "loss": np.ones(I.shape[1]),
+        "mu" : mu,
+        "epsilon" : 1,
+    })
 
     def custom_obj(predt, dtrain):
         y_true = dtrain.get_label()
         y_pred = predt
         loss_group = squaredloss_group(y_pred, y_true, subgroup)
         epsilon = np.max(loss_group)
+        mu = info[-1]["mu"].copy()
 
         if dual_learning == "optim":
             # dual problem solved analytically
@@ -945,38 +944,26 @@ def dual_obj_reg(
             mu_opt[idx_biggest_loss] = fair_weight
 
         elif dual_learning == "gradient":
-            if len(info) == 0:
-                mu_opt = np.zeros(loss_group.shape[0])
-            else:
-                mu_opt = info[-1]["mu"].copy()
-            mu_opt += multiplier_learning_rate * fair_weight * loss_group
+            mu_new = mu + multiplier_learning_rate * fair_weight * loss_group
 
         elif dual_learning == "gradient_norm":
-            if len(info) == 0:
-                mu_opt = np.ones(loss_group.shape[0])
-            else:
-                mu_opt = info[-1]["mu"].copy()
-                mu_opt += multiplier_learning_rate * (loss_group - epsilon)
-            mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
+            mu_new = mu + multiplier_learning_rate * (loss_group - epsilon)
+            mu_new = projection_to_simplex(mu_new, z=fair_weight)
 
         elif dual_learning == "gradient_norm2":
-            if len(info) == 0:
-                mu_opt = np.ones(loss_group.shape[0])
-            else:
-                mu_opt = info[-1]["mu"].copy()
-                mu_opt += multiplier_learning_rate * (loss_group - epsilon)
-            mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
+            mu_new = mu + multiplier_learning_rate * (loss_group - epsilon)
+            mu_new = mu_new / np.sum(mu_new) * fair_weight
         
         info.append({
             "loss": loss_group,
-            "mu": mu_opt,
+            "mu": mu_new,
             "epsilon" : epsilon
         })
         grad_fair = squaredloss_grad(y_pred, y_true, fairness_constraint)
-        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu_opt
+        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu
 
         hess_fair = squaredloss_hess(y_pred, y_true, fairness_constraint)
-        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu_opt
+        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu
 
         grad = squaredloss_grad(y_pred, y_true)
         hess = squaredloss_hess(y_pred, y_true)
