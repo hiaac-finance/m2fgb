@@ -619,7 +619,7 @@ def experiment_classification(args):
         "MinMaxFair_tpr",
         "MinimaxPareto_tpr"
         ###
-        "M2FGBClassifier",
+        "M2FGBClassifier",  
         "FairGBMClassifier",
         "MinMaxFair",
         "MinimaxPareto"

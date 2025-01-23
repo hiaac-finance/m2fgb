@@ -373,7 +373,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
                 num_boost_round=self.n_estimators,
                 feval=custom_metric,
                 callbacks=[
-                    lgb.early_stopping(stopping_rounds=10, min_delta = 1e-4),
+                    lgb.early_stopping(stopping_rounds=10, min_delta = 1e-5),
                 ],
             )
         else:
