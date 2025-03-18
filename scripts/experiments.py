@@ -487,7 +487,7 @@ def run_fair_weight_experiment():
     thresh = 0.5
     n_jobs = 10
     n_params = 100
-    model_name = "M2FGBClassifier"
+    model_name = "M2FGBClassifier_tpr"
     fair_weight_list = [
         0.01,
         0.025,
