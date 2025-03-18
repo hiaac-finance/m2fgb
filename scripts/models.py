@@ -124,8 +124,7 @@ def get_subgroup_indicator(subgroup):
 def dual_obj_cls(
     subgroup,
     fair_weight,
-    group_losses,
-    mu_opt_list,
+    info,
     fairness_constraint="equalized_loss",
     dual_learning="optim",
     multiplier_learning_rate=0.1,
@@ -150,70 +149,62 @@ def dual_obj_cls(
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
     I = get_subgroup_indicator(subgroup)
+    mu = np.ones(I.shape[1])
+    mu = mu / np.sum(mu) * fair_weight
+    info.append({
+        "loss": np.ones(I.shape[1]),
+        "mu" : mu,
+        "epsilon" : 1,
+    })
 
     def custom_obj(predt, dtrain):
         y_true = dtrain.get_label()
         y_pred = 1 / (1 + np.exp(-predt))
         y_pred = np.clip(y_pred, 1e-7, 1 - 1e-7)  # avoid log(0)
         loss_group = logloss_group(y_pred, y_true, subgroup, fairness_constraint)
-        group_losses.append(loss_group)
+        epsilon = np.max(loss_group)
+        mu = info[-1]["mu"].copy()
 
         if dual_learning == "optim":
             # dual problem solved analytically
             idx_biggest_loss = np.where(loss_group == np.max(loss_group))[0]
             # if is more than one, randomly choose one
             idx_biggest_loss = np.random.choice(idx_biggest_loss)
-            mu_opt = np.zeros(loss_group.shape[0])
-            mu_opt[idx_biggest_loss] = fair_weight
+            mu_new = np.zeros(loss_group.shape[0])
+            mu_new[idx_biggest_loss] = fair_weight
 
-        elif dual_learning == "gradient":
-            if mu_opt_list[0] is None:
-                mu_opt = np.zeros(loss_group.shape[0])
-            else:
-                mu_opt = mu_opt_list[-1].copy()
-            mu_opt += multiplier_learning_rate * fair_weight * loss_group
+        elif dual_learning == "gradient":            
+            mu_new = mu + multiplier_learning_rate * fair_weight * loss_group
 
         elif dual_learning == "gradient_norm":
-            if mu_opt_list[0] is None:
-                mu_opt = loss_group
-            else:
-                mu_opt = mu_opt_list[-1].copy()
-
-            mu_opt += multiplier_learning_rate * loss_group
-            mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
+            mu_new = mu + multiplier_learning_rate * fair_weight * (loss_group - epsilon)
+            mu_new = projection_to_simplex(mu_new, z=fair_weight)
 
         elif dual_learning == "gradient_norm2":
-            if mu_opt_list[0] is None:
-                mu_opt = loss_group
-            else:
-                mu_opt = mu_opt_list[-1].copy()
+            mu_new = mu + multiplier_learning_rate * fair_weight * (loss_group - epsilon)
+            # to make sure that mu is positive
+            if np.min(mu_new) < 0:
+                mu_new = mu_new - np.min(mu_new)
+            #mu_new = np.clip(mu_new, 0, None)
+            mu_new = mu_new / np.sum(mu_new) * fair_weight
 
-            mu_opt += multiplier_learning_rate * loss_group
-            mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
 
-        if mu_opt_list[0] is None:
-            mu_opt_list[0] = mu_opt
-        else:
-            mu_opt_list.append(mu_opt)
-
+        info.append({
+            "loss": loss_group,
+            "mu": mu_new,
+            "epsilon" : epsilon,
+        })
         grad_fair = logloss_group_grad(y_pred, y_true, fairness_constraint)
-        # grad_fair = I * grad_fair.reshape(-1, 1) @ mu_opt
-        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu_opt
+        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu
 
         hess_fair = logloss_group_hess(y_pred, y_true, fairness_constraint)
-        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu_opt
-        # hess_fair = I * hess_fair.reshape(-1, 1) @ mu_opt
+        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu
 
         grad = logloss_grad(y_pred, y_true)
         hess = logloss_hessian(y_pred, y_true)
 
-        # It is not necessary to multiply fairness gradient by fair_weight because it is already included on mu
-        # grad = (1 - fair_weight) * grad + fair_weight * grad_fair
-        # hess = (1 - fair_weight) * hess + fair_weight * hess_fair
-
         grad = (1 - fair_weight) * grad + grad_fair
         hess = (1 - fair_weight) * hess + hess_fair
-
         return grad, hess
 
     return custom_obj
@@ -252,7 +243,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
         self,
         fairness_constraint="equalized_loss",
         fair_weight=0.5,
-        dual_learning="gradient_norm2",
+        dual_learning="gradient_norm",
         multiplier_learning_rate=0.1,
         n_estimators=100,
         learning_rate=0.1,
@@ -271,7 +262,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
             "positive_rate",
             "true_negative_rate",
         ]
-        assert dual_learning in ["optim", "gradient", "gradient_norm", "gradient_norm2"]
+        assert dual_learning in ["optim", "gradient", "gradient_norm", "gradient_norm2", "fixed", "zero"]
 
         assert fair_weight >= 0 and fair_weight <= 1
 
@@ -330,12 +321,16 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
 
         X, y = check_X_y(X, y)
         self.classes_ = np.unique(y)
-        self.group_losses = []
-        self.mu_opt_list = [None]
+        self.info = []
         dtrain = lgb.Dataset(X, label=y)
         if X_val is not None:
-            sensitive_attribute_val = sensitive_attribute_val.values
-            dval = lgb.Dataset(X_val.values, label=Y_val.values)
+            if isinstance(X_val, pd.DataFrame):
+                X_val = X_val.values
+            if isinstance(Y_val, pd.Series):
+                Y_val = Y_val.values
+            if isinstance(sensitive_attribute_val, pd.Series):
+                sensitive_attribute_val = sensitive_attribute_val.values
+            dval = lgb.Dataset(X_val, label=Y_val)
 
         def custom_metric(preds, val_data):
             preds = 1 / (1 + np.exp(-preds))
@@ -352,8 +347,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
             "objective": dual_obj_cls(
                 sensitive_attribute,
                 self.fair_weight,
-                self.group_losses,
-                self.mu_opt_list,
+                self.info,
                 self.fairness_constraint,
                 self.dual_learning,
                 self.multiplier_learning_rate,
@@ -379,7 +373,7 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
                 num_boost_round=self.n_estimators,
                 feval=custom_metric,
                 callbacks=[
-                    lgb.early_stopping(stopping_rounds=25),
+                    lgb.early_stopping(stopping_rounds=10, min_delta = 1e-5),
                 ],
             )
         else:
@@ -388,8 +382,6 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
                 dtrain,
                 num_boost_round=self.n_estimators,
             )
-        self.group_losses = np.array(self.group_losses)
-        self.mu_opt_list = np.array(self.mu_opt_list)
         return self
 
     def predict(self, X):
@@ -400,11 +392,11 @@ class M2FGBClassifier(BaseEstimator, ClassifierMixin):
         preds = 1 / (1 + np.exp(-log_odds))
         return (preds > 0.5).astype(int)
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, start_iteration = 0, num_iteration = None):
         """Predict the probabilities of the data."""
         check_is_fitted(self)
         X = check_array(X)
-        log_odds = self.model_.predict(X)
+        log_odds = self.model_.predict(X, start_iteration = start_iteration, num_iteration = num_iteration)
         preds_pos = 1 / (1 + np.exp(-log_odds))
         preds = np.ones((preds_pos.shape[0], 2))
         preds[:, 1] = preds_pos
@@ -485,7 +477,12 @@ class LGBMClassifier:
             return "obj_function", l1, False
 
         if X_val is not None:
-            dval = lgb.Dataset(X_val.values, label=Y_val.values)
+            if isinstance(X_val, pd.DataFrame):
+                X_val = X_val.values
+            if isinstance(Y_val, pd.Series):
+                Y_val = Y_val.values
+
+            dval = lgb.Dataset(X_val, label=Y_val)
             self.model_ = lgb.train(
                 params,
                 dtrain,
@@ -493,7 +490,7 @@ class LGBMClassifier:
                 num_boost_round=self.n_estimators,
                 feval=custom_metric,
                 callbacks=[
-                    lgb.early_stopping(stopping_rounds=25),
+                    lgb.early_stopping(stopping_rounds=10, min_delta = 1e-4),
                 ],
             )
 
@@ -580,13 +577,14 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
                 y_ = y[idx]
                 y_pred_ = y_pred[idx]
                 y_pred_hat = y_pred_ > 0.5
-                logloss = (y_ == 1.0) * (-(y_ * np.log(y_pred_) + (1 - y_) * np.log(1 - y_pred_)))
+                logloss = (y_ == 1.0) * (
+                    -(y_ * np.log(y_pred_) + (1 - y_) * np.log(1 - y_pred_))
+                )
                 logloss = np.mean(logloss)
 
             min_logloss = min(min_logloss, logloss)
             max_logloss = max(max_logloss, logloss)
 
-        print(min_logloss, max_logloss)
         gamma_hat = min_logloss + self.gamma * (max_logloss - min_logloss)
 
         (
@@ -667,11 +665,13 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
         X = check_array(X)
 
         predictions = np.stack([model.predict_proba(X)[:, 1] for model in self.model])
-        idx = np.random.choice(predictions.shape[0], predictions.shape[1], replace=True).reshape(1, -1)
+        idx = np.random.choice(
+            predictions.shape[0], predictions.shape[1], replace=True
+        ).reshape(1, -1)
         predictions = np.take_along_axis(predictions, idx, axis=0)
         predictions = np.squeeze(predictions, axis=0)  # remove the extra dimension
-        predictions = np.stack([1-predictions, predictions], axis=1)
-        
+        predictions = np.stack([1 - predictions, predictions], axis=1)
+
         # def rand_pred(row):
         #     idx = np.random.choice(len(self.model))
         #     return self.model[idx].predict_proba(row.reshape(1, -1))
@@ -683,7 +683,14 @@ class MinMaxFair(BaseEstimator, ClassifierMixin):
 
 class MinimaxPareto(BaseEstimator, ClassifierMixin):
     def __init__(
-        self, n_iterations=100, C=1.0, Kini=1, Kmin=20, alpha=0.5, max_iter=100, fairness_constraint = "equalized_loss"
+        self,
+        n_iterations=100,
+        C=1.0,
+        Kini=1,
+        Kmin=20,
+        alpha=0.5,
+        max_iter=100,
+        fairness_constraint="equalized_loss",
     ):
         self.n_iterations = n_iterations
         self.C = C
@@ -707,7 +714,7 @@ class MinimaxPareto(BaseEstimator, ClassifierMixin):
             sensitive_attribute,
             C_reg=self.C,
             max_iter=self.max_iter,
-            fairness_constraint=self.fairness_constraint
+            fairness_constraint=self.fairness_constraint,
         )
 
         mu_ini = np.ones(len(sensitive_attribute.unique()))
@@ -845,16 +852,14 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
 
         X, y = check_X_y(X, y)
         self.range_ = [np.min(y), np.max(y)]
-        self.group_losses = []
-        self.mu_opt_list = [None]
+        self.info = []
         dtrain = lgb.Dataset(X, label=y)
 
         params = {
             "objective": dual_obj_reg(
                 sensitive_attribute,
                 self.fair_weight,
-                self.group_losses,
-                self.mu_opt_list,
+                self.info,
                 self.fairness_constraint,
                 self.dual_learning,
                 self.multiplier_learning_rate,
@@ -877,8 +882,6 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
             dtrain,
             num_boost_round=self.n_estimators,
         )
-        self.group_losses = np.array(self.group_losses)
-        self.mu_opt_list = np.array(self.mu_opt_list)
         return self
 
     def predict(self, X):
@@ -892,8 +895,7 @@ class M2FGBRegressor(BaseEstimator, RegressorMixin):
 def dual_obj_reg(
     subgroup,
     fair_weight,
-    group_losses,
-    mu_opt_list,
+    info,
     fairness_constraint="equalized_loss",
     dual_learning="optim",
     multiplier_learning_rate=0.1,
@@ -918,12 +920,20 @@ def dual_obj_reg(
         Learning rate used in the gradient learning of the dual, used only if dual_learning="gradient", by default 0.1
     """
     I = get_subgroup_indicator(subgroup)
+    mu = np.ones(I.shape[1])
+    mu = mu / np.sum(mu) * fair_weight
+    info.append({
+        "loss": np.ones(I.shape[1]),
+        "mu" : mu,
+        "epsilon" : 1,
+    })
 
     def custom_obj(predt, dtrain):
         y_true = dtrain.get_label()
         y_pred = predt
         loss_group = squaredloss_group(y_pred, y_true, subgroup)
-        group_losses.append(loss_group)
+        epsilon = np.max(loss_group)
+        mu = info[-1]["mu"].copy()
 
         if dual_learning == "optim":
             # dual problem solved analytically
@@ -934,40 +944,26 @@ def dual_obj_reg(
             mu_opt[idx_biggest_loss] = fair_weight
 
         elif dual_learning == "gradient":
-            if mu_opt_list[0] is None:
-                mu_opt = np.zeros(loss_group.shape[0])
-            else:
-                mu_opt = mu_opt_list[-1].copy()
-            mu_opt += multiplier_learning_rate * fair_weight * loss_group
+            mu_new = mu + multiplier_learning_rate * fair_weight * loss_group
 
         elif dual_learning == "gradient_norm":
-            if mu_opt_list[0] is None:
-                mu_opt = loss_group
-            else:
-                mu_opt = mu_opt_list[-1].copy()
-
-            mu_opt += multiplier_learning_rate * loss_group
-            mu_opt = projection_to_simplex(mu_opt, z=fair_weight)
+            mu_new = mu + multiplier_learning_rate * (loss_group - epsilon)
+            mu_new = projection_to_simplex(mu_new, z=fair_weight)
 
         elif dual_learning == "gradient_norm2":
-            if mu_opt_list[0] is None:
-                mu_opt = np.ones(loss_group.shape[0])
-            else:
-                mu_opt = mu_opt_list[-1].copy()
-
-            mu_opt += multiplier_learning_rate * loss_group
-            mu_opt = mu_opt / np.sum(mu_opt) * fair_weight
-
-        if mu_opt_list[0] is None:
-            mu_opt_list[0] = mu_opt
-        else:
-            mu_opt_list.append(mu_opt)
-
+            mu_new = mu + multiplier_learning_rate * (loss_group - epsilon)
+            mu_new = mu_new / np.sum(mu_new) * fair_weight
+        
+        info.append({
+            "loss": loss_group,
+            "mu": mu_new,
+            "epsilon" : epsilon
+        })
         grad_fair = squaredloss_grad(y_pred, y_true, fairness_constraint)
-        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu_opt
+        grad_fair = I.multiply(grad_fair.reshape(-1, 1)) @ mu
 
         hess_fair = squaredloss_hess(y_pred, y_true, fairness_constraint)
-        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu_opt
+        hess_fair = I.multiply(hess_fair.reshape(-1, 1)) @ mu
 
         grad = squaredloss_grad(y_pred, y_true)
         hess = squaredloss_hess(y_pred, y_true)
@@ -1087,8 +1083,8 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         b=0.5,
         gamma=0.0,
         relaxed=False,
-        C = 1.0,
-        max_iter = 100,
+        C=1.0,
+        max_iter=100,
     ):
         assert fairness_constraint in ["equalized_loss"]
         self.fairness_constraint = fairness_constraint
@@ -1107,12 +1103,7 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         error_type = "MSE"
 
         # train a logistic model to get min and max logloss
-        model = Ridge(
-            solver="saga",
-            max_iter=self.max_iter,
-            alpha = self.C
-
-        )
+        model = Ridge(solver="saga", max_iter=self.max_iter, alpha=self.C)
         model.fit(X, y)
         y_pred = model.predict(X)
         min_mse = np.inf
@@ -1197,10 +1188,12 @@ class MinMaxFairRegressor(BaseEstimator, RegressorMixin):
         X = check_array(X)
 
         predictions = np.stack([model.predict(X) for model in self.model])
-        idx = np.random.choice(predictions.shape[0], predictions.shape[1], replace=True).reshape(1, -1)
+        idx = np.random.choice(
+            predictions.shape[0], predictions.shape[1], replace=True
+        ).reshape(1, -1)
         predictions = np.take_along_axis(predictions, idx, axis=0)
         predictions = np.squeeze(predictions, axis=0)  # remove the extra dimension
-        
+
         # def rand_pred(row):
         #     idx = np.random.choice(len(self.model))
         #     return self.model[idx].predict_proba(row.reshape(1, -1))
