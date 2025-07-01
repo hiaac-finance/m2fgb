@@ -392,28 +392,6 @@ def logloss_group(y_ground, y_prob, A, fairness_constraint):
     return loss
 
 
-def max_logloss_score(y_ground, y_prob, A, fairness_constraint = "equalized_loss"):
-    """Calculate the minimum mean loss of the groups. The loss is binary cross entropy.
-    It work with multiple groups.
-
-    Parameters
-    ----------
-    y_ground : ndarray
-        Ground truth labels in {0, 1}
-    y_prob : ndarray
-        Predicted probabilities of the positive class
-    A : ndarray
-        Group labels
-
-    Returns
-    -------
-    float
-        Minimum mean loss of groups
-    """
-    logloss = logloss_group(y_ground, y_prob, A, fairness_constraint)
-    return max(logloss)
-
-
 def logloss_score(y_ground, y_pred):
     y_pred = np.clip(y_pred, 1e-15, 1 - 1e-15)
     return -np.mean(y_ground * np.log(y_pred) + (1 - y_ground) * np.log(1 - y_pred))
@@ -433,10 +411,11 @@ def group_level_mse(y_ground, y_pred, A):
         r[f"mse_g={a}"] = np.mean((y_ground[A == a] - y_pred[A == a]) ** 2)
     return r
 
+
 def group_ratio(A):
     r = {}
     for a in np.unique(A):
-        r[f"ratio_g={a}"] =  len(A) / np.sum(A == a)
+        r[f"ratio_g={a}"] = len(A) / np.sum(A == a)
     return r
 
 
@@ -458,12 +437,10 @@ def get_fairness_metrics(y_true, y_pred, y_score, A):
         min_tpr.append(tpr_score(y_true_a, y_pred_a))
         min_pr.append(np.mean(y_pred_a))
         max_logloss.append(logloss_score(y_true_a, y_score_a))
-        max_logloss_tpr.append(logloss_score(
-            y_true_a[y_true_a == 1], y_score_a[y_true_a == 1]
-        ))
+        max_logloss_tpr.append(
+            logloss_score(y_true_a[y_true_a == 1], y_score_a[y_true_a == 1])
+        )
 
-
-    
     return {
         "min_acc": min(min_acc),
         "min_bal_acc": min(min_bal_acc),
@@ -471,7 +448,7 @@ def get_fairness_metrics(y_true, y_pred, y_score, A):
         "min_pr": min(min_pr),
         "max_logloss": max(max_logloss),
         "max_logloss_tpr": max(max_logloss_tpr),
-        "eod" : max(min_tpr) - min(min_tpr),
-        "spd" : max(min_pr) - min(min_pr),
-        "eq_loss" : max(max_logloss) - min(max_logloss)
+        "eod": max(min_tpr) - min(min_tpr),
+        "spd": max(min_pr) - min(min_pr),
+        "eq_loss": max(max_logloss) - min(max_logloss),
     }
