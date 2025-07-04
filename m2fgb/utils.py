@@ -66,7 +66,7 @@ def logloss_group(
     """
     if fairness_constraint == "equalized_loss":
         loss = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
-    if fairness_constraint == "positive_rate":
+    elif fairness_constraint == "positive_rate":
         y_ = np.ones(y_true.shape[0])  # all positive class
         loss = -(y_ * np.log(y_pred) + (1 - y_) * np.log(1 - y_pred))
     elif fairness_constraint == "true_positive_rate":

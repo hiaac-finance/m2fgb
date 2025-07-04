@@ -58,9 +58,9 @@ class M2FGB(BaseEstimator):
         X: Union[np.ndarray, pd.DataFrame],
         y: Union[np.ndarray, pd.Series],
         sensitive_attribute: Union[np.ndarray, pd.Series],
-        X_val: Union[np.ndarray, pd.DataFrame],
-        y_val: Union[np.ndarray, pd.Series],
-        sensitive_attribute_val: Union[np.ndarray, pd.Series],
+        X_val: Union[np.ndarray, pd.DataFrame] = None,
+        y_val: Union[np.ndarray, pd.Series] = None,
+        sensitive_attribute_val: Union[np.ndarray, pd.Series] = None,
     ) -> "M2FGB":
         """Fit the model to the data.
 
@@ -72,6 +72,12 @@ class M2FGB(BaseEstimator):
             Labels array-like of shape (n_samples), must be (0 or 1)
         sensitive_attribute : pandas.Series or numpy.ndarray
             Sensitive attribute array-like of shape (n_samples)
+        X_val : pandas.DataFrame or numpy.ndarray, optional
+            Validation dataframe of shape (n_samples, n_features)
+        y_val : pandas.Series or numpy.ndarray, optional
+            Validation labels array-like of shape (n_samples), must be (0 or 1)
+        sensitive_attribute_val : pandas.Series or numpy.ndarray, optional
+            Validation sensitive attribute array-like of shape (n_samples)
 
         Returns
         -------
@@ -153,7 +159,18 @@ class M2FGB(BaseEstimator):
         return self
 
     def predict(self, X: Union[np.ndarray, pd.DataFrame]) -> np.ndarray:
-        """Base method to predict the labels of the data."""
+        """Base method to predict the labels of the data.
+        
+        Parameters
+        ----------
+        X : pandas.DataFrame or numpy.ndarray
+            Dataframe of shape (n_samples, n_features)
+
+        Returns
+        -------
+        np.ndarray
+            Predicted labels of shape (n_samples,)
+        """
         raise NotImplementedError("This method should be implemented in the subclasses.")
 
 
