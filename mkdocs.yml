@@ -1,0 +1,21 @@
+site_name:  M²FGB
+nav:
+- Home: index.md
+- Example: test_acsincome.md
+- Reference:
+  - M²FGB: reference/m2fgb.md
+  - utils: reference/utils.md
+
+
+theme: material
+
+plugins:
+- search
+- mkdocstrings:
+    handlers:
+      python:
+        paths: [m2fgb]
+        options:
+          docstring_style: numpy
+          show_root_heading: true
+          show_source: false
