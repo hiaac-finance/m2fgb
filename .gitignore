@@ -164,6 +164,4 @@ data/
 *.pkl
 
 figs/
-results/
-
 *log.txt
