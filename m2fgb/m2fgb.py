@@ -11,39 +11,40 @@ import lightgbm as lgb
 
 class M2FGB(BaseEstimator):
     """Class that extends the LightGBM model to optimize for min-max fairness with an Sklearn interface.
-        This is the base class for the M2FGBClassifier and M2FGBRegressor.
+    This is the base class for the M2FGBClassifier and M2FGBRegressor.
 
-        Parameters
-        ----------
-        fairness_constraint : str, optional
-            Fairness function to be optimize, by default "equalized_loss"
-        objective : str, optional
-            Learning objective, must be "binary" or "mse", by default "binary"
-        fair_weight : float, optional
-            Weight parameter of weighted objective, must be between 0 and 1, by default 0.5
-        n_estimators : int, optional
-            Number of boosting rounds, by default 100
-        learning_rate : float, optional
-            Learning rate of primal updates, by default 0.1
-        multiplier_learning_rate : float, optional
-            Learning rate of dual updates, by default 0.1
-        num_leaves : int, optional
-            Maximum number of leaves in a tree, by default 31
-        max_depth : int, optional
-            Max depth of a tree, by default -1
-        min_child_samples : int, optional
-            Minimum number of samples in a leaf, by default 20
-        min_child_weight : float, optional
-            Minimum sum of hessian of samples in a leaf, by default 1e-3
-        colsample_bytree : float, optional
-            Fraction of columns sampled to build each new estimator, by default 1.0
-        reg_alpha : float, optional
-            L1 regularization weight, by default 0.0
-        reg_lambda : float, optional
-            L2 regularization weight, by default 0.0
-        random_state : int, optional
-            Random seed, by default None
-        """
+    Parameters
+    ----------
+    fairness_constraint : str, optional
+        Fairness function to be optimize, by default "equalized_loss"
+    objective : str, optional
+        Learning objective, must be "binary" or "mse", by default "binary"
+    fair_weight : float, optional
+        Weight parameter of weighted objective, must be between 0 and 1, by default 0.5
+    n_estimators : int, optional
+        Number of boosting rounds, by default 100
+    learning_rate : float, optional
+        Learning rate of primal updates, by default 0.1
+    multiplier_learning_rate : float, optional
+        Learning rate of dual updates, by default 0.1
+    num_leaves : int, optional
+        Maximum number of leaves in a tree, by default 31
+    max_depth : int, optional
+        Max depth of a tree, by default -1
+    min_child_samples : int, optional
+        Minimum number of samples in a leaf, by default 20
+    min_child_weight : float, optional
+        Minimum sum of hessian of samples in a leaf, by default 1e-3
+    colsample_bytree : float, optional
+        Fraction of columns sampled to build each new estimator, by default 1.0
+    reg_alpha : float, optional
+        L1 regularization weight, by default 0.0
+    reg_lambda : float, optional
+        L2 regularization weight, by default 0.0
+    random_state : int, optional
+        Random seed, by default None
+    """
+
     def __init__(
         self,
         fairness_constraint: str = "equalized_loss",
@@ -194,7 +195,7 @@ class M2FGB(BaseEstimator):
 
     def predict(self, X: Union[np.ndarray, pd.DataFrame]) -> np.ndarray:
         """Base method to predict the labels of the data.
-        
+
         Parameters
         ----------
         X : pandas.DataFrame or numpy.ndarray
@@ -205,10 +206,45 @@ class M2FGB(BaseEstimator):
         np.ndarray
             Predicted labels of shape (n_samples,)
         """
-        raise NotImplementedError("This method should be implemented in the subclasses.")
+        raise NotImplementedError(
+            "This method should be implemented in the subclasses."
+        )
 
 
 class M2FGBClassifier(M2FGB, ClassifierMixin):
+    """Class that extends the LightGBM model to optimize for min-max fairness with an Sklearn interface.
+    This is the implementation for classification tasks.
+
+    Parameters
+    ----------
+    fairness_constraint : str, optional
+        Fairness function to be optimize, by default "equalized_loss"
+    fair_weight : float, optional
+        Weight parameter of weighted objective, must be between 0 and 1, by default 0.5
+    n_estimators : int, optional
+        Number of boosting rounds, by default 100
+    learning_rate : float, optional
+        Learning rate of primal updates, by default 0.1
+    multiplier_learning_rate : float, optional
+        Learning rate of dual updates, by default 0.1
+    num_leaves : int, optional
+        Maximum number of leaves in a tree, by default 31
+    max_depth : int, optional
+        Max depth of a tree, by default -1
+    min_child_samples : int, optional
+        Minimum number of samples in a leaf, by default 20
+    min_child_weight : float, optional
+        Minimum sum of hessian of samples in a leaf, by default 1e-3
+    colsample_bytree : float, optional
+        Fraction of columns sampled to build each new estimator, by default 1.0
+    reg_alpha : float, optional
+        L1 regularization weight, by default 0.0
+    reg_lambda : float, optional
+        L2 regularization weight, by default 0.0
+    random_state : int, optional
+        Random seed, by default None
+    """
+
     def __init__(
         self,
         fairness_constraint: str = "equalized_loss",
@@ -274,6 +310,39 @@ class M2FGBClassifier(M2FGB, ClassifierMixin):
 
 
 class M2FGBRegressor(M2FGB, RegressorMixin):
+    """Class that extends the LightGBM model to optimize for min-max fairness with an Sklearn interface.
+    This is the implementation for regression tasks.
+
+    Parameters
+    ----------
+    fairness_constraint : str, optional
+        Fairness function to be optimize, by default "equalized_loss"
+    fair_weight : float, optional
+        Weight parameter of weighted objective, must be between 0 and 1, by default 0.5
+    n_estimators : int, optional
+        Number of boosting rounds, by default 100
+    learning_rate : float, optional
+        Learning rate of primal updates, by default 0.1
+    multiplier_learning_rate : float, optional
+        Learning rate of dual updates, by default 0.1
+    num_leaves : int, optional
+        Maximum number of leaves in a tree, by default 31
+    max_depth : int, optional
+        Max depth of a tree, by default -1
+    min_child_samples : int, optional
+        Minimum number of samples in a leaf, by default 20
+    min_child_weight : float, optional
+        Minimum sum of hessian of samples in a leaf, by default 1e-3
+    colsample_bytree : float, optional
+        Fraction of columns sampled to build each new estimator, by default 1.0
+    reg_alpha : float, optional
+        L1 regularization weight, by default 0.0
+    reg_lambda : float, optional
+        L2 regularization weight, by default 0.0
+    random_state : int, optional
+        Random seed, by default None
+    """
+
     def __init__(
         self,
         fairness_constraint: str = "equalized_loss",
