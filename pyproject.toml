@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "m2fgb"
+version = "1.0"
+description = "A package for fair machine learning with gradient boosting."
+readme = "README.md"
+readme-content-type = "text/markdown"
+authors = [
+    { name = "Giovani Valdrighi", email = "giovani.valdrighi@ic.unicamp.br" }
+]
+license = { text = "MIT" }
+keywords = ["fairness", "machine-learning", "gradient-boosting", "lightgbm"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Development Status :: 4 - Beta",
+    "Natural Language :: English",
+    "Framework :: Scikit-learn",
+    "Framework :: LightGBM"
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "scikit-learn>=0.24.0",
+    "lightgbm>=3.2.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/hiaac-finance/m2fgb"
+Source = "https://github.com/hiaac-finance/m2fgb"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["m2fgb*"]

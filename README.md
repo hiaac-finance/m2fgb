@@ -9,22 +9,11 @@ This repository contains the implementation of M²FGB and executed experiments. 
 
 ## Installation
 
-The recommend way to run the code is to set a Docker container. The file `Dockerfile`contains the configuration of the container utilized during development. Another way is to have Python installed on your machine. It is recommended to use a virtual environment to manage dependencies. Follow the steps below to set up your environment:
+We recommend using [uv](https://docs.astral.sh/uv/) to install the package. Create a virtual environment and install the package with the following command:
 
-1. Create a virtual environment:
-   ```bash
-   python3 -m venv venv
-   ```
-
-2. Activate the virtual environment. On macOS/Linux:
-     ```bash
-     source venv/bin/activate
-     ```
-    
-3. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+pip install .
+```
 
 ## Directory Structure
 
