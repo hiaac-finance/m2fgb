@@ -15,9 +15,6 @@ model = M2FGBClassifier(
 model.fit(X_train, Y_train, A_train)
 ```
 
-## Reference
-
-For a detailed reference of the M²FGB framework, please refer to the [API documentation](reference.md).
 
 ## Citation
 

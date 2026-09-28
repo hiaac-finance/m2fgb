@@ -44,13 +44,9 @@ model.fit(X_train, Y_train, A_train)
 # A_train is the array of protected attributes
 ```
 
-## Usage
-
-wip
-
 ## Reference
 
-For a detailed reference of the M²FGB framework, please refer to the [API documentation](reference.md).
+For a detailed reference of the M²FGB framework, please refer to the [documentation](https://hiaac-finance.github.io/m2fgb/).
 
 ## Citation
 
