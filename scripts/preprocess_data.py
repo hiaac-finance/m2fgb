@@ -437,9 +437,17 @@ def preprocess_enem(
 
 def download_data():
     import gdown
+    import zipfile
 
-    url = "https://drive.google.com/drive/folders/12r-AU7HS9XBcfv__9aUYvwEZDsAbcOwK"
-    gdown.download_folder(url, quiet=True, use_cookies=False)
+    url = "https://drive.google.com/file/d/1Uee2Mvmm8cmY8iiOA4b4nxxDakeEm61-/view?usp=sharing"
+    output = "data.zip"
+    gdown.download(url, output, quiet=False, fuzzy=True)
+
+    with zipfile.ZipFile(output, 'r') as zip_ref:
+        zip_ref.extractall("../")
+
+    # remove the downloaded zip file
+    os.remove(output)
 
 
 if __name__ == "__main__":
